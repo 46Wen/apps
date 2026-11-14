@@ -1861,11 +1861,12 @@ class HudApp {
         this.nightOn = this._nightDim();
         if (this.nightOn) this.theme = dimTheme(this.theme, NIGHT_DIM);
         this.log.info('layout "' + layout.name + '", theme ' + this.theme.name + (this.layoutTheme ? '' : ' (' + this.setting('hudTheme') + ')'));
-        // full screen unless "Leave BMW's bottom strip clear" is on (Nov 14 2026): a backdrop with "fullH" grows to it, over
-        // BMW's strip, and the theme's own strip row (toggle "!stripClear") shows the clock, range and outside temperature
-        const full = this.setting('stripClear') !== true;
+        // full screen unless "Leave BMW's bottom strip clear" is on (Nov 14 2026): the layout's strip widgets (toggle
+        // "!stripClear", design/genlib.py full_screen) cover BMW's strip except a window over its drive mode and gear
+        // letter, and the theme's own strip row ("stripRow" l / r) shows the clock, range and outside temperature.
+        // Copies, since the strip row's connection is set below.
         const shown = layout.widgets.filter((w) => !(w.toggle && !this._toggleOn(w.toggle)) && !(w.themes && w.themes.indexOf(this.themeName) < 0))
-            .map((w) => (full && (isNum(w.fullH) || w.strip) ? Object.assign({}, w, isNum(w.fullH) ? { h: w.fullH } : {}) : w));
+            .map((w) => (w.stripRow ? Object.assign({}, w) : w));
         this.shown = shown;              // for a scale to find its rev bar (driver camera wings)
         this._setNeeds(shown);
         // plan the layers first (a sheet's size is only known once every member is placed), then make them
@@ -1878,7 +1879,7 @@ class HudApp {
         // memory); relaxed along with the size limit when the layer budget needs it. Without it: the size limit only.
         let waste = isNum(layout.packWaste) ? layout.packWaste : Infinity;
         // the strip row goes on the connection where it costs the fewest pixels without going over the layer budget
-        const row = shown.filter((w) => w.strip);
+        const row = shown.filter((w) => w.stripRow);
         if (row.length) {
             let best = null;
             for (let ci = 0; ci < MAX_CONN; ci++) {
@@ -1890,7 +1891,7 @@ class HudApp {
             }
             if (!best) {
                 // the layout alone is already over at the first size limit: the least used connection (a new one if one is left)
-                const base = this._connCounts(this._plan(shown.filter((w) => !w.strip), Math.floor(area / SHEET_AREA_FRAC), waste));
+                const base = this._connCounts(this._plan(shown.filter((w) => !w.stripRow), Math.floor(area / SHEET_AREA_FRAC), waste));
                 let ci = base.length < MAX_CONN ? base.length : 0;
                 base.forEach((k, i) => { if (k < (ci < base.length ? base[ci] : 0)) ci = i; });
                 best = { ci };
@@ -1975,7 +1976,10 @@ class HudApp {
                 if (s.kind !== 'sheet' || s.klass !== klass || s.z !== z || s.conn !== conn) continue;
                 const u = union(s, w);
                 const own = s.members.reduce((a, m) => a + m.w * m.h, 0) + w.w * w.h;
-                if (u.w * u.h <= maxPx && (u.w * u.h <= waste * own || (w.strip && s.members.every((m) => m.strip)))) { sheet = s; box = u; }   // the strip row: one sheet
+                // the strip row: one sheet a side of BMW's gear window, never shared with the rest (a sheet's box must not
+                // reach over the window: car test Nov 14 2026, BMW blacks out its gear slot while its strip is covered)
+                if (!s.members.every((m) => (m.stripRow || '') === (w.stripRow || ''))) continue;
+                if (u.w * u.h <= maxPx && (u.w * u.h <= waste * own || w.stripRow)) { sheet = s; box = u; }
             }
             if (!sheet) { sheet = { kind: 'sheet', klass, z, conn, x: w.x, y: w.y, w: w.w, h: w.h, members: [], ref: 0, c: null, ci: conn, buf: null }; plan.push(sheet); }
             else { sheet.x = box.x; sheet.y = box.y; sheet.w = box.w; sheet.h = box.h; }

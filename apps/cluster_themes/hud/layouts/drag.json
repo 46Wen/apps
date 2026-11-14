@@ -97,8 +97,7 @@
           "head": 36,
           "radius": 4
         }
-      ],
-      "fullH": 720
+      ]
     },
     {
       "id": "revs",
@@ -391,6 +390,32 @@
       ]
     },
     {
+      "id": "strip_cover_l",
+      "type": "fill",
+      "class": "content",
+      "z": 0,
+      "x": 0,
+      "y": 660,
+      "w": 1150,
+      "h": 60,
+      "color": "bg",
+      "toggle": "!stripClear",
+      "stripRow": "l"
+    },
+    {
+      "id": "strip_cover_r",
+      "type": "fill",
+      "class": "content",
+      "z": 0,
+      "x": 1470,
+      "y": 660,
+      "w": 450,
+      "h": 60,
+      "color": "bg",
+      "toggle": "!stripClear",
+      "stripRow": "r"
+    },
+    {
       "id": "strip_time",
       "type": "text",
       "z": 3,
@@ -403,7 +428,7 @@
       "color": "fg",
       "align": "right",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "l"
     },
     {
       "id": "strip_ampm",
@@ -418,7 +443,7 @@
       "color": "dim",
       "align": "left",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "l"
     },
     {
       "id": "strip_range",
@@ -433,7 +458,7 @@
       "color": "fg",
       "align": "right",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "l"
     },
     {
       "id": "strip_range_u",
@@ -448,7 +473,7 @@
       "color": "dim",
       "align": "left",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "l"
     },
     {
       "id": "strip_out",
@@ -463,7 +488,7 @@
       "color": "fg",
       "align": "right",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "r"
     },
     {
       "id": "strip_out_u",
@@ -478,7 +503,7 @@
       "color": "dim",
       "align": "left",
       "toggle": "!stripClear",
-      "strip": 1
+      "stripRow": "r"
     }
   ]
 }
