@@ -29,7 +29,7 @@ mgu.run({
             tabs: ['look', 'readouts', 'position', 'colours', 'alerts', 'gmeter', 'settings'],
             settings: ['units', 'clock', 'timeZone', 'tankLitres', 'redline', 'shiftBefore', 'coldGuard', 'showClock', 'showOil', 'showCoolant', 'showBoost', 'holiday', 'demo'],
             // the drive mode check's candidates this app's app.json listens to (issue #8; shared/hud.js modeDiagLines)
-            modeCheck: ['HMI', 'Sport2'],
+            modeCheck: ['HMI', 'MDrive', 'Sport2'],
         }).start();
         process.on('exit', () => { try { hud.stop(); } catch (e) { /* exiting anyway */ } });
     },

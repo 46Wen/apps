@@ -296,11 +296,9 @@ const TYRE_CORNERS = ['FL', 'FR', 'RL', 'RR'];
 // the Roadster's speed dial: 0..160 mph or 0..240 km/h in 8 steps (labels {{dial:speed:<i>}})
 const DIAL_SPEED = { us: { max: 160, ticks: 8 }, metric: { max: 240, ticks: 8 } };
 // the HUD's place (the page's Position tab): settings that move / scale the layers already there, no rebuild
-const PLACE_KEYS = ['hudX', 'hudY', 'hudScale', 'stripClear'];
-// "Leave BMW's bottom strip clear" (cluster, issues #5 / #1): BMW's own strip (range, clock, belt light, P) starts at
-// y 662. A theme drawn only above it is reported (#5, an M car) to stop BMW painting its black boxes over the theme.
-// cluster-render has no clip, so the switch squeezes every layer to 662 / 720 of its height about the panel's top.
-const STRIP_TOP = 662;
+const PLACE_KEYS = ['hudX', 'hudY', 'hudScale'];
+// (0.17.4: "Leave BMW's bottom strip clear" is gone. Since 0.17.0 every cluster theme ends above BMW's strip anyway;
+// its squeeze to 662 / 720 only lifted the theme off the bottoms of BMW's own gauges, car photo Nov 14 2026.)
 // settings that only change what a text shows (the next tick paints it), no rebuild
 const LIVE_KEYS = ['warnOil', 'warnCoolant', 'warnBoost', 'badge', 'badgeBMW', 'gFlipLat', 'gFlipLong', 'gRange', 'gTrail'];
 // g (after cauliflowermossgrape's G-Force, MIT, idea only): a sample over G_BAD is a bad reading, not a corner;
@@ -371,6 +369,18 @@ function scaleFrac(v, marks) {
  */
 /** The mode's variant: 'plus' (Sport+ / Comfort+ / Eco Pro+: wire 2, 5, 8, or PLUS / EXPERT in the name), 'individual'
  *  (wire 3, 6, 9, or INDIVID in the name), else null. */
+/**
+ * M cars (issue #8): MDrive.controlDisplayMSystems.controlDisplayEngineMode, the engine mode M Setup shows; FES's
+ * driving experience stays on Comfort on these cars. KOMFORT 1 is what M calls Efficient, SPORT 2, SPORT_PLUS 3;
+ * 0, 4 and 7 carry no mode. The enum comes as its name or its number. Signal and values: ALMSTRA/idv7lol (tested on
+ * an F98 X4 M Competition, Nov 14 2026; facts only, no code taken). Returns { mode, variant } or null.
+ */
+function mEngineModeOf(v) {
+    let n = v && typeof v === 'object' ? v.controlDisplayEngineMode : v;
+    if (typeof n === 'string') n = /^\d+$/.test(n.trim()) ? Number(n.trim()) : { KOMFORT: 1, SPORT: 2, SPORT_PLUS: 3 }[n.trim().toUpperCase()];
+    return n === 1 ? { mode: 'comfort', variant: null } : n === 2 ? { mode: 'sport', variant: null } : n === 3 ? { mode: 'sport', variant: 'plus' } : null;
+}
+
 function driveVariantOf(raw) {
     const v = typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : raw;
     if (typeof v === 'number') return v === 2 || v === 5 || v === 8 ? 'plus' : v === 3 || v === 6 || v === 9 ? 'individual' : null;
@@ -503,6 +513,8 @@ class HudApp {
         this.modeDiagLogged = {};        // how many distinct values of each went to the log (20 at most)
         this.lastDiag = '';
         this.diagTimer = null;
+        this.mDrive = false;             // issue #8: the drive mode comes from M Drive (an M car)
+        this.fesWorks = false;           // FES has shown a mode other than Comfort: its mode is right on this car
         this.diagAt = {};                // when each busy candidate (Engine, Sport2: boost rides on it) was last looked at
 
         this.slotsFile = path.join(ctx.dataDir || '.', 'slots.json');
@@ -597,13 +609,12 @@ class HudApp {
      * so the layout's box stays inside it. The scale is cluster-render's layer sx / sy about the layout's centre.
      */
     _place() {
-        const off = this._offset(), sc = this._scale(), st = this._stripSy();
+        const off = this._offset(), sc = this._scale();
         if (!this.placed.length) return;
         const b = this._placedBox(), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
         this.placed.forEach((l) => {
             const o = { x: l.x + off.x, y: l.y + off.y };
-            if (st !== 1) { o.sx = 1; o.sy = st; o.px = 0; o.py = -l.y; l.scaled = true; }      // about the panel's top, y 0
-            else if (sc !== 1 || l.scaled) { o.sx = sc; o.sy = sc; o.px = cx - l.x; o.py = cy - l.y; l.scaled = sc !== 1; }
+            if (sc !== 1 || l.scaled) { o.sx = sc; o.sy = sc; o.px = cx - l.x; o.py = cy - l.y; l.scaled = sc !== 1; }
             l.c.set(l.ref, o);
         });
     }
@@ -633,11 +644,6 @@ class HudApp {
     }
     _cameraOn() { return this.target === 'panel' && !!this.ctx.settings.item('cameraNotch') && this.setting('cameraNotch') === true; }
 
-    /** The cluster's squeeze for "Leave BMW's bottom strip clear": 662 / 720 while it's on, else 1. */
-    _stripSy() {
-        if (this.target !== 'panel' || !this.ctx.settings.item('stripClear')) return 1;
-        return this.setting('stripClear') === true ? STRIP_TOP / TARGET_SIZES.panel[1] : 1;
-    }
     _scale() {
         if (!this.ctx.settings.item('hudScale')) return 1;
         const v = this.setting('hudScale');
@@ -705,8 +711,16 @@ class HudApp {
             },
             // S / M next to the gear: the gearbox status carries no programme on some cars, the M drive display does
             'de.bmw.infotainment.misc.MDrive': {
-                // issue #8: what an M car keeps here (car_vitals reads xDrive from it), for the drive mode check
-                statusMSystem: (v) => this._diag('MSystem', v),
+                // issue #8: an M car's drive mode (M Setup's engine mode). Used unless FES has ever shown a mode other
+                // than Comfort (then this car's FES works and stays in charge)
+                controlDisplayMSystems: (v) => {
+                    this._diag('MDrive', v);
+                    const m = mEngineModeOf(v);
+                    if (!m || this.fesWorks) return;
+                    if (!this.mDrive) this.log.info('drive mode: from M Drive (M Setup\'s engine mode)');
+                    this.mDrive = true;
+                    this._driveMode(m.mode, m.variant, 'M Drive ' + JSON.stringify(v && typeof v === 'object' ? v.controlDisplayEngineMode : v));
+                },
                 dataDisplayGearbox: (v) => {
                     const raw = v && v.displayProgramGearbox;
                     this.program = PROGRAMS[raw] || null;
@@ -749,11 +763,9 @@ class HudApp {
                         return;
                     }
                     this.driveRaw = null;
-                    if (this.demoKeep) { this.demoKeep.mode = m; this.demoKeep.variant = variant; return; }   // the demo show has the mode; kept for after
-                    if (m === this.driveMode && variant === this.driveVariant) return;
-                    this.log.info('drive mode ' + MODE_NAME[m] + (variant ? ' ' + variant : '') + ' (' + raw + ')');
-                    this.driveMode = m; this.driveVariant = variant;
-                    if (this._layoutName() !== this.activeName) this._rebuild(); else this._status();
+                    if (m !== 'comfort') this.fesWorks = true;      // not an M car whose FES is stuck on Comfort
+                    if (this.mDrive && !this.fesWorks) return;     // an M car: M Drive has the mode
+                    this._driveMode(m, variant, raw);
                 },
             },
         };
@@ -1187,9 +1199,18 @@ class HudApp {
     /**
      * Issue #8: M cars keep FES's drive mode on Comfort whatever their M Setup says, so the real mode is somewhere
      * else. While "Change with the drive mode" is on, the Settings tab shows the raw contents of the candidates
-     * (FES HMI switch, FES engine display, FES sport display 2, MDrive M system) for a driver to photograph in each
+     * (FES HMI switch, MDrive's engine mode, FES engine display, FES sport display 2) for a driver to photograph in each
      * mode. Fields that change all the time while driving (boost, power, torque) are left out. Never throws.
      */
+    /** A drive mode from the car (FES, or M Drive on M cars): the layout for it, or the status line. */
+    _driveMode(m, variant, raw) {
+        if (this.demoKeep) { this.demoKeep.mode = m; this.demoKeep.variant = variant; return; }   // the demo show has the mode; kept for after
+        if (m === this.driveMode && variant === this.driveVariant) return;
+        this.log.info('drive mode ' + MODE_NAME[m] + (variant ? ' ' + variant : '') + ' (' + raw + ')');
+        this.driveMode = m; this.driveVariant = variant;
+        if (this._layoutName() !== this.activeName) this._rebuild(); else this._status();
+    }
+
     _diag(name, v, drop) {
         try {
             // nothing to show while byMode is off; the busy candidates (drop: they notify with every boost or power
@@ -1217,7 +1238,7 @@ class HudApp {
      */
     modeDiagLines(names) {
         if (this.setting('byMode') !== true) return [];
-        return (names || ['HMI', 'MSystem', 'Engine', 'Sport2']).map((n, i) => (i ? '' : 'Drive mode check: ') + n + '  ' + (this.modeDiag[n] || '--'));
+        return (names || ['HMI', 'MDrive', 'Engine', 'Sport2']).map((n, i) => (i ? '' : 'Drive mode check: ') + n + '  ' + (this.modeDiag[n] || '--'));
     }
 
 /* ---------------- theme, units, values ---------------- */
@@ -1861,7 +1882,7 @@ class HudApp {
                 this._guard('widget ' + e.w.id, () => this._create(e.w, null));
             }
         });
-        if (this._offset().x || this._offset().y || this._scale() !== 1 || this._stripSy() !== 1) this._place();
+        if (this._offset().x || this._offset().y || this._scale() !== 1) this._place();
         const atlasBytes = this._atlasBytes();
         px += atlasBytes;
         this.pixelBytes = px;
