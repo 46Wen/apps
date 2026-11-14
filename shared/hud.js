@@ -503,6 +503,7 @@ class HudApp {
         this.modeDiagLogged = {};        // how many distinct values of each went to the log (20 at most)
         this.lastDiag = '';
         this.diagTimer = null;
+        this.diagAt = {};                // when each busy candidate (Engine, Sport2: boost rides on it) was last looked at
 
         this.slotsFile = path.join(ctx.dataDir || '.', 'slots.json');
         this.slotPicks = {};             // { layout: { slot id: sensor id } }: the readout slots' picks (page.js Readouts)
@@ -934,6 +935,7 @@ class HudApp {
         clearInterval(this.dmeTimer);
         clearInterval(this.claimTimer);
         clearTimeout(this.statusAskT);
+        clearTimeout(this.diagTimer); this.diagTimer = null;
         this.vstate.stop();
         this.stallTimers.forEach((t) => clearTimeout(t)); this.stallTimers.clear();
         if (this.waze) this._guard('waze stop', () => this.waze.stop());
@@ -1190,6 +1192,14 @@ class HudApp {
      */
     _diag(name, v, drop) {
         try {
+            // nothing to show while byMode is off; the busy candidates (drop: they notify with every boost or power
+            // change) are looked at once a second at most, never on every notification
+            if (this.setting('byMode') !== true) return;
+            if (drop) {
+                const now = Date.now();
+                if (now - (this.diagAt[name] || 0) < 1000) return;
+                this.diagAt[name] = now;
+            }
             let o = v;
             if (v && typeof v === 'object' && drop) { o = {}; Object.keys(v).forEach((k) => { if (drop.indexOf(k) < 0) o[k] = v[k]; }); }
             const t = String(JSON.stringify(o)).replace(/"/g, '').slice(0, 84);
@@ -1201,10 +1211,13 @@ class HudApp {
             if (!this.diagTimer) this.diagTimer = setTimeout(() => { this.diagTimer = null; try { this._status(); } catch (e) { /* next status */ } }, 500);
         } catch (e) { /* a diagnostic never stops the app */ }
     }
-    /** The drive mode check's lines for the Settings tab (one per signal), [] while byMode is off. */
-    modeDiagLines() {
+    /**
+     * The drive mode check's lines for the Settings tab (one per signal), [] while byMode is off. names: the
+     * candidates the app listens to (its app.json; main.js gives them to the page), so none shows "--" for ever.
+     */
+    modeDiagLines(names) {
         if (this.setting('byMode') !== true) return [];
-        return ['HMI', 'MSystem', 'Engine', 'Sport2'].map((n, i) => (i ? '' : 'Drive mode check: ') + n + '  ' + (this.modeDiag[n] || '--'));
+        return (names || ['HMI', 'MSystem', 'Engine', 'Sport2']).map((n, i) => (i ? '' : 'Drive mode check: ') + n + '  ' + (this.modeDiag[n] || '--'));
     }
 
 /* ---------------- theme, units, values ---------------- */
@@ -1319,7 +1332,8 @@ class HudApp {
                 if (m && !this.demoKeep) this.demoKeep = { mode: this.driveMode, variant: this.driveVariant };
                 if (m) { this.driveMode = m; this.driveVariant = null; }
                 else if (this.demoKeep) { this.driveMode = this.demoKeep.mode; this.driveVariant = this.demoKeep.variant; this.demoKeep = null; }
-                if (force || this._layoutName() !== this.activeName) this._rebuild(); else this._status();
+                // a calibration layout carries the DEMO tag only while the show plays (CAL_LAYOUTS): Play and Stop rebuild it
+                if (force || this._layoutName() !== this.activeName || CAL_LAYOUTS[this.activeName]) this._rebuild(); else this._status();
             },
         };
     }
@@ -1586,6 +1600,7 @@ class HudApp {
             const kind = tok.slice(0, tok.indexOf(':')), sn = this.slotSensor(this.activeName, tok.slice(kind.length + 1), this.layoutSlots);
             if (kind === 'slot') return this.sensorValue(sn);
             if (kind === 'slotHead') return sn ? sn.head : '';
+            if (kind === 'slotHeadS') return sn ? sn.short || sn.head : '';     // M's slot rows: LAST SHIFT -> SHIFTED
             // the heading with the unit, for a slot with no unit of its own: "FUEL %" (a temperature's ° is on its value)
             if (kind === 'slotHeadU') { const u = sn && !sn.suffix ? this.sensorUnit(sn) : ''; return sn ? sn.head + (u ? ' ' + u : '') : ''; }
             if (kind === 'slotUnit') return this.sensorUnit(sn);

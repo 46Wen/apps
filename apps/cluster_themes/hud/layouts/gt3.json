@@ -265,7 +265,10 @@
       "h": 37,
       "text": "{{slotUnit:1}}",
       "font": "unit",
-      "color": "dim"
+      "color": "dim",
+      "fit": [
+        "head"
+      ]
     },
     {
       "id": "rpm_head",
@@ -418,7 +421,10 @@
       "text": "{{slotUnit:3}}",
       "font": "unit",
       "color": "dim",
-      "toggle": "showBoost"
+      "toggle": "showBoost",
+      "fit": [
+        "head"
+      ]
     },
     {
       "id": "shift_head",
@@ -490,7 +496,10 @@
       "text": "{{slotUnit:5}}",
       "font": "unit",
       "color": "dim",
-      "toggle": "!mapUp"
+      "toggle": "!mapUp",
+      "fit": [
+        "head"
+      ]
     },
     {
       "id": "temps_head",
@@ -575,9 +584,9 @@
       "id": "water_label",
       "type": "text",
       "z": 5,
-      "x": 632,
+      "x": 592,
       "y": 594,
-      "w": 100,
+      "w": 140,
       "h": 27,
       "text": "{{slotHeadU:6}}",
       "font": "head",

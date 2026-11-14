@@ -804,11 +804,11 @@
       "id": "s1_head",
       "type": "text",
       "z": 5,
-      "x": 226,
+      "x": 202,
       "y": 238,
       "w": 130,
       "h": 25,
-      "text": "{{slotHead:1}}",
+      "text": "{{slotHeadS:1}}",
       "font": "m_label",
       "color": "dim",
       "toggle": "!mapUp"
@@ -817,9 +817,9 @@
       "id": "s1",
       "type": "text",
       "z": 5,
-      "x": 340,
+      "x": 304,
       "y": 233,
-      "w": 104,
+      "w": 128,
       "h": 34,
       "text": "{{slot:1}}",
       "font": "m_mid",
@@ -832,7 +832,7 @@
       "id": "s1_unit",
       "type": "text",
       "z": 5,
-      "x": 452,
+      "x": 440,
       "y": 238,
       "w": 80,
       "h": 25,
@@ -867,7 +867,10 @@
       "color": "fg",
       "align": "right",
       "slot": "1",
-      "toggle": "mapUp"
+      "toggle": "mapUp",
+      "fit": [
+        "m_tyre"
+      ]
     },
     {
       "id": "ms1_unit",
@@ -886,11 +889,11 @@
       "id": "s2_head",
       "type": "text",
       "z": 5,
-      "x": 226,
+      "x": 202,
       "y": 290,
       "w": 130,
       "h": 25,
-      "text": "{{slotHead:2}}",
+      "text": "{{slotHeadS:2}}",
       "font": "m_label",
       "color": "dim",
       "toggle": "!mapUp"
@@ -899,9 +902,9 @@
       "id": "s2",
       "type": "text",
       "z": 5,
-      "x": 340,
+      "x": 304,
       "y": 285,
-      "w": 104,
+      "w": 128,
       "h": 34,
       "text": "{{slot:2}}",
       "font": "m_mid",
@@ -914,7 +917,7 @@
       "id": "s2_unit",
       "type": "text",
       "z": 5,
-      "x": 452,
+      "x": 440,
       "y": 290,
       "w": 80,
       "h": 25,
@@ -949,7 +952,10 @@
       "color": "fg",
       "align": "right",
       "slot": "2",
-      "toggle": "mapUp"
+      "toggle": "mapUp",
+      "fit": [
+        "m_tyre"
+      ]
     },
     {
       "id": "ms2_unit",
@@ -968,11 +974,11 @@
       "id": "s3_head",
       "type": "text",
       "z": 5,
-      "x": 226,
+      "x": 202,
       "y": 342,
       "w": 130,
       "h": 25,
-      "text": "{{slotHead:3}}",
+      "text": "{{slotHeadS:3}}",
       "font": "m_label",
       "color": "dim",
       "toggle": "!mapUp"
@@ -981,9 +987,9 @@
       "id": "s3",
       "type": "text",
       "z": 5,
-      "x": 340,
+      "x": 304,
       "y": 337,
-      "w": 104,
+      "w": 128,
       "h": 34,
       "text": "{{slot:3}}",
       "font": "m_mid",
@@ -996,7 +1002,7 @@
       "id": "s3_unit",
       "type": "text",
       "z": 5,
-      "x": 452,
+      "x": 440,
       "y": 342,
       "w": 80,
       "h": 25,
@@ -1031,7 +1037,10 @@
       "color": "fg",
       "align": "right",
       "slot": "3",
-      "toggle": "mapUp"
+      "toggle": "mapUp",
+      "fit": [
+        "m_tyre"
+      ]
     },
     {
       "id": "ms3_unit",
@@ -1050,11 +1059,11 @@
       "id": "s4_head",
       "type": "text",
       "z": 5,
-      "x": 226,
+      "x": 202,
       "y": 394,
       "w": 130,
       "h": 25,
-      "text": "{{slotHead:4}}",
+      "text": "{{slotHeadS:4}}",
       "font": "m_label",
       "color": "dim",
       "toggle": "!mapUp"
@@ -1063,9 +1072,9 @@
       "id": "s4",
       "type": "text",
       "z": 5,
-      "x": 340,
+      "x": 304,
       "y": 389,
-      "w": 104,
+      "w": 128,
       "h": 34,
       "text": "{{slot:4}}",
       "font": "m_mid",
@@ -1078,7 +1087,7 @@
       "id": "s4_unit",
       "type": "text",
       "z": 5,
-      "x": 452,
+      "x": 440,
       "y": 394,
       "w": 80,
       "h": 25,
@@ -1113,7 +1122,10 @@
       "color": "fg",
       "align": "right",
       "slot": "4",
-      "toggle": "mapUp"
+      "toggle": "mapUp",
+      "fit": [
+        "m_tyre"
+      ]
     },
     {
       "id": "ms4_unit",

@@ -2,6 +2,14 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 14 2026
+
+- **Cluster Themes 0.17.3, HUD Widgets 0.14.1:** fixes from a code review.
+  - **Readout names and values no longer get cut off.** Some picks on the Readouts tab could lose letters or digits: a clock or 4-digit value in M's readouts, LAST SHIFT in M, TORQUE LB-FT in GT3, Rally and the HUD's Sport and Redline, LB-FT next to a value in GT3 and the HUD's Daily. Every box now fits every readout. On M, Last shift is called SHIFTED, the readouts sit a little further left so LB-FT clears the rev blade, and with the Waze map on a clock or 4-digit value uses smaller digits. On the HUD's Sport layout the values sit a little further right.
+  - **Drive mode check (issue #8):** all four lines now fit on every screen; before, only the first one showed on some screens. The Settings rows get slightly shorter to make room when needed. HUD Widgets lists only the two signals it reads, and the check does no work while Change with the drive mode is off.
+  - **Play demo on the calibration screens** (Calibration grid and Map calibration, the HUD's grid and Window calibration) shows the DEMO tag again.
+  - Not yet tested on a car.
+
 ## Nov 13 2026
 
 - **Cluster Themes 0.17.2:** a drive mode check for M cars (issue #8). With Change with the drive mode on, the Settings tab lists what the car sends on four signals, so an M owner can photograph it in Efficient, Sport and Sport+ and the M modes can be added. Nothing else changes.
