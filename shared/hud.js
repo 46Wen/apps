@@ -843,6 +843,7 @@ class HudApp {
         c.on('budget', (capKb, maxKb, reason) => this.log.info('budget' + tag + ' ' + capKb + '/' + maxKb + ' kb/s (' + reason + ')'));
         c.on('status', (text) => {
             this.log.info('cluster-render status: ' + text);
+            this._stallsFromStatus(text);
             const ids = sceneIdsOf(text);
             if (!ids) return;
             const apart = ids.panel !== ids.hud;
@@ -851,6 +852,27 @@ class HudApp {
             this.log.info(apart ? 'cluster and HUD on their own scenes (panel ' + ids.panel + ', hud ' + ids.hud + '): both apps can show at once'
                 : 'cluster and HUD share scene ' + ids.panel + ': one app at a time');
             this.screen.beat();
+        });
+    }
+
+    /**
+     * cluster-render's status lists every layer of every client with its state. After a reconnect it may show our layers
+     * without a per-layer event for each (car log Nov 14 2026: "still stalled after 5 s" 3 s after the status had them all
+     * shown): when the status shows as many of a connection's layers as we made, none of them is stalled any more.
+     */
+    _stallsFromStatus(text) {
+        const lines = String(text).split('\n');
+        this.clients.forEach((c, ci) => {
+            const re = new RegExp('^layer \\d+ \\w+ of ' + c.app.replace(/[^\w-]/g, '') + ' on ' + this.target + ',.*: shown$');
+            const shown = lines.filter((l) => re.test(l.trim())).length;
+            const mine = this._layerRefs().filter((r) => r.ci === ci).length;
+            if (!mine || shown < mine) return;
+            this.layerStates.forEach((st, key) => {
+                if (key.indexOf(ci + ':') !== 0 || st.state !== 'stalled') return;
+                clearTimeout(this.stallTimers.get(key)); this.stallTimers.delete(key);
+                if (st.long) this.log.info('layer ' + key.slice(key.indexOf(':') + 1) + (ci ? ' [connection ' + (ci + 1) + ']' : '') + ' shown (cluster-render status)');
+                this.layerStates.set(key, { state: 'shown', reason: null, since: Date.now(), long: false });
+            });
         });
     }
 
@@ -1839,7 +1861,11 @@ class HudApp {
         this.nightOn = this._nightDim();
         if (this.nightOn) this.theme = dimTheme(this.theme, NIGHT_DIM);
         this.log.info('layout "' + layout.name + '", theme ' + this.theme.name + (this.layoutTheme ? '' : ' (' + this.setting('hudTheme') + ')'));
-        const shown = layout.widgets.filter((w) => !(w.toggle && !this._toggleOn(w.toggle)) && !(w.themes && w.themes.indexOf(this.themeName) < 0));
+        // full screen unless "Leave BMW's bottom strip clear" is on (Nov 14 2026): a backdrop with "fullH" grows to it, over
+        // BMW's strip, and the theme's own strip row (toggle "!stripClear") shows the clock, range and outside temperature
+        const full = this.setting('stripClear') !== true;
+        const shown = layout.widgets.filter((w) => !(w.toggle && !this._toggleOn(w.toggle)) && !(w.themes && w.themes.indexOf(this.themeName) < 0))
+            .map((w) => (full && (isNum(w.fullH) || w.strip) ? Object.assign({}, w, isNum(w.fullH) ? { h: w.fullH } : {}) : w));
         this.shown = shown;              // for a scale to find its rev bar (driver camera wings)
         this._setNeeds(shown);
         // plan the layers first (a sheet's size is only known once every member is placed), then make them
@@ -1851,6 +1877,26 @@ class HudApp {
         // that many times its members' own area, so far-apart readouts don't share one mostly empty sheet (pixel
         // memory); relaxed along with the size limit when the layer budget needs it. Without it: the size limit only.
         let waste = isNum(layout.packWaste) ? layout.packWaste : Infinity;
+        // the strip row goes on the connection where it costs the fewest pixels without going over the layer budget
+        const row = shown.filter((w) => w.strip);
+        if (row.length) {
+            let best = null;
+            for (let ci = 0; ci < MAX_CONN; ci++) {
+                row.forEach((w) => { w.conn = ci; });
+                const p = this._plan(shown, Math.floor(area / SHEET_AREA_FRAC), waste);
+                if (over(p)) continue;
+                const px = p.reduce((a, e) => a + (e.kind === 'sheet' ? e.w * e.h : 0), 0), conns = this._connCounts(p).length;
+                if (!best || px < best.px || (px === best.px && conns < best.conns)) best = { ci, px, conns };
+            }
+            if (!best) {
+                // the layout alone is already over at the first size limit: the least used connection (a new one if one is left)
+                const base = this._connCounts(this._plan(shown.filter((w) => !w.strip), Math.floor(area / SHEET_AREA_FRAC), waste));
+                let ci = base.length < MAX_CONN ? base.length : 0;
+                base.forEach((k, i) => { if (k < (ci < base.length ? base[ci] : 0)) ci = i; });
+                best = { ci };
+            }
+            row.forEach((w) => { w.conn = best.ci; });
+        }
         // the demo show's DEMO tag (demo_script.js), at a free spot that costs the fewest layers and pixels. It is in every
         // layout (drawn empty until the show plays), so pressing Play changes one small image and rebuilds nothing;
         // the calibration layouts only get it while the show plays (there it would cost a layer)
@@ -1929,7 +1975,7 @@ class HudApp {
                 if (s.kind !== 'sheet' || s.klass !== klass || s.z !== z || s.conn !== conn) continue;
                 const u = union(s, w);
                 const own = s.members.reduce((a, m) => a + m.w * m.h, 0) + w.w * w.h;
-                if (u.w * u.h <= maxPx && u.w * u.h <= waste * own) { sheet = s; box = u; }
+                if (u.w * u.h <= maxPx && (u.w * u.h <= waste * own || (w.strip && s.members.every((m) => m.strip)))) { sheet = s; box = u; }   // the strip row: one sheet
             }
             if (!sheet) { sheet = { kind: 'sheet', klass, z, conn, x: w.x, y: w.y, w: w.w, h: w.h, members: [], ref: 0, c: null, ci: conn, buf: null }; plan.push(sheet); }
             else { sheet.x = box.x; sheet.y = box.y; sheet.w = box.w; sheet.h = box.h; }

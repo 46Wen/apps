@@ -14,7 +14,8 @@
       "y": 0,
       "w": 1920,
       "h": 660,
-      "color": "bg"
+      "color": "bg",
+      "fullH": 720
     },
     {
       "id": "revs",
@@ -167,6 +168,96 @@
       "font": "badge",
       "color": "dim",
       "align": "center"
+    },
+    {
+      "id": "strip_time",
+      "type": "text",
+      "z": 3,
+      "x": 205,
+      "y": 676,
+      "w": 63,
+      "h": 30,
+      "text": "{{time}}",
+      "font": "r_label",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_ampm",
+      "type": "text",
+      "z": 3,
+      "x": 274,
+      "y": 676,
+      "w": 32,
+      "h": 30,
+      "text": "{{ampm}}",
+      "font": "r_label",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range",
+      "type": "text",
+      "z": 3,
+      "x": 750,
+      "y": 676,
+      "w": 56,
+      "h": 30,
+      "text": "{{range}}",
+      "font": "r_label",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range_u",
+      "type": "text",
+      "z": 3,
+      "x": 812,
+      "y": 676,
+      "w": 32,
+      "h": 30,
+      "text": "{{u:dist}}",
+      "font": "r_label",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out",
+      "type": "text",
+      "z": 3,
+      "x": 1717,
+      "y": 676,
+      "w": 39,
+      "h": 30,
+      "text": "{{ambientN}}",
+      "font": "r_label",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out_u",
+      "type": "text",
+      "z": 3,
+      "x": 1762,
+      "y": 676,
+      "w": 25,
+      "h": 30,
+      "text": "{{u:temp}}",
+      "font": "r_label",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
     }
   ]
 }

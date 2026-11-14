@@ -45,7 +45,8 @@
           1610,
           430
         ]
-      ]
+      ],
+      "fullH": 720
     },
     {
       "id": "ribbon",
@@ -1021,6 +1022,96 @@
       "color": "fg",
       "align": "right",
       "conn": 2
+    },
+    {
+      "id": "strip_time",
+      "type": "text",
+      "z": 3,
+      "x": 137,
+      "y": 668,
+      "w": 131,
+      "h": 45,
+      "text": "{{time}}",
+      "font": "b_val",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_ampm",
+      "type": "text",
+      "z": 3,
+      "x": 274,
+      "y": 668,
+      "w": 68,
+      "h": 45,
+      "text": "{{ampm}}",
+      "font": "b_val",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range",
+      "type": "text",
+      "z": 3,
+      "x": 686,
+      "y": 668,
+      "w": 120,
+      "h": 45,
+      "text": "{{range}}",
+      "font": "b_val",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range_u",
+      "type": "text",
+      "z": 3,
+      "x": 812,
+      "y": 668,
+      "w": 70,
+      "h": 45,
+      "text": "{{u:dist}}",
+      "font": "b_val",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out",
+      "type": "text",
+      "z": 3,
+      "x": 1671,
+      "y": 668,
+      "w": 85,
+      "h": 45,
+      "text": "{{ambient}}",
+      "font": "b_val",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out_u",
+      "type": "text",
+      "z": 3,
+      "x": 1762,
+      "y": 668,
+      "w": 47,
+      "h": 45,
+      "text": "{{u:temp}}",
+      "font": "b_val",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
     }
   ]
 }

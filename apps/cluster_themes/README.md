@@ -10,7 +10,7 @@ Redraws the whole instrument cluster in a theme of your choice. Open **Cluster T
 
 ## Themes
 
-Every theme ends just above BMW's own bottom strip, so the car's range, clock, street, drive mode and outside temperature always show under it and the theme doesn't repeat them. Every theme shows the drive mode (Comfort, Sport and so on) next to the gear.
+Every theme fills the whole cluster and shows its own clock, range and outside temperature along the bottom, in the theme's style. To see BMW's own bottom strip instead (range, clock, street, drive mode, outside temperature), turn on Leave BMW's bottom strip clear on the Settings tab: the theme then ends just above it. Every theme shows the drive mode (Comfort, Sport and so on) next to the gear.
 
 ### GT3
 
@@ -32,7 +32,7 @@ A current M8's cluster, traced off a photo of it and drawn on black.
 - **Middle:** two bowed glass rev blades either side of the gear and speed, reading 0 to 7000 rpm like the M40i's own cluster. A red marker rides each blade at the rpm, the blade glows below it, and orange and red marks sit before and past your redline. The gear shows with its shifter programme: P, D3, S3 or M3, and the drive mode sits under the speed.
 - **Left:** a black card with a grey rim and four readouts where the M8 has its tyre block: boost, coolant, oil and intake air out of the box, each one changeable on the Readouts tab. The fuel dial sits over the card's lower corner, drawn like the M8's: a thin glass bracket inside a hatched chrome bezel, lit from the bottom up to the level, with a red streak at the level and another at the reserve.
 - **Right:** what the engine, chassis, steering and gearbox are set to, as four rows with a step bar, and the oil temperature dial, the same glass bracket (blue streak at the cold end, red at the hot end). The rows follow the drive mode buttons: Eco Pro, Comfort, Sport, Sport Plus and Sport Individual. The car only reports that an Individual setup is on, not what each part is set to, so those rows read INDIVIDUAL.
-- **Bottom:** left clear, so BMW's own strip (range, clock, street, drive mode, outside temperature) shows under the theme.
+- **Bottom:** the clock, range and outside temperature, or BMW's own strip with Leave BMW's bottom strip clear on.
 - **With the Waze map:** the blades keep their shape and numbers and move out to the sides, the map fills the middle between them, and the gear, speed and drive mode sit in a row under it.
 
 <p align="center"><img src="../../docs/images/cluster-m.png" width="900" alt="M theme"></p>
@@ -44,7 +44,7 @@ The look of BMW's newer Live Cockpit Sport view.
 - **Left:** speed as a blue bracket on BMW's 0 to 200 mph scale (0 to 320 km/h), with a fuel bar up its lower leg.
 - **Right:** revs as a red bracket on the M40i's 0 to 7000 rpm scale, with yellow and red marks around your redline, with an oil temperature bar up its lower leg.
 - **Middle:** the speed in big figures with the gear and drive mode under it, over a road like BMW's own Sport view whose lane dashes run towards you as you drive. With "Show Waze map inside the theme" on, the map takes the middle and the speed and gear move into the brackets.
-- **Bottom:** boost and coolant in the blue and red bar. BMW's own strip under it shows the clock, range and outside temperature, so the theme doesn't repeat them.
+- **Bottom:** boost and coolant in the blue and red bar. Under it, the clock, range and outside temperature, or BMW's own strip with Leave BMW's bottom strip clear on.
 
 <p align="center"><img src="../../docs/images/cluster-sport.png" width="900" alt="Sport theme"></p>
 
@@ -136,6 +136,7 @@ More themes are on the way.
 - **Shift point before redline:** how far below the redline the shift lights peak (300 rpm by default).
 - **Cold-engine rev guard:** until the oil reaches 80°C, the shift point starts at 4500 rpm and climbs as the oil warms up.
 - **Show boost.**
+- **Leave BMW's bottom strip clear** (off by default): the theme ends just above BMW's own bottom strip, so the car's range, clock, street, drive mode, gear letter and outside temperature show under it, and the theme's own clock, range and outside temperature go away. Try it if BMW draws a black box over the theme: owners found that leaving the strip clear stops it (issue #5).
 - **Leave room for the driver camera** (off by default): for newer cars with a driver attention camera in the top middle of the cluster, where other cars show the model badge. The shift lights and rev bars (GT3, Track, Dyno, Rally) become two mirrored wings either side of the camera that fill from the outer ends in towards it and meet at the shift point, Track's rpm numbers are left out, M's logo is hidden, and Ribbon's ribbon dips under the camera instead. The camera's spot is taken from where the badge sits on a car without one. Not yet tested on a car with a camera; please report how it lines up on yours.
 - **Holiday editions:** a string of glowing holiday lights along the top of every theme, and Ribbon's own holiday edition. Auto (the default) puts them on by the date: Thanksgiving in its week (Monday to Sunday), Christmas from December 1 to 26, New Year from December 27 to January 2, and the Fourth of July from July 1 to 5, then takes them off again. Or pick one holiday to keep it on, or Off. The date follows the Time zone (clock) setting.
 - **G-meter** (its own tab): the range (0.8, 1.0, 1.2, 1.5 or 2.0 g at the edge; 1.2 by default), the trail (off, 1, 2 or 4 seconds), **Swap left / right** (if the dot goes the wrong way in a turn) and **Brake on top**, the best left, right, accelerating, braking and overall g of the drive with a Reset button, and a live copy of the meter. The g comes from the car's own acceleration sensor: parked on level ground it reads 0.00, and a hill adds a little.

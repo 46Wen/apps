@@ -124,7 +124,8 @@
         376,
         1181,
         55
-      ]
+      ],
+      "fullH": 720
     },
     {
       "type": "mdash",
@@ -227,7 +228,8 @@
       ],
       "holeWhen": "mapUp",
       "holeInset": 8,
-      "holeRadius": 24
+      "holeRadius": 24,
+      "fullH": 720
     },
     {
       "id": "tach_left",
@@ -1435,6 +1437,96 @@
       "font": "m_badge",
       "color": "dim",
       "align": "center"
+    },
+    {
+      "id": "strip_time",
+      "type": "text",
+      "z": 3,
+      "x": 140,
+      "y": 676,
+      "w": 128,
+      "h": 29,
+      "text": "{{time}}",
+      "font": "m_mid",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_ampm",
+      "type": "text",
+      "z": 3,
+      "x": 274,
+      "y": 675,
+      "w": 36,
+      "h": 32,
+      "text": "{{ampmLc}}",
+      "font": "m_tiny",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range",
+      "type": "text",
+      "z": 3,
+      "x": 686,
+      "y": 676,
+      "w": 120,
+      "h": 29,
+      "text": "{{range}}",
+      "font": "m_mid",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_range_u",
+      "type": "text",
+      "z": 3,
+      "x": 812,
+      "y": 675,
+      "w": 36,
+      "h": 32,
+      "text": "{{u:distLc}}",
+      "font": "m_tiny",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out",
+      "type": "text",
+      "z": 3,
+      "x": 1678,
+      "y": 676,
+      "w": 78,
+      "h": 29,
+      "text": "{{ambient}}",
+      "font": "m_mid",
+      "color": "fg",
+      "align": "right",
+      "toggle": "!stripClear",
+      "strip": 1
+    },
+    {
+      "id": "strip_out_u",
+      "type": "text",
+      "z": 3,
+      "x": 1762,
+      "y": 675,
+      "w": 29,
+      "h": 32,
+      "text": "{{u:temp}}",
+      "font": "m_tiny",
+      "color": "dim",
+      "align": "left",
+      "toggle": "!stripClear",
+      "strip": 1
     }
   ]
 }
