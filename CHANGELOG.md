@@ -4,6 +4,11 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 14 2026
 
+- **Cluster Themes 0.17.7, HUD Widgets 0.14.5:**
+  - **Full screen leaves only BMW's gear letter uncovered.** On a test car, 0.17.6 kept BMW's black box away by leaving the drive mode and gear letter open; now the theme also covers the drive mode and leaves just the gear letter. The theme's own drive mode still shows next to its gear.
+  - **Leave BMW's bottom strip clear is gone.** With BMW's gear letter uncovered, BMW no longer draws its black box (issue #5), so the switch has nothing left to fix. If you had it on, your theme goes full screen.
+  - HUD Widgets: no change you will see.
+  - Not yet tested on a car.
 - **Cluster Themes 0.17.6, HUD Widgets 0.14.4:**
   - **Full screen leaves BMW's drive mode and gear letter uncovered.** On a test car, BMW drew its black box whenever a theme covered the gear letter in its bottom strip, and it went away once the strip was clear. Full screen now covers the strip on both sides of the drive mode and gear letter but leaves that spot open, to see if full screen can work without the box. If the box still shows on your car, turn on Leave BMW's bottom strip clear (issue #5); it goes away at the next gear change.
   - **M:** the fuel and oil dials are cleaner. A sharp red line marks the level inside the glass, the unlit glass shows faintly above it, the glass and the bezel end on the same line, and the °F and oil can sit clear of the bezel.
