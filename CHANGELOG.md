@@ -4,6 +4,12 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 14 2026
 
+- **Cluster Themes 0.17.8, HUD Widgets 0.14.6:**
+  - **Roadster is gone.** If it was your theme, the cluster switches to GT3; pick another on the Themes tab.
+  - **M:** SPORT PLUS in the setup rows no longer gets cut off (it read SPORT PLL).
+  - **Full screen** covers a little more of BMW's drive mode, so no letter of it shows next to the gear letter.
+  - HUD Widgets: no change you will see.
+  - Not yet tested on a car.
 - **Cluster Themes 0.17.7, HUD Widgets 0.14.5:**
   - **Full screen leaves only BMW's gear letter uncovered.** On a test car, 0.17.6 kept BMW's black box away by leaving the drive mode and gear letter open; now the theme also covers the drive mode and leaves just the gear letter. The theme's own drive mode still shows next to its gear.
   - **Leave BMW's bottom strip clear is gone.** With BMW's gear letter uncovered, BMW no longer draws its black box (issue #5), so the switch has nothing left to fix. If you had it on, your theme goes full screen.

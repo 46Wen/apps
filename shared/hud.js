@@ -99,11 +99,6 @@
  *             widest advance and h = its cell height, logged at creation), and a new value is one uniform
  *             message of glyph codes. "text" tokens as text, "font", "color" role, "align" left | right | center.
  *             Up to 32 cells; only the characters the font has.
- *   dial      effect layer (shaders.js dial): a classic round gauge, the Roadster's: "measure" speed | rpm | signal ("signal",
- *             "max", "ticks"); speed reads 0..160 mph / 0..240 km/h (DIAL_SPEED, labels {{dial:speed:<i>}}), rpm 0.."max"
- *             (8000) with the red band from the redline (_redMarks) and the ring in the shift red at the shift point;
- *             "start" / "sweep" degrees (225 / 270), "minor" ticks per step (4), "ringW" px (14), roles "ring" (line)
- *             fading to "ring2" (dim), "tick" (fg), "needle" (hot), "face" (bg). The numbers are text widgets.
  *   meter     effect layer (shaders.js meter): a segmented bar, "signal" between "min" and "max" (raw units: km/h, C,
  *             bar, rpm), "segments" (20), "gap" px (4), "vertical": true fills upward; "colors" [3 roles] lit below
  *             "at"[0] / up to "at"[1] / past it (fractions of the bar), "trackColor" (track); "peak": ms (true = 3 s)
@@ -293,8 +288,6 @@ const TEXT_MS = 200;             // text re-draws at most 5 times a second (what
 const TARGET_SIZES = { hud: [800, 480], panel: [1920, 720] };
 const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
 const TYRE_CORNERS = ['FL', 'FR', 'RL', 'RR'];
-// the Roadster's speed dial: 0..160 mph or 0..240 km/h in 8 steps (labels {{dial:speed:<i>}})
-const DIAL_SPEED = { us: { max: 160, ticks: 8 }, metric: { max: 240, ticks: 8 } };
 // the HUD's place (the page's Position tab): settings that move / scale the layers already there, no rebuild
 const PLACE_KEYS = ['hudX', 'hudY', 'hudScale'];
 // (0.17.4: "Leave BMW's bottom strip clear" is gone. Since 0.17.0 every cluster theme ends above BMW's strip anyway;
@@ -327,7 +320,7 @@ const TILE_BAR = {
 const TILE_MAX = 14;       // half a flash: red, then the normal colour
 // widgets that show the shift cue (the reaction time is learned only while one of them is drawn)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
-const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true, dial: true };
+const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
 const TEST_FROM = 1500, TEST_CLIMB_MS = 2500, TEST_HOLD_MS = 1200;
 // night colours (Cluster Themes "nightDim"): after sunset the theme's whites and greys go to this brightness
@@ -1479,13 +1472,6 @@ class HudApp {
         return kind === 'p' ? (rear ? 2.5 : 2.3) : (rear ? 27 : 24);
     }
 
-    /** A dial's scale: { max, ticks } in display units (speed: DIAL_SPEED by the units setting; rpm: "max", 8000). */
-    _dialScale(w) {
-        if (w.measure === 'speed') return DIAL_SPEED[this.setting('units') === 'us' ? 'us' : 'metric'];
-        if (w.measure === 'rpm') { const max = w.max || 8000; return { max, ticks: max / 1000 }; }
-        return { max: w.max || 1, ticks: w.ticks || 8 };
-    }
-
     /** Peak hold for a gauge: the highest value of the last `hold` ms (true: 3 s), as 0..1. */
     _peakHold(x, v, now, hold) {
         const ms = hold === true ? 3000 : hold;
@@ -1651,10 +1637,6 @@ class HudApp {
         }
         if (tok.indexOf('tyreP:') === 0) { const v = this._tyre('p', tok.slice(6)); return isNum(v) ? (us ? fix(v * 14.5038, 0) : fix(v, 1)) : '--'; }
         if (tok.indexOf('tyreT:') === 0) { const v = this._tyre('t', tok.slice(6)); return isNum(v) ? String(Math.round(us ? v * 9 / 5 + 32 : v)) : '--'; }
-        if (tok.indexOf('dial:speed:') === 0) {     // a speed dial's label i ({{dial:speed:<i>}}): DIAL_SPEED's steps
-            const D = DIAL_SPEED[us ? 'us' : 'metric'];
-            return String(Math.round(D.max / D.ticks * Number(tok.slice(11))));
-        }
         switch (tok) {
             case 'u:pressure': return us ? 'psi' : 'bar';
             case 'intake': { const v = this._raw('intake'); return fix(isNum(v) ? (us ? v * 9 / 5 + 32 : v) : v, 0); }
@@ -2154,22 +2136,6 @@ class HudApp {
             c.uniform(ref, 'u_highAt', [(red - 500) / max]);
             c.uniform(ref, 'u_track', rgba(t.track));
             c.uniform(ref, 'u_flash', [0]);
-        } else if (w.type === 'dial') {
-            const D = this._dialScale(w);
-            c.uniform(ref, 'u_size', [w.w, w.h]);
-            c.uniform(ref, 'u_start', [(w.start === undefined ? 225 : w.start) * Math.PI / 180]);
-            c.uniform(ref, 'u_sweep', [(w.sweep === undefined ? 270 : w.sweep) * Math.PI / 180]);
-            c.uniform(ref, 'u_ticks', [D.ticks]);
-            c.uniform(ref, 'u_minor', [w.minor || 4]);
-            c.uniform(ref, 'u_redFrom', [w.measure === 'rpm' ? this._redMarks(D.max)[0] : (isNum(w.redFrom) ? w.redFrom : 2)]);
-            c.uniform(ref, 'u_ringW', [w.ringW || 14]);
-            c.uniform(ref, 'u_ring', rgb(color(t, w.ring || 'line')));
-            c.uniform(ref, 'u_ring2', rgb(color(t, w.ring2 || 'dim')));
-            c.uniform(ref, 'u_tick', rgb(color(t, w.tick || 'fg')));
-            c.uniform(ref, 'u_needle', rgb(color(t, w.needle || 'hot')));
-            c.uniform(ref, 'u_red', rgb(t.hot));
-            c.uniform(ref, 'u_face', rgb(color(t, w.face || 'bg')));
-            c.uniform(ref, 'u_hot', [0]);
         } else if (w.type === 'gmeter') {
             // 14 uniform vectors (shaders.js gmeter): u_geo [w, h, range, step] and u_dot [x, y, trail points, envelope
             // on] go from the update below; the dot's amber [255, 176, 40] and its 0.5 / 0.8 g marks are constants in the shader;
@@ -2570,18 +2536,6 @@ class HudApp {
             x.last = key;
             x.c.uniform(x.ref, 'u_value', [q]);
             if (w.peak) x.c.uniform(x.ref, 'u_peak', [pk > q ? pk : -1]);
-        } else if (w.type === 'dial') {
-            const D = this._dialScale(w), us = this.setting('units') === 'us';
-            let raw = this._raw(w.measure === 'rpm' ? 'rpm' : w.measure === 'speed' ? 'speed' : w.signal);
-            if (w.measure === 'speed' && isNum(raw) && us) raw *= 0.621371;
-            const v = isNum(raw) ? Math.min(1, Math.max(0, raw / D.max)) : 0;
-            const q = Math.round(v * 1000) / 1000;
-            const hot = w.measure === 'rpm' && this._shift().now ? 1 : 0;
-            const key = q + '|' + hot;
-            if (!force && key === x.last) return;
-            x.last = key;
-            x.c.uniform(x.ref, 'u_value', [q]);
-            x.c.uniform(x.ref, 'u_hot', [hot]);
         } else if (w.type === 'sdash') {
             const us = this.setting('units') === 'us';
             const sp = this._raw('speed'), rpm = this._raw('rpm'), fuel = this._raw('fuel'), oil = this._raw('oil');

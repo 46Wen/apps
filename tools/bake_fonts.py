@@ -75,10 +75,7 @@ CLUSTER_FONTS = [
     ('n_speed', 'BarlowSemiCondensed-Medium.ttf', 260, DIGITS + '-'),
     ('n_gear', 'BarlowSemiCondensed-SemiBold.ttf', 110, DIGITS + 'PRNDSM-'),
     ('n_unit', 'Barlow-Medium.ttf', 34, LOWER + UPPER + '/'),
-    # Roadster: dial numbers, readouts, the chrome gear
-    ('r_num', 'BarlowSemiCondensed-SemiBold.ttf', 36, DIGITS),
-    ('r_val', 'BarlowSemiCondensed-Medium.ttf', 58, DIGITS + '.:-+°'),
-    ('r_gear', 'BarlowCondensed-Bold.ttf', 170, DIGITS + 'PRNDSM-'),
+    # Cruise and Minimal labels (r_label: the Roadster theme's, kept when Roadster was removed in 0.17.8)
     ('r_label', 'BarlowSemiCondensed-SemiBold.ttf', 24, UPPER + LOWER + DIGITS + '/°%.: -'),
     # Drag: the 0-60 clock
     ('timer', 'BarlowCondensed-Bold.ttf', 220, DIGITS + '.-'),

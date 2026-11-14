@@ -940,94 +940,6 @@ void main() {
 }
 `;
 
-const DIAL = `// A classic round gauge for a cluster-render "effect" layer (GLSL ES 1.00), the Roadster theme's: a black face, a
-// chrome ring (u_ring at the top fading to u_ring2 at the bottom), major and minor ticks round u_sweep from u_start
-// (radians, clockwise from 12 o'clock), a red band from u_redFrom (0..1 of the sweep; above 1: none), and a needle
-// with a short tail and a centre cap. The numbers are text widgets round it. u_value 0..1 of the sweep.
-// u_hot 1: the ring turns the shift red (at the shift point). v_uv (0,0) is the top-left; the dial fills the
-// smaller side of the layer.
-precision mediump float;
-varying vec2 v_uv;
-uniform vec2 u_size;
-uniform float u_value;
-uniform float u_start;
-uniform float u_sweep;
-uniform float u_ticks;    // major steps over the sweep (8: 9 marks)
-uniform float u_minor;    // minor steps per major step
-uniform float u_redFrom;
-uniform float u_ringW;    // chrome ring width px
-uniform vec3 u_ring;
-uniform vec3 u_ring2;
-uniform vec3 u_tick;
-uniform vec3 u_needle;
-uniform vec3 u_red;
-uniform vec3 u_face;
-uniform float u_hot;
-
-const float PI = 3.14159265359;
-
-// distance from p to the segment a..b
-float seg(vec2 p, vec2 a, vec2 b) {
-    vec2 pa = p - a, ba = b - a;
-    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-    return length(pa - ba * h);
-}
-
-void main() {
-    vec2 p = vec2(v_uv.x - 0.5, 0.5 - v_uv.y) * u_size;   // px from the centre, +y up
-    float R = min(u_size.x, u_size.y) * 0.5 - 1.0;
-    float d = length(p);
-    if (d > R + 0.5) { gl_FragColor = vec4(0.0); return; }
-    float edge = clamp(R + 0.5 - d, 0.0, 1.0);
-    vec3 col = u_face;
-    // the chrome ring, a bright lip on its inner edge
-    float rin = R - u_ringW;
-    if (d > rin) {
-        float t = clamp(0.5 - p.y / (2.0 * R), 0.0, 1.0);
-        vec3 ring = mix(u_ring, u_ring2, t);
-        if (u_hot > 0.5) ring = mix(ring, u_red, 0.75);
-        float lip = clamp(1.0 - (d - rin) / 3.0, 0.0, 1.0);
-        col = mix(ring, vec3(1.0), lip * 0.35);
-        gl_FragColor = vec4(col, edge);
-        return;
-    }
-    float a = atan(p.x, p.y);
-    float rel = mod(a - u_start + 4.0 * PI, 2.0 * PI);
-    float inSweep = rel <= u_sweep + 0.02 ? 1.0 : 0.0;
-    float tr = rin - 8.0;                          // the ticks' outer end
-    // the red band just inside the ticks
-    float frac = rel / u_sweep;
-    if (inSweep > 0.5 && u_redFrom <= 1.0 && frac >= u_redFrom && d < tr - 2.0 && d > tr - 12.0) col = u_red;
-    // ticks: the nearest minor step
-    float steps = u_ticks * u_minor;
-    float k = floor(frac * steps + 0.5);
-    if (k >= 0.0 && k <= steps && inSweep > 0.5) {
-        float ta = u_start + k / steps * u_sweep;
-        vec2 dir = vec2(sin(ta), cos(ta));
-        bool major = mod(k, u_minor) < 0.5;
-        float len = major ? 26.0 : 13.0, wid = major ? 2.4 : 1.2;
-        float dd = seg(p, dir * (tr - len), dir * tr) - wid;
-        float c = clamp(0.5 - dd, 0.0, 1.0);
-        vec3 tc = u_redFrom <= 1.0 && k / steps >= u_redFrom - 0.001 ? u_red : u_tick;
-        col = mix(col, tc, c);
-    }
-    // the needle: tapering from the cap to near the ticks, a short tail
-    float na = u_start + clamp(u_value, 0.0, 1.0) * u_sweep;
-    vec2 nd = vec2(sin(na), cos(na));
-    vec2 q = vec2(dot(p, vec2(nd.y, -nd.x)), dot(p, nd));    // across, along the needle
-    float L = tr - 4.0;
-    if (q.y > -0.18 * L && q.y < L) {
-        float hwid = mix(4.5, 1.5, clamp(q.y / L, 0.0, 1.0));
-        float c = clamp(hwid + 0.5 - abs(q.x), 0.0, 1.0);
-        col = mix(col, u_needle, c);
-    }
-    // the cap
-    if (d < 20.0) col = mix(vec3(0.16), vec3(0.42), clamp((20.0 - d) / 6.0, 0.0, 1.0) * clamp(0.5 + p.y / 40.0, 0.0, 1.0));
-    if (d < 20.0 && d > 17.5) col = u_ring2;
-    gl_FragColor = vec4(col, edge);
-}
-`;
-
 const METER = `// A segmented bar meter for a cluster-render "effect" layer (GLSL ES 1.00): u_segs segments along the layer's
 // width (or its height when u_vertical is 1, filling upward), the first u_value of the way lit. A lit segment takes
 // u_c1 below u_at.x of the bar, u_c2 up to u_at.y, u_c3 from there (the retro green / amber / red, or warm-up blue /
@@ -1491,4 +1403,4 @@ void main() {
 }
 `;
 
-module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, dial: DIAL, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO };
+module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO };
