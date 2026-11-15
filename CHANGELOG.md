@@ -4,6 +4,7 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 15 2026
 
+- **HUD Widgets 0.14.9:** on Redline, two readouts showing the same long name (like TORQUE LB-FT in both) no longer run together into one line.
 - **Cluster Themes 0.18.1, HUD Widgets 0.14.8:**
   - **Every theme redrawn for full screen.** Now that leaving BMW's gear letter uncovered keeps its black box away (0.17.8), the themes no longer leave room for it: the right side of each theme lines up with the left again, and everything reaches down to the theme's own clock, range and outside temperature row.
   - **GT3:** the right column mirrors the left, the boxes are a little taller, and the Waze map window is wider.
