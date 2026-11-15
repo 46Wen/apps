@@ -39,6 +39,9 @@ HUD_FONTS = [
     # Retro: seven-segment digits (DSEG7 Classic, SIL OFL; the unlit 8s behind are the same font in "track")
     ('d7_hero', 'DSEG7Classic-Bold.ttf', 76, DIGITS + 'PRN-', 0, None, {'R': 'r', 'N': 'n'}),   # r and n: seven segments can't draw R or N
     ('d7_mid', 'DSEG7Classic-Bold.ttf', 26, DIGITS + '-.:'),
+    # Vector: now playing (any printable ASCII: a song's text is folded to it, hud.js mediaText)
+    ('np_title', 'BarlowSemiCondensed-SemiBold.ttf', 22, ''.join(chr(i) for i in range(32, 127))),
+    ('np_small', 'Barlow-Medium.ttf', 16, ''.join(chr(i) for i in range(32, 127))),
 ]
 # Cluster Themes, 1920x720 LCD. GT3: the race-dash look, Barlow Condensed.
 CLUSTER_FONTS = [
@@ -71,6 +74,13 @@ CLUSTER_FONTS = [
     ('s_unit', 'Barlow-Medium.ttf', 24, LOWER + UPPER + DIGITS + '°/-. '),
     ('s_label', 'BarlowSemiCondensed-SemiBold.ttf', 30, UPPER + DIGITS + ' .'),
     ('s_gl', 'Michroma-Regular.ttf', 21, DIGITS + '/', 1),
+    # Vector: the music panel's song title and artist (any printable ASCII: a song's text is folded to it, hud.js
+    # mediaText), the ring gauges' numbers and labels, the track time
+    ('v_title', 'BarlowSemiCondensed-SemiBold.ttf', 38, ''.join(chr(i) for i in range(32, 127))),
+    ('v_artist', 'Barlow-Medium.ttf', 26, ''.join(chr(i) for i in range(32, 127))),
+    ('v_val', 'Michroma-Regular.ttf', 22, DIGITS + '.-+', 1),
+    ('v_label', 'BarlowSemiCondensed-SemiBold.ttf', 19, UPPER + LOWER + DIGITS + ' °%/.-'),
+    ('v_time', 'Michroma-Regular.ttf', 16, DIGITS + ':-', 1),
     # Minimal: one huge speed, the gear, small print
     ('n_speed', 'BarlowSemiCondensed-Medium.ttf', 260, DIGITS + '-'),
     ('n_gear', 'BarlowSemiCondensed-SemiBold.ttf', 110, DIGITS + 'PRNDSM-'),

@@ -80,8 +80,16 @@
  *             left scale's line, target px, at most 32 points, its corners already rounded; the right scale is its
  *             mirror), "scale" [arc length at 0, at the top mark], "dial" [x, y, r] and "dialAng" [full, empty] (the fuel
  *             dial; the oil one is its mirror), "line" [x0, x1, y, bottom line end x]; speed 0..MVIEW_SPEED, revs
- *             0..MVIEW_RPM; the map window as fill ("hole", "holeWhen"). A layout with "mapLive": true and no widget
+ *             0..MVIEW_RPM; the map window as fill ("hole", "holeWhen"), an oval feathered over "holeOval" px if set;
+ *             "panel" [[top x, y], [middle x, y], [bottom x, y], inset]: the dark panel inside the left scale (from
+ *             inset px inside the line to that chevron edge; mirrored right) and BMW's red glow by the needle. A layout with "mapLive": true and no widget
  *             toggled on mapUp opens and closes the window by u_hole alone, without a rebuild
+ *   vdash     effect layer; the whole Vector theme (shaders.js vdash, layout made by design/gen_vector.py): "tach" [cx, cy,
+ *             inner r, outer r, start deg, sweep deg, segments] (revs 0..VDASH_RPM), "segs" (the bracket lines, at most
+ *             20: [x0, y0, x1, y1, width, brightness 0..1]), "rings" (at most 4: {cx, cy, r, signal, min, max, color
+ *             [r, g, b] 0..1}), "bars" (at most 3, gone while the map shows: {x, y, w, signal, min, max}), "panel" [x, y,
+ *             w, h] (the music panel's plate), "vinyl" [cx, cy, r] (red label while something plays), "prog" [x, y, w]
+ *             (the track's progress); the map window as fill ("hole", "holeWhen") with its corners cut "holeCut" px
  *   sdash     effect layer; the whole Sport theme (shaders.js sdash), optional "road" [horizonY, scale] (a road in the
  *             middle while no map shows, its dashes running with the speed): "geo" [yTop, yBend, yBottom, xBend] and
  *             "k" [above, below, round] for the left bracket's outer line (the right one is mirrored), "band"
@@ -189,6 +197,9 @@
  * Text "showWhen": "abnormal" (or "abnormal:oil" / "abnormal:coolant" on a plain label): empty while that temperature is
  *   normal and the setting "smartTemps" is on; temperature values take their band's colour, outside blue at 3 C and
  *   under (smart_temps.js).
+ * Text "showWhen": "media" / "!media" (something with a title is playing, HmiMediaState, or not) and "mapUp" / "!mapUp"
+ *   (the Waze map shows inside the theme): empty otherwise, without a rebuild. Text "ellipsis": true: a text wider than
+ *   the box is cut to fit, ending in "...".
  * Switch-off guard (vehicle_state.js): no new layer while BMW's vehicle state is off / switching on / off, the layers
  *   dropped at 12 or 5 and under, built again when the car is on.
  * HUD holiday colours (shared/hud_holiday.js, the "holiday" setting on the HUD target): the theme's accents in the holiday's
@@ -213,7 +224,7 @@
  *
  * Text tokens: {{speed}} {{u:speed}} {{oil}} {{coolant}} {{boost}} {{u:boost}} {{rpm}}
  * {{gear}} (P / R / N, D3 / S3 / M3 by the shifter programme, or just 3 when the selector position is unknown), {{gearnum}} (3, or P / R / N)
- * {{spd:<i>}} (speed scale label i of SPEED_SCALE: 0..200 mph, 0..320 km/h) {{range}} {{u:distLc}} (mi, km) {{u:dist}} (MI, KM) {{ambient}} (outside, signed: +75) {{u:speedLc}} (mph, km/h) {{ampmLc}} (am, pm) {{torque}} {{u:torque}} (lb-ft, Nm) {{torquePct}} {{powerPct}} (% of config.engine's peak) {{boostHi}} {{boostMid}}
+ * {{spd:<i>}} (speed scale label i of SPEED_SCALE: 0..200 mph, 0..320 km/h) {{range}} {{u:distLc}} (mi, km) {{u:dist}} (MI, KM) {{ambient}} (outside, signed: +75) {{u:speedLc}} (mph, km/h) {{speed2}} {{u:speed2Lc}} {{u:speed2}} (the speed in the other unit) {{mediaTitle}} {{mediaArtist}} {{mediaElapsed}} {{mediaLeft}} (now playing, HmiMediaState; empty without) {{ampmLc}} (am, pm) {{torque}} {{u:torque}} (lb-ft, Nm) {{torquePct}} {{powerPct}} (% of config.engine's peak) {{boostHi}} {{boostMid}}
  * (gauge labels for 1.4 / 0.7 bar in the display unit) {{stage}} (P R N, D / S / M by the shifter programme) {{gearInD}} (gear number while in D) {{mode}} (COMFORT, SPORT, SPORT PLUS, SPORT INDIVIDUAL, ECO PRO, ...)
  * {{temp:<deg C>}} (that temperature in the display unit, °F rounded to 10, for gauge labels) {{setup:engine|chassis|steering|gearbox}} (what that part is set to in the drive mode now)
  * {{time}} {{ampm}} {{u:temp}} (°F / °C) {{gLat}} {{gLong}} (g, 2 decimals) {{gSide}} ("0.42 L", "0.42 R")
@@ -326,7 +337,19 @@ const TILE_BAR = {
 const TILE_MAX = 14;       // half a flash: red, then the normal colour
 // widgets that show the shift cue (the reaction time is learned only while one of them is drawn)
 const MVIEW_RPM = 8000;            // the M view theme's rev scale: 0..8
-const MVIEW_SPEED = { us: 200, metric: 330 };   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
+const MVIEW_SPEED = { us: 200, metric: 330 };
+const VDASH_RPM = 8000;            // the Vector theme's rev counter: 0..8
+const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';   // the head unit's now playing (front)
+const MEDIA_TYPES = { 1: 'ARTIST', 2: 'ALBUM', 3: 'TITLE' };
+/** A song's text for the baked fonts: accents dropped, curly quotes and dashes made plain, the rest left out. */
+function mediaText(v) {
+    let t = String(v === undefined || v === null ? '' : v);
+    try { t = t.normalize('NFD'); } catch (e) { /* no ICU: keep it */ }
+    return t.replace(/[\u0300-\u036f]/g, '').replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"')
+        .replace(/[\u2013\u2014]/g, '-').replace(/\u2026/g, '...').replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim();
+}
+/** Seconds as m:ss. */
+function clockOf(sec) { const t = Math.max(0, Math.floor(sec)); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
 const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
@@ -770,6 +793,13 @@ class HudApp {
                     this._driveMode(m, variant, raw);
                 },
             },
+        };
+        // now playing (the Vector layouts' music panel): the head unit's own media state, front screen only. Optional
+        // (app.json): not every unit may have it, and whether CarPlay fills it is not known yet. Added last, so the
+        // one-at-a-time SOME/IP setup (signals.js) reaches every vehicle signal before it, whatever this one does
+        extra[MEDIA_IF] = {
+            playerMetadata: (v) => this._mediaFeed('meta', v),
+            trackProgress: (v) => this._mediaFeed('progress', v),
         };
         this.car = new Car(this.ctx, ['rpm', 'speed', 'temps', 'accel', 'gear', 'torque'], extra);
         // "Play demo": this.car becomes the show's stand-in (the car's own data unless the show plays)
@@ -1601,6 +1631,7 @@ class HudApp {
             if (name === 'torquePct') return Math.max(0, d.torque) / (e.torqueNm || 500) * 100;
             return isNum(d.rpm) ? Math.max(0, d.torque) * d.rpm / 9549 / (e.powerKw || 285) * 100 : null;
         }
+        if (name === 'mediaPct') { const e = this._mediaElapsed(); return e === null ? null : e / this.media.total * 100; }   // the song's progress
         if (name.indexOf('setupLevel:') === 0) { const s = this._setup(); return s ? SETUP_LEVEL[s[name.slice(11)]] || 0 : 0; }
         const d = this.car.data();
         return Object.prototype.hasOwnProperty.call(d, name) ? d[name] : null;
@@ -1658,6 +1689,13 @@ class HudApp {
             case 'badge': return badges.text(this.setting('badge'), this.setting('badgeBMW') === true);
             case 'speed': { const v = this._raw('speed'); return fix(isNum(v) ? (us ? v * 0.621371 : v) : v, 0); }
             case 'u:speed': return us ? 'MPH' : 'KM/H';
+            case 'mediaTitle': return this._mediaOn() ? this.media.title : '';
+            case 'mediaArtist': return this._mediaOn() ? this.media.artist : '';
+            case 'mediaElapsed': { const e = this._mediaElapsed(); return e === null ? '' : clockOf(e); }
+            case 'mediaLeft': { const e = this._mediaElapsed(); return e === null ? '' : '-' + clockOf(this.media.total - e); }
+            case 'speed2': { const v = this._raw('speed'); return fix(isNum(v) ? (us ? v : v * 0.621371) : v, 0); }   // the other unit
+            case 'u:speed2Lc': return us ? 'km/h' : 'mph';
+            case 'u:speed2': return us ? 'KM/H' : 'MPH';
             case 'oil': case 'coolant': { const v = this._raw(tok); return fix(isNum(v) ? (us ? v * 9 / 5 + 32 : v) : v, 0); }
             case 'boost': { const v = this._raw('boost'); return us ? fix(isNum(v) ? v * 14.5038 : v, 1) : fix(v, 2); }
             case 'u:boost': return us ? 'PSI' : 'BAR';
@@ -2113,6 +2151,36 @@ class HudApp {
             c.uniform(ref, 'u_line', [w.line[0] - w.x, w.line[1] - w.x, w.line[2] - w.y, w.line[3] - w.x]);
             c.uniform(ref, 'u_hole', this._hole(w));
             c.uniform(ref, 'u_holeR', [this._holeRadius(w)]);
+            const pn = w.panel;     // [[top x, y], [middle x, y], [bottom x, y], inset]
+            c.uniform(ref, 'u_panel', pn ? [pn[0][0] - w.x, pn[0][1] - w.y, pn[1][0] - w.x, pn[1][1] - w.y] : [0, 0, 0, 1]);
+            c.uniform(ref, 'u_panelB', pn ? [pn[2][0] - w.x, pn[2][1] - w.y, pn[3], 0] : [0, 2, 0, 0]);
+            c.uniform(ref, 'u_oval', [isNum(w.holeOval) ? w.holeOval : 0]);
+        } else if (w.type === 'vdash') {
+            // the bracket lines (target px): [x0, y0, x1, y1, width, brightness 0..1]
+            const seg = [], segW = [];
+            (w.segs || []).slice(0, 20).forEach((g) => {
+                seg.push(g[0] - w.x, g[1] - w.y, g[2] - w.x, g[3] - w.y);
+                segW.push(Math.max(1, Math.floor(g[4] || 2)) + Math.min(0.99, Math.max(0, isNum(g[5]) ? g[5] : 0.99)));
+            });
+            const nseg = segW.length;
+            while (seg.length < 80) seg.push(0);
+            while (segW.length < 20) segW.push(0);
+            c.uniform(ref, 'u_size', [w.w, w.h]);
+            c.uniform(ref, 'u_seg', seg, { type: 'vec4' });
+            c.uniform(ref, 'u_segW', segW, { type: 'float' });
+            c.uniform(ref, 'u_nseg', [nseg]);
+            const T = w.tach;      // [cx, cy, inner r, outer r, start deg, sweep deg, segments]
+            c.uniform(ref, 'u_tach', [T[0] - w.x, T[1] - w.y, T[2], T[3]]);
+            c.uniform(ref, 'u_redFrom', [this._redMarks(VDASH_RPM)[0]]);
+            const rc = [];
+            [0, 1, 2, 3].forEach((i) => { const g = (w.rings || [])[i]; rc.push.apply(rc, g && g.color ? g.color : [1, 1, 1]); });
+            c.uniform(ref, 'u_ringC', rc, { type: 'vec3' });
+            const pn = w.panel, vn = w.vinyl, pr = w.prog;
+            c.uniform(ref, 'u_panel', pn ? [pn[0] - w.x, pn[1] - w.y, pn[2], pn[3]] : [0, 0, 0, 0]);
+            x.vinyl = vn ? [vn[0] - w.x, vn[1] - w.y, vn[2]] : [0, 0, 0];
+            x.prog = pr ? [pr[0] - w.x, pr[1] - w.y, pr[2]] : [0, 0, 0];
+            c.uniform(ref, 'u_hole', this._hole(w));
+            c.uniform(ref, 'u_holeC', [isNum(w.holeCut) ? w.holeCut : 40]);
         } else if (w.type === 'mdash') {
             const ty = w.tyres || [0, 0, 0], L = w.gaugeL || {}, R = w.gaugeR || {}, b = w.blade || {};
             const bars = Array.isArray(w.segbars) ? w.segbars.slice(0, 4) : [];
@@ -2372,6 +2440,61 @@ class HudApp {
     _holeRadius(w) { return isNum(w.holeRadius) ? w.holeRadius : 28; }
 
     /**
+     * Now playing from HmiMediaState: playerMetadata (two lines, each tagged TITLE / ARTIST / ALBUM, or three rows)
+     * and trackProgress (elapsed, total). Only the front screen's (sink FRONT). The first few values are logged, so a
+     * car's log shows what it really sends (the time unit, which source fills it).
+     */
+    _mediaFeed(kind, v) {
+        if (!v || typeof v !== 'object') return;
+        if (v.sink !== undefined && v.sink !== 0 && v.sink !== 'FRONT') return;
+        const m = this.media || (this.media = { title: '', artist: '', elapsed: 0, total: 0, at: 0, moved: 0 });
+        this.mediaLogged = (this.mediaLogged || 0) + 1;
+        if (this.mediaLogged <= 6) this.log.info('media ' + kind + ': ' + JSON.stringify(v).slice(0, 300));
+        if (kind === 'meta') {
+            const type = (t) => MEDIA_TYPES[t] || String(t || '').toUpperCase();
+            const lines = [[mediaText(v.firstLineText), type(v.firstLineType)], [mediaText(v.secondLineText), type(v.secondLineType)]];
+            let title = '', artist = '';
+            lines.forEach(([t, k]) => { if (!t) return; if (k === 'TITLE' && !title) title = t; else if (k === 'ARTIST' && !artist) artist = t; });
+            if (!title) title = (lines.find(([t, k]) => t && k !== 'ARTIST' && t !== artist) || [''])[0];
+            if (!artist) artist = (lines.find(([t]) => t && t !== title) || [''])[0];
+            if (!title && v.threeRowText) {
+                const rows = String(v.threeRowText).split(/[\r\n]+/).map(mediaText).filter(Boolean);
+                title = rows[0] || ''; artist = rows[1] || '';
+            }
+            if (title !== m.title || artist !== m.artist) { m.elapsed = 0; m.total = 0; m.moved = 0; }
+            m.title = title; m.artist = artist;
+        } else {
+            const e = Number(v.elapsed), t = Number(v.total);
+            if (!isFinite(e) || !isFinite(t) || v.hasProgress === false) { m.total = 0; return; }
+            // milliseconds or seconds: a track over ~3 hours in seconds is unlikely, so a big total is ms
+            const k = t > 10800 ? 1000 : 1;
+            if (e / k !== m.elapsed) m.moved = Date.now();
+            m.elapsed = e / k; m.total = t / k; m.at = Date.now();
+        }
+    }
+
+    /** Something is playing that has a title (the music panel shows it; "showWhen": "media"). */
+    _mediaOn() { return !!(this.media && this.media.title); }
+
+    /** The track's elapsed seconds now: carried on from the last value while it was still moving (playing). */
+    _mediaElapsed() {
+        const m = this.media;
+        if (!m || !m.total) return null;
+        const run = Date.now() - m.moved < 2500 ? (Date.now() - m.at) / 1000 : 0;
+        return Math.min(m.total, m.elapsed + run);
+    }
+
+    /** "showWhen": "media" / "!media" (the music panel or what shows instead), "mapUp" / "!mapUp": empty otherwise. */
+    _shownNow(w) {
+        const sw = w.showWhen;
+        if (sw === 'media') return this._mediaOn();
+        if (sw === '!media') return !this._mediaOn();
+        if (sw === 'mapUp') return this.setting('mapUp') === true;
+        if (sw === '!mapUp') return this.setting('mapUp') !== true;
+        return true;
+    }
+
+    /**
      * A "mapLive" layout's map window, opened or closed as the Waze map comes or goes: only its own layers' u_hole changes
      * (no widget of it toggles on mapUp), so the theme stays up instead of being built again (seconds on the car).
      */
@@ -2440,7 +2563,7 @@ class HudApp {
         else if (w.type === 'garland') this._garlandTick(x, now);
         else if (w.type === 'text') {
             if (!force && now - x.lastPaint < (w.rate || TEXT_MS)) return;
-            const s = (w.navHide && this.navShown) || smartTemps.hidden(this, w) ? '' : this._resolve(w.text);   // nav turn showing / "showWhen": "abnormal"
+            let s = (w.navHide && this.navShown) || smartTemps.hidden(this, w) || !this._shownNow(w) ? '' : this._resolve(w.text);   // nav turn showing / "showWhen"
             let role = w.color || 'fg';
             if (w.colorBy === 'verdict' && this.score.last) role = VERDICT[this.score.last.verdict] || role;
             if (w.near && this._nearMark(w.near[0]) === w.near[1]) role = w.nearColor || 'fg';
@@ -2462,6 +2585,12 @@ class HudApp {
             // longer value than its default) or has a character the font lacks (Retro's seven-segment digits have no
             // letters, + or °), on the same baseline
             let font = w.font, offsetY = 0;
+            // "ellipsis": a longer text (a song title) is cut to fit, ending in ...
+            if (w.ellipsis && textRaster.measure(s, font, w.spacing) > w.w) {
+                let t = s;
+                while (t.length > 1 && textRaster.measure(t.replace(/\s+$/, '') + '...', font, w.spacing) > w.w) t = t.slice(0, -1);
+                s = t.replace(/\s+$/, '') + '...';
+            }
             const has = (n) => { const g = textRaster.loadFont(n).metrics.glyphs; return s.split('').every((ch) => ch === ' ' || g[ch]); };
             if (w.fit && (textRaster.measure(s, font, w.spacing) > w.w || !has(font))) {
                 const f = w.fit.find((n) => has(n) && textRaster.measure(s, n, w.spacing) <= w.w) || w.fit[w.fit.length - 1];
@@ -2607,6 +2736,27 @@ class HudApp {
             x.c.uniform(x.ref, 'u_rpm', [vals[1]]);
             x.c.uniform(x.ref, 'u_fuel', [vals[2]]);
             x.c.uniform(x.ref, 'u_oil', [vals[3]]);
+        } else if (w.type === 'vdash') {
+            const T = w.tach, q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 400) / 400;
+            const frac = (g) => { const v = g && g.signal ? this._raw(g.signal) : null; return isNum(v) ? q((v - g.min) / (g.max - g.min)) : 0; };
+            const rpm = this._raw('rpm');
+            const rings = [0, 1, 2, 3].map((i) => (w.rings || [])[i]), bars = [0, 1, 2].map((i) => (w.bars || [])[i]);
+            const rv = rings.map(frac), bv = bars.map(frac);
+            const on = this._mediaOn() ? 1 : 0, e = this._mediaElapsed();
+            const pv = on && e !== null && this.media.total > 0 ? q(e / this.media.total) : 0;
+            const key = [isNum(rpm) ? q(rpm / VDASH_RPM) : 0].concat(rv, bv, [on, pv, this.setting('mapUp') ? 1 : 0]).join('|');
+            if (!force && key === x.last) return;
+            x.last = key;
+            x.c.uniform(x.ref, 'u_tachA', [T[4], T[5], T[6], isNum(rpm) ? q(rpm / VDASH_RPM) : 0]);
+            const ru = [], bu = [];
+            rings.forEach((g, i) => ru.push(g ? g.cx - w.x : 0, g ? g.cy - w.y : 0, g ? g.r : 0, rv[i]));
+            // the bars sit under the map window: gone while the map shows
+            const mapUp = this.setting('mapUp') === true;
+            bars.forEach((b, i) => bu.push(b ? b.x - w.x : 0, b ? b.y - w.y : 0, b && !mapUp ? b.w : 0, bv[i]));
+            x.c.uniform(x.ref, 'u_ring', ru, { type: 'vec4' });
+            x.c.uniform(x.ref, 'u_bar', bu, { type: 'vec4' });
+            x.c.uniform(x.ref, 'u_vinyl', x.vinyl.concat([on]));
+            x.c.uniform(x.ref, 'u_prog', x.prog.concat([pv]));
         } else if (w.type === 'mview') {
             const us = this.setting('units') === 'us';
             const sp = this._raw('speed'), rpm = this._raw('rpm'), fuel = this._raw('fuel'), oil = this._raw('oil');

@@ -1434,9 +1434,13 @@ uniform float u_oil;       // 0..1 (50..150 C)
 uniform vec4 u_line;       // the line under the speed: from x, to x, y; the bottom line runs on to x
 uniform vec4 u_hole;       // the map window x, y, w, h (w 0 = none)
 uniform float u_holeR;
+uniform vec4 u_panel;      // the dark panel's inner edge: its top point x, y and its point at the middle x, y
+uniform vec4 u_panelB;     // its bottom point x, y; z: how far inside the line the panel starts (0 = no panel)
+uniform float u_oval;      // > 0: the map window is an oval inside u_hole, feathered over this many px
 
 const vec3 WHITE = vec3(0.92, 0.93, 0.95);
 const vec3 GREY = vec3(0.55, 0.57, 0.6);
+const vec3 PANEL = vec3(0.105, 0.11, 0.12);
 const vec3 RED = vec3(0.95, 0.1, 0.12);
 const vec3 ORANGE = vec3(1.0, 0.6, 0.1);
 const vec3 BLUE = vec3(0.25, 0.55, 1.0);
@@ -1466,6 +1470,18 @@ void main() {
     float sv = mix(s0, s1, v);
     float f = (s - s0) / (s1 - s0);
 
+    // the dark panel inside the scale: from a little inside the line to the chevron edge facing the middle
+    if (u_panelB.z > 0.0 && sd > 0.0) {
+        vec2 t = u_panel.xy, m = u_panel.zw, b = u_panelB.xy;
+        float ex, slope;
+        if (q.y < m.y) { float h = (q.y - t.y) / (m.y - t.y); ex = mix(t.x, m.x, h); slope = (m.x - t.x) / (m.y - t.y); }
+        else { float h = (q.y - m.y) / (b.y - m.y); ex = mix(m.x, b.x, h); slope = (b.x - m.x) / (b.y - m.y); }
+        float inner = (ex - q.x) / sqrt(1.0 + slope * slope);
+        float pm = clamp(inner + 0.5, 0.0, 1.0) * smoothstep(u_panelB.z, u_panelB.z + 3.0, sd) * step(t.y, q.y);
+        // a touch lighter towards the line, like BMW's
+        c = put(c, PANEL * (1.0 + 0.35 * exp(-(sd - u_panelB.z) / 90.0)), pm);
+    }
+
     if (best < 140.0) {
         // from 0 up to the value the band inside the line is lit: grey, brightest by the line and towards the needle
         if (s >= s0 - 6.0 && s <= sv && sd > 0.0 && sd < 100.0) {
@@ -1478,6 +1494,14 @@ void main() {
             float spot = cov(length(cell) - 1.4);
             float near = exp(-(sv - s) / 55.0) * (1.0 - smoothstep(40.0, 95.0, sd));
             c = put(c, RED, spot * near * 0.9);
+        }
+        // BMW's red glow by the needle, at any value (also at 0, parked): red dots fading along and inwards
+        if (u_panelB.z > 0.0 && sd > 0.0 && sd < 120.0 && s > s0 - 90.0) {
+            vec2 cell = mod(p, 6.0) - 3.0;
+            float spot = cov(length(cell) - 1.5);
+            float glow = exp(-abs(s - sv) / 60.0) * (1.0 - smoothstep(20.0, 120.0, sd)) * smoothstep(s0 - 90.0, s0 - 30.0, s);
+            c = put(c, RED, spot * glow * 0.85);
+            c = put(c, RED * 0.35, glow * 0.35);
         }
         // the line: white, fading out at both ends, with a faint second line inside it
         float ends = smoothstep(0.0, 40.0, s) * smoothstep(0.0, 30.0, total - s);
@@ -1546,7 +1570,13 @@ void main() {
     }
 
     float alpha = 1.0;
-    if (u_hole.z > 0.0) {
+    if (u_hole.z > 0.0 && u_oval > 0.0) {
+        // an oval window, its edge feathered into the black like BMW's map
+        vec2 hs = u_hole.zw * 0.5;
+        vec2 e = (p - (u_hole.xy + hs)) / hs;
+        float ed = (length(e) - 1.0) * min(hs.x, hs.y);     // about px outside the oval
+        alpha = smoothstep(-u_oval, 0.0, ed);
+    } else if (u_hole.z > 0.0) {
         vec2 hs = u_hole.zw * 0.5;
         vec2 hq = abs(p - (u_hole.xy + hs)) - (hs - vec2(u_holeR));
         float hd = length(max(hq, 0.0)) + min(max(hq.x, hq.y), 0.0) - u_holeR;
@@ -1559,4 +1589,154 @@ void main() {
 }
 `;
 
-module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO, mview: MVIEW };
+const VDASH = `// The Vector theme in one cluster-render "effect" layer (GLSL ES 1.00): black, angled bracket lines (u_seg), a round
+// segmented rev counter (u_tach), four ring gauges (u_ring), three bars in the middle while no map shows (u_bar), and the
+// music panel on the right (u_panel: its backdrop; u_vinyl: a record that turns red while something plays; u_prog: the
+// track's progress). The middle is cut see-through, an octagon (u_hole, u_holeC), while the Waze map shows ("mapLive").
+// v_uv (0,0) is the top-left.
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 v_uv;
+uniform vec2 u_size;
+uniform vec4 u_seg[20];    // the bracket lines: from x, y, to x, y
+uniform float u_segW[20];  // each one's width (whole px) + brightness (the fraction: 0 grey .. 0.99 white)
+uniform float u_nseg;
+uniform vec4 u_tach;       // the rev counter: centre x, y, inner and outer radius of its segments
+uniform vec4 u_tachA;      // its start angle (deg, clockwise from 3 o'clock), sweep (deg), segments, revs 0..1
+uniform float u_redFrom;   // 0..1 of the rev counter
+uniform vec4 u_ring[4];    // the ring gauges: centre x, y, radius, value 0..1 (radius 0 = none)
+uniform vec3 u_ringC[4];   // their colours
+uniform vec4 u_bar[3];     // the middle bars: left x, y, width (0 = none), value 0..1
+uniform vec4 u_panel;      // the music panel's backdrop x, y, w, h (w 0 = none)
+uniform vec4 u_vinyl;      // the record: centre x, y, radius; w: 1 while something plays
+uniform vec4 u_prog;       // the progress line: left x, y, width, value 0..1
+uniform vec4 u_hole;       // the map window x, y, w, h (w 0 = none)
+uniform float u_holeC;     // its corners cut this far
+
+const vec3 WHITE = vec3(0.93, 0.94, 0.96);
+const vec3 GREY = vec3(0.5, 0.53, 0.58);
+const vec3 TRACK = vec3(0.15, 0.16, 0.19);
+const vec3 RED = vec3(0.95, 0.12, 0.14);
+
+float cov(float d) { return clamp(0.5 - d, 0.0, 1.0); }
+vec3 put(vec3 c, vec3 col, float a) { return mix(c, col, clamp(a, 0.0, 1.0)); }
+float segd(vec2 p, vec2 a, vec2 b) {
+    vec2 ba = b - a;
+    float h = clamp(dot(p - a, ba) / max(dot(ba, ba), 0.001), 0.0, 1.0);
+    return length(p - a - ba * h);
+}
+// signed distance (about px) to a box with its corners cut at 45 degrees
+float octd(vec2 p, vec4 r, float ch) {
+    vec2 hs = r.zw * 0.5;
+    vec2 q = abs(p - (r.xy + hs));
+    return max(max(q.x - hs.x, q.y - hs.y), (q.x + q.y - (hs.x + hs.y - ch)) * 0.70710678);
+}
+
+void main() {
+    vec2 p = v_uv * u_size;
+    vec3 c = vec3(0.0);
+    bool playing = u_vinyl.w > 0.5;
+
+    // the music panel: a dark plate with cut corners and a thin edge
+    if (u_panel.z > 0.0) {
+        float d = octd(p, u_panel, 26.0);
+        c = put(c, vec3(0.05, 0.053, 0.06), cov(d));
+        c = put(c, vec3(0.2, 0.21, 0.24), cov(abs(d) - 0.8));
+    }
+    // the record: grooves, a sheen, the label red while something plays
+    if (u_vinyl.z > 0.0) {
+        vec2 d = p - u_vinyl.xy;
+        float r = length(d), R = u_vinyl.z;
+        if (r < R + 2.0) {
+            vec3 vc = vec3(0.025);
+            float groove = 0.5 + 0.5 * sin(r * 0.9);
+            vc = mix(vc, vec3(0.1, 0.105, 0.12), groove * smoothstep(R * 0.38, R * 0.42, r) * 0.8);
+            float sheen = pow(abs(cos(atan(d.y, d.x) - 0.8)), 12.0) * 0.16 * smoothstep(R * 0.4, R * 0.5, r);
+            vc += vec3(sheen);
+            vc = mix(vc, playing ? RED * 0.85 : GREY * 0.45, cov(r - R * 0.36));
+            vc = mix(vc, vec3(0.0), cov(r - 5.0));
+            c = put(c, vc, cov(r - R));
+            c = put(c, GREY * 0.7, cov(abs(r - R) - 0.8));
+        }
+    }
+    // the progress line, with a dot at the position
+    if (playing && u_prog.z > 0.0) {
+        float t = (p.x - u_prog.x) / u_prog.z;
+        float on = step(0.0, t) * step(t, 1.0);
+        float line = cov(abs(p.y - u_prog.y) - 2.0) * on;
+        c = put(c, TRACK, line);
+        c = put(c, WHITE, line * step(t, u_prog.w));
+        c = put(c, WHITE, cov(length(p - vec2(u_prog.x + u_prog.z * u_prog.w, u_prog.y)) - 6.0));
+    }
+
+    // the rev counter: segments round the dial, lit up to the revs, red from the redline
+    {
+        vec2 d = p - u_tach.xy;
+        float r = length(d);
+        if (r < u_tach.w + 30.0 && r > u_tach.z - 24.0) {
+            float rel = mod(degrees(atan(d.y, d.x)) - u_tachA.x + 720.0, 360.0);
+            float f = rel / u_tachA.y;
+            if (f <= 1.0) {
+                float n = u_tachA.z, k = floor(f * n), within = fract(f * n);
+                float edge = min(within, 1.0 - within) * radians(u_tachA.y) / n * r;     // px to the segment's side
+                float m = cov(-min(r - u_tach.z, u_tach.w - r)) * clamp(edge - 1.5 + 0.5, 0.0, 1.0);
+                float mid = (k + 0.5) / n;
+                bool red = mid >= u_redFrom;
+                vec3 off = red ? vec3(0.3, 0.05, 0.06) : TRACK;
+                vec3 lit = red ? RED : mix(GREY, WHITE, mid);
+                c = put(c, mid <= u_tachA.w ? lit : off, m);
+                // a thin ring inside, and a mark outside at every 1000
+                c = put(c, GREY * 0.8, cov(abs(r - (u_tach.z - 14.0)) - 0.7));
+                float per = u_tachA.y / 8.0;
+                float tk = abs(radians(mod(rel + per * 0.5, per) - per * 0.5)) * r;
+                c = put(c, f >= u_redFrom - 0.01 ? RED : WHITE, cov(tk - 1.5) * cov(abs(r - (u_tach.w + 9.0)) - 5.0));
+            }
+        }
+    }
+
+    // the ring gauges: a 300 degree track open at the bottom, filled to the value in the ring's colour
+    for (int i = 0; i < 4; i++) {
+        vec4 g = u_ring[i];
+        if (g.z <= 0.0) continue;
+        vec2 d = p - g.xy;
+        float r = length(d);
+        if (r > g.z + 8.0) continue;
+        float f = mod(degrees(atan(d.y, d.x)) - 120.0 + 720.0, 360.0) / 300.0;
+        float on = step(f, 1.0);
+        float ring = cov(abs(r - g.z) - 4.0) * on;
+        c = put(c, TRACK, ring);
+        c = put(c, u_ringC[i], ring * step(f, g.w));
+        c = put(c, GREY * 0.55, cov(abs(r - g.z + 11.0) - 0.6) * on);
+    }
+
+    // the middle bars, with a mark every 10 %
+    for (int i = 0; i < 3; i++) {
+        vec4 b = u_bar[i];
+        if (b.z <= 0.0) continue;
+        float t = (p.x - b.x) / b.z;
+        float on = step(0.0, t) * step(t, 1.0);
+        float bar = cov(abs(p.y - b.y) - 4.0) * on;
+        c = put(c, TRACK, bar);
+        c = put(c, mix(GREY, WHITE, t), bar * step(t, b.w));
+        float mk = abs(fract(t * 10.0 + 0.5) - 0.5) * b.z / 10.0;
+        c = put(c, GREY * 0.7, cov(mk - 0.6) * on * cov(abs(p.y - b.y - 13.0) - 3.0));
+    }
+
+    // the bracket lines
+    for (int i = 0; i < 20; i++) {
+        if (float(i) >= u_nseg) break;
+        vec4 s = u_seg[i];
+        float w = floor(u_segW[i]), br = fract(u_segW[i]);
+        c = put(c, mix(GREY, WHITE, br), cov(segd(p, s.xy, s.zw) - w * 0.5));
+    }
+
+    float alpha = 1.0;
+    if (u_hole.z > 0.0) alpha = clamp(octd(p, u_hole, u_holeC) + 0.5, 0.0, 1.0);
+    gl_FragColor = vec4(c, alpha);
+}
+`;
+
+module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO, mview: MVIEW, vdash: VDASH };

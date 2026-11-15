@@ -4,6 +4,12 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 15 2026
 
+- **Cluster Themes 0.19.0, HUD Widgets 0.15.0:**
+  - **New theme: Vector,** a race-sim style dash with angled frames: a round segmented rev counter with the speed and gear inside, ring gauges for coolant, oil, fuel and boost, and boost, torque and power bars in the middle. With "Show Waze map inside the theme" on, the map shows in the middle instead of the bars.
+  - **Music panel (experimental):** Vector shows the song that is playing, with the title, artist and time, read from the car's own now playing. When nothing is playing, or your car doesn't send it, the panel shows average speed, peak boost and lateral G instead. So far this has only been tried on the bench, so please tell us in an issue whether it works with radio, Bluetooth, USB and CarPlay on your car.
+  - **M view:** closer to BMW's own M view. Dark panels inside both scales, the map window is now an oval that fades into the black, the speed in the other unit sits under the line (km/h under mph, or the other way round), and the red glow by the needle shows even when parked.
+  - **HUD Widgets: two new layouts.** M view: the rev bar, a big gear with the drive mode, and the speed in the other unit next to BMW's own. Vector: shift lights, oil, coolant and boost rings, and the song playing (or range and outside temperature when nothing plays).
+  - Not yet tested on a car.
 - **HUD Widgets 0.14.9:** on Redline, two readouts showing the same long name (like TORQUE LB-FT in both) no longer run together into one line.
 - **Cluster Themes 0.18.1, HUD Widgets 0.14.8:**
   - **Every theme redrawn for full screen.** Now that leaving BMW's gear letter uncovered keeps its black box away (0.17.8), the themes no longer leave room for it: the right side of each theme lines up with the left again, and everything reaches down to the theme's own clock, range and outside temperature row.
