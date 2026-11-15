@@ -86,7 +86,7 @@ A segmented rev arc sweeps across the top of the screen, white, then rally yello
 
 ### Retro 80s
 
-An 80s digital dash: amber seven-segment digits with their unlit 8s showing faintly behind, for the gear and the speed. A segmented rev bar runs across the top, bar graphs show oil, water and fuel on the left, and boost and two readouts sit on the right.
+An 80s digital dash: amber seven-segment digits with their unlit 8s showing faintly behind, for the gear and the speed. A segmented rev bar runs across the top, bar graphs show oil, water and fuel on the left, and boost and two readouts sit on the right. The clock, range and outside temperature along the bottom are seven-segment digits too.
 
 <p align="center"><img src="../../docs/images/cluster-retro80s.png" width="900" alt="Retro 80s theme"></p>
 

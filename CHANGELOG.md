@@ -4,6 +4,16 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 15 2026
 
+- **Cluster Themes 0.18.1, HUD Widgets 0.14.8:**
+  - **Every theme redrawn for full screen.** Now that leaving BMW's gear letter uncovered keeps its black box away (0.17.8), the themes no longer leave room for it: the right side of each theme lines up with the left again, and everything reaches down to the theme's own clock, range and outside temperature row.
+  - **GT3:** the right column mirrors the left, the boxes are a little taller, and the Waze map window is wider.
+  - **Sport:** the brackets are taller, and the boost and coolant bar sits right above the bottom row.
+  - **Dyno:** Power and Torque are each two rows tall, in line with the grid.
+  - **Drag, Track, Rally, Retro 80s and Ribbon:** the right side mirrors the left, so the theme sits centred.
+  - **Retro 80s:** the clock, range and outside temperature are in seven-segment digits.
+  - **M, M view, Cruise and Minimal:** the range is centred in the bottom row.
+  - HUD Widgets: no change you will see.
+  - Not yet tested on a car.
 - **Cluster Themes 0.18.0, HUD Widgets 0.14.7:**
   - **New theme: M view,** after the M view of the M3 / M5 Live Cockpit in Sport (issue #15). Speed on the left (0 to 200 mph or 0 to 330 km/h) and revs on the right (0 to 8000), each scale lit up to its needle, with the speed and gear in big figures, the drive mode under the gear, and fuel and oil temperature dials at the far edges. Pick it on the Themes tab.
   - **M view and the Waze map:** the middle of the theme is a window for the map. It opens when the map shows and closes when it goes, without the theme redrawing.
