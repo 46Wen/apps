@@ -76,6 +76,12 @@
  *   mtach     effect layer; the M rev bar: "side" left|right, "max" rpm, and in target px for the LEFT bar
  *             "y0" (0 rpm), "y8" (max), "ym" (the bend), "xm" (outer edge x at the bend; the right bar gives
  *             its own, mirrored), "kTop" / "kBot" (x per y px above / below the bend), "round", "wBot" / "wTop" / "wBend"
+ *   mview     effect layer; the whole M view theme (shaders.js mview, layout made by design/gen_mview.py): "path" (the
+ *             left scale's line, target px, at most 32 points, its corners already rounded; the right scale is its
+ *             mirror), "scale" [arc length at 0, at the top mark], "dial" [x, y, r] and "dialAng" [full, empty] (the fuel
+ *             dial; the oil one is its mirror), "line" [x0, x1, y, bottom line end x]; speed 0..MVIEW_SPEED, revs
+ *             0..MVIEW_RPM; the map window as fill ("hole", "holeWhen"). A layout with "mapLive": true and no widget
+ *             toggled on mapUp opens and closes the window by u_hole alone, without a rebuild
  *   sdash     effect layer; the whole Sport theme (shaders.js sdash), optional "road" [horizonY, scale] (a road in the
  *             middle while no map shows, its dashes running with the speed): "geo" [yTop, yBend, yBottom, xBend] and
  *             "k" [above, below, round] for the left bracket's outer line (the right one is mirrored), "band"
@@ -319,6 +325,8 @@ const TILE_BAR = {
 };
 const TILE_MAX = 14;       // half a flash: red, then the normal colour
 // widgets that show the shift cue (the reaction time is learned only while one of them is drawn)
+const MVIEW_RPM = 8000;            // the M view theme's rev scale: 0..8
+const MVIEW_SPEED = { us: 200, metric: 330 };   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
 const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
@@ -518,9 +526,10 @@ class HudApp {
         this.mapLayout = false;          // the active layout has a map window (a widget with holeWhen "mapUp")
         // the Waze map inside the theme (Cluster Themes, config.waze; waze.js): "mapUp" is on while it shows
         this.waze = this.config.waze ? new Waze(Object.assign({ dataDir: ctx.dataDir }, this.config.waze), this.log, () => this._guard('waze', () => {
-            if (this.mapLayout && this.setting('mapUp') !== this.mapShown) this._rebuild(); else this._status();
+            if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
         })) : null;
-        this.mapShown = false;           // "mapUp" when the layout was built
+        this.mapShown = false;           // "mapUp" when the layout was built (or last opened / closed, mapLive)
+        this.mapLive = false;            // the active layout opens and closes its map window without a rebuild
         // the screen shared with the other app (screen.js): stepping aside while the driver gave it to the other one
         this.screen = new Screen(this.target === 'panel' ? 'cluster' : 'hud', ctx.dataDir, this.log,
             () => !!(this.started && this.activeName && this.activeName !== 'off'), () => this._guard('screen', () => this._rebuild()),
@@ -1833,6 +1842,8 @@ class HudApp {
         }
         this.problem = null;
         this.mapLayout = layout.widgets.some((w) => w.holeWhen === 'mapUp');
+        // "mapLive" holds only while nothing else changes with the map (a widget toggled on mapUp needs the rebuild)
+        this.mapLive = layout.mapLive === true && !layout.widgets.some((w) => typeof w.toggle === 'string' && w.toggle.indexOf('mapUp') >= 0);
         this._wazeWant();
         this.layoutSlots = layout.slots || [];
         this.layoutTheme = layout.theme && THEMES[layout.theme] ? layout.theme : null;
@@ -2077,6 +2088,31 @@ class HudApp {
             c.uniform(ref, 'u_strip', w.strip);
             c.uniform(ref, 'u_topEnd', [w.topEnd]);
             c.uniform(ref, 'u_road', w.road ? [w.road[0], w.road[1], 0, 1] : [0, 1, 0, 0]);
+        } else if (w.type === 'mview') {
+            // the left scale's line: points (layer px) and the arc length at each (the shader mirrors it for the right)
+            const pts = [], cum = [];
+            let acc = 0;
+            w.path.slice(0, 32).forEach((pt, i) => {
+                if (i) acc += Math.hypot(pt[0] - w.path[i - 1][0], pt[1] - w.path[i - 1][1]);
+                pts.push(pt[0] - w.x, pt[1] - w.y); cum.push(acc);
+            });
+            while (pts.length < 64) pts.push(0);
+            while (cum.length < 32) cum.push(0);
+            c.uniform(ref, 'u_size', [w.w, w.h]);
+            c.uniform(ref, 'u_path', pts, { type: 'vec2' });
+            c.uniform(ref, 'u_cum', cum, { type: 'float' });
+            c.uniform(ref, 'u_n', [Math.min(32, w.path.length)]);
+            c.uniform(ref, 'u_scale', [w.scale[0], w.scale[1], 0, acc]);
+            const us = this.setting('units') === 'us';
+            c.uniform(ref, 'u_ticks', us ? [10, 2, 8, 2] : [11, 3, 8, 2]);   // a mark every 10 mph / 10 km/h; every 500 rpm
+            const [redFrom, orange] = this._redMarks(MVIEW_RPM);
+            c.uniform(ref, 'u_redFrom', [redFrom]);
+            c.uniform(ref, 'u_orange', [orange]);
+            c.uniform(ref, 'u_dial', [w.dial[0] - w.x, w.dial[1] - w.y, w.dial[2], 0]);
+            c.uniform(ref, 'u_dialAng', w.dialAng);
+            c.uniform(ref, 'u_line', [w.line[0] - w.x, w.line[1] - w.x, w.line[2] - w.y, w.line[3] - w.x]);
+            c.uniform(ref, 'u_hole', this._hole(w));
+            c.uniform(ref, 'u_holeR', [this._holeRadius(w)]);
         } else if (w.type === 'mdash') {
             const ty = w.tyres || [0, 0, 0], L = w.gaugeL || {}, R = w.gaugeR || {}, b = w.blade || {};
             const bars = Array.isArray(w.segbars) ? w.segbars.slice(0, 4) : [];
@@ -2335,6 +2371,16 @@ class HudApp {
 
     _holeRadius(w) { return isNum(w.holeRadius) ? w.holeRadius : 28; }
 
+    /**
+     * A "mapLive" layout's map window, opened or closed as the Waze map comes or goes: only its own layers' u_hole changes
+     * (no widget of it toggles on mapUp), so the theme stays up instead of being built again (seconds on the car).
+     */
+    _mapLive() {
+        this.mapShown = this.setting('mapUp');
+        this.widgets.forEach((x) => { if (!x.sheet && x.c && x.w.holeWhen === 'mapUp') x.c.uniform(x.ref, 'u_hole', this._hole(x.w)); });
+        this._status();
+    }
+
     _tick() {
         const now = Date.now();
         this._smoothRpm(now);
@@ -2557,6 +2603,19 @@ class HudApp {
             if (!force && key === x.last) return;
             x.last = key;
             if (w.road) x.c.uniform(x.ref, 'u_road', [w.road[0], w.road[1], vals[4], 1]);
+            x.c.uniform(x.ref, 'u_speed', [vals[0]]);
+            x.c.uniform(x.ref, 'u_rpm', [vals[1]]);
+            x.c.uniform(x.ref, 'u_fuel', [vals[2]]);
+            x.c.uniform(x.ref, 'u_oil', [vals[3]]);
+        } else if (w.type === 'mview') {
+            const us = this.setting('units') === 'us';
+            const sp = this._raw('speed'), rpm = this._raw('rpm'), fuel = this._raw('fuel'), oil = this._raw('oil');
+            const q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+            const vals = [q(isNum(sp) ? (us ? sp * 0.621371 : sp) / MVIEW_SPEED[us ? 'us' : 'metric'] : 0),
+                q(isNum(rpm) ? rpm / MVIEW_RPM : 0), q(isNum(fuel) ? fuel : 0), q(isNum(oil) ? (oil - 50) / 100 : 0)];
+            const key = vals.join('|');
+            if (!force && key === x.last) return;
+            x.last = key;
             x.c.uniform(x.ref, 'u_speed', [vals[0]]);
             x.c.uniform(x.ref, 'u_rpm', [vals[1]]);
             x.c.uniform(x.ref, 'u_fuel', [vals[2]]);

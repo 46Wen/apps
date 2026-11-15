@@ -2,6 +2,16 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 15 2026
+
+- **Cluster Themes 0.18.0, HUD Widgets 0.14.7:**
+  - **New theme: M view,** after the M view of the M3 / M5 Live Cockpit in Sport (issue #15). Speed on the left (0 to 200 mph or 0 to 330 km/h) and revs on the right (0 to 8000), each scale lit up to its needle, with the speed and gear in big figures, the drive mode under the gear, and fuel and oil temperature dials at the far edges. Pick it on the Themes tab.
+  - **M view and the Waze map:** the middle of the theme is a window for the map. It opens when the map shows and closes when it goes, without the theme redrawing.
+  - Thanks to Asksket, who drew the first version of this theme on their own branch; its shape and look are used here.
+  - The theme previews on the Themes tab now leave the same small gap over BMW's gear letter that the cluster does.
+  - HUD Widgets: no change you will see.
+  - Not yet tested on a car.
+
 ## Nov 14 2026
 
 - **Cluster Themes 0.17.8, HUD Widgets 0.14.6:**
