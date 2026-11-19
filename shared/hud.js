@@ -296,6 +296,12 @@ const STATUS_ASK_MS = 2000;      // after a rebuild: ask cluster-render for its 
 // an image layer is "stalled" until its first pixels reach cluster-render, which after a rebuild takes a second or two
 // through the upload budget: normal. Only one still stalled this long is logged as a problem (and its recovery)
 const STALL_WARN_MS = 5000;
+// The switch cover (cluster only): one black full-screen effect layer, put up just before a rebuild drops the old
+// layers and dropped once every new layer is shown, so BMW's own cluster doesn't flash through while the new theme
+// is built (a drive mode change, a map window opening or closing). An effect layer costs no pixel memory; it has a
+// connection of its own (<app id>_cover), so it never takes a layer a theme's connections need.
+const COVER_MAX_MS = 5000;       // the cover comes down by then whatever the new layers say
+const COVER_FS = 'precision mediump float;\nvoid main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }\n';
 const LAYER_BUDGET = 8;          // cluster-render's limit per client connection (CompositorLimits.per_client; confirmed on the car Nov 5 2026)
 const MAX_CONN = 4;              // connections a layout may ask for ("conn"): 32 layers service-wide / 8 per connection
 const PIXEL_BYTES = 16 * 1024 * 1024;   // cluster-render's pixel memory for every app's images together (CompositorLimits.pixel_bytes)
@@ -567,6 +573,9 @@ class HudApp {
         // cluster-render 0.5.1+ gives the panel its own scene id, so the cluster and the HUD can show at once; null until
         // its status says (sceneIdsOf), false while they share one (older versions, or a panel fallen back after the guard)
         this.scenesApart = null;
+        this.cover = null;               // the switch cover while it is up: { c, ref, at } (_coverUp)
+        this.coverTimer = null;
+        this.coverClient = null;         // the cover's own connection to cluster-render (cluster only), from start()
         this.claimBy = null;             // the id of another kit app holding the HUD now (hud_claim), we step aside
         this.testAt = null;              // the shift-light test's start (Date.now()), while it runs
         this.nightOn = false;            // the layout was built with the night colours (nightDim)
@@ -868,6 +877,7 @@ class HudApp {
                 if (old && old.state === 'stalled' && old.long) this.log.info(name() + ' ' + state + ' after ' + ((Date.now() - old.since) / 1000).toFixed(1) + ' s stalled');
             }
             this._statusSoon();
+            if (this.cover) this._guard('switch cover', () => this._coverCheck());
         });
         c.on('target', (name, state, holder, reason) => {
             if (name !== this.target) return;
@@ -934,6 +944,11 @@ class HudApp {
         this._status();
         this._startDme();
         if (this.waze) { this.waze.start(); this._wazeWant(); }
+        if (this.target === 'panel') {
+            this.coverClient = new ClusterRender(this.ctx.spec.id + '_cover', this.socketPath);
+            this.coverClient.on('refused', (op, ref, reason) => this.log.warn('switch cover: ' + op + ' refused: ' + reason));
+            this.coverClient.connect();
+        }
         this.screen.start();
     }
 
@@ -1029,6 +1044,8 @@ class HudApp {
         clearInterval(this.claimTimer);
         clearTimeout(this.statusAskT);
         clearTimeout(this.diagTimer); this.diagTimer = null;
+        clearTimeout(this.coverTimer); this.coverTimer = null; this.cover = null;
+        if (this.coverClient) this._guard('switch cover stop', () => this.coverClient.close());
         this.vstate.stop();
         this.stallTimers.forEach((t) => clearTimeout(t)); this.stallTimers.clear();
         if (this.waze) this._guard('waze stop', () => this.waze.stop());
@@ -1870,12 +1887,47 @@ class HudApp {
 
     _rebuild() {
         this._guard('rebuild', () => this._rebuildInner());
+        this._guard('switch cover', () => this._coverCheck());
         this._status();
+    }
+
+    /**
+     * Before a rebuild drops the theme now showing: the black cover over the whole cluster, unless nothing is showing
+     * or the next layout is "off" (BMW's own cluster is wanted then). Kept while it is already up.
+     */
+    _coverUp() {
+        if (this.target !== 'panel' || this.cover || !this.started) return;
+        if (!this._layerRefs().length || this._layoutName() === 'off') return;
+        const c = this.coverClient;
+        if (!c || !c.ready) return;
+        const [w, h] = TARGET_SIZES.panel;
+        const ref = c.effect({ target: 'panel', klass: 'overlay', z: 1000, x: 0, y: 0, w, h, fs: COVER_FS });
+        if (!ref) return;
+        this.cover = { c, ref, at: Date.now() };
+        this.coverTimer = setTimeout(() => this._guard('switch cover', () => this._coverDown('timed out')), COVER_MAX_MS);
+    }
+
+    /** The cover down once every layer of the new layout is shown (or there is none to wait for). */
+    _coverCheck() {
+        if (!this.cover) return;
+        const refs = this._layerRefs();
+        if (!refs.length) return this._coverDown('nothing to show');
+        if (refs.every((r) => { const st = this.layerStates.get(r.key); return st && st.state === 'shown'; })) this._coverDown('theme shown');
+    }
+
+    _coverDown(why) {
+        if (!this.cover) return;
+        clearTimeout(this.coverTimer); this.coverTimer = null;
+        const k = this.cover;
+        this.cover = null;
+        try { k.c.drop(k.ref); } catch (e) { /* the connection went; nothing to drop */ }
+        this.log.info('switch cover down after ' + (Date.now() - k.at) + ' ms (' + why + ')');
     }
 
     _rebuildInner() {
         if (!this.client.ready) return; // the 'ready' handler calls us again
         if (this._vehKeep()) return;
+        this._coverUp();
         this._layerRefs().forEach((r) => r.c.drop(r.ref));
         this.placed = [];
         this.widgets.clear();
