@@ -304,6 +304,10 @@ const TICK_MS = 50;              // 20 Hz: shift bar and gauges
 const TEXT_MS = 200;             // text re-draws at most 5 times a second (what BMW's own readouts do)
 const TARGET_SIZES = { hud: [800, 480], panel: [1920, 720] };
 const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
+// "Show Waze map inside the theme" per drive mode (Cluster Themes): while byMode is on and the mode is known, the
+// mode's own switch also has to be on. All on by default, so the map shows in every mode as before.
+const MAP_MODE_KEY = { comfort: 'mapComfort', sport: 'mapSport', eco: 'mapEco' };
+const MAP_MODE_KEYS = ['mapComfort', 'mapSport', 'mapEco'];
 const TYRE_CORNERS = ['FL', 'FR', 'RL', 'RR'];
 // the HUD's place (the page's Position tab): settings that move / scale the layers already there, no rebuild
 const PLACE_KEYS = ['hudX', 'hudY', 'hudScale'];
@@ -576,6 +580,7 @@ class HudApp {
             // a theme or layout picked anywhere (the page asks first, the kit's All settings list doesn't): no longer stepping aside
             if (['hudLayout', 'inComfort', 'inSport', 'inEco', 'byMode'].indexOf(key) >= 0 && this.screen.yielded) this.screen.release();
             if (PLACE_KEYS.indexOf(key) >= 0) this._guard('place', () => this._place());
+            else if (MAP_MODE_KEYS.indexOf(key) >= 0) this._guard('map mode', () => this._mapCheck());
             else if (LIVE_KEYS.indexOf(key) >= 0) this.widgets.forEach((x) => { x.last = null; });
             else if (key !== 'demo') this._rebuild(); else this._status();
         });
@@ -696,7 +701,7 @@ class HudApp {
     /** A setting's value, or its default when the saved value isn't one the schema allows. */
     setting(key) {
         // "mapUp": not saved, the Waze map is showing inside the theme now (the setting on, waze.js says so)
-        if (key === 'mapUp') return !!(this.waze && this.waze.up && this.ctx.settings.get('mapInTheme') === true);
+        if (key === 'mapUp') return !!(this.waze && this.waze.up && this._mapWanted());
         // "ribScale": not saved, the Ribbon's scale numbers to show: thousands on the bar, "c" while the camera dip is on
         if (key === 'ribScale') return String(this._barMax() / 1000) + (this._cameraOn() ? 'c' : '');
         const s = this.ctx.settings.item(key);
@@ -932,9 +937,27 @@ class HudApp {
         this.screen.start();
     }
 
-    /** Waze's map on the panel only while the setting is on and the theme shown has a map window. */
+    /** Waze's map on the panel only while the setting is on (for this drive mode) and the theme shown has a map window. */
     _wazeWant() {
-        if (this.waze) this.waze.want(this.started && this.setting('mapInTheme') === true && this.mapLayout);
+        if (this.waze) this.waze.want(this.started && this._mapWanted() && this.mapLayout);
+    }
+
+    /**
+     * "Show Waze map inside the theme" for now: the setting on and, while the theme changes with the drive mode and the
+     * car has said which mode it is in, that mode's own switch on (mapComfort / mapSport / mapEco). With the mode not
+     * known yet, or byMode off, the setting alone decides.
+     */
+    _mapWanted() {
+        if (this.ctx.settings.get('mapInTheme') !== true) return false;
+        if (this.setting('byMode') !== true || !this.driveMode || !MAP_MODE_KEY[this.driveMode]) return true;
+        const k = MAP_MODE_KEY[this.driveMode];
+        return !this.ctx.settings.item(k) || this.setting(k) !== false;
+    }
+
+    /** The map wanted or not after a drive mode or a per-mode switch changed: tell Waze, open or close the window. */
+    _mapCheck() {
+        this._wazeWant();
+        if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
     }
 
     /** Boost, intake, fuel % and hybrid battery from the car's units (config.dme), over the read-only link. */
@@ -1247,7 +1270,7 @@ class HudApp {
 
     _status() {
         // the Waze map's state rides along while that setting is on (and redraws the page's Map tab when it changes)
-        const s = this.statusText() + (this.waze && this.setting('mapInTheme') === true ? '; Waze: ' + this.waze.info().text : '');
+        const s = this.statusText() + (this.waze && this._mapWanted() ? '; Waze: ' + this.waze.info().text : '');
         const d = this.modeDiagLines().join('\n');
         if (s === this.lastStatus && d === this.lastDiag) return;
         this.lastStatus = s; this.lastDiag = d;
@@ -1266,7 +1289,7 @@ class HudApp {
         if (m === this.driveMode && variant === this.driveVariant) return;
         this.log.info('drive mode ' + MODE_NAME[m] + (variant ? ' ' + variant : '') + ' (' + raw + ')');
         this.driveMode = m; this.driveVariant = variant;
-        if (this._layoutName() !== this.activeName) this._rebuild(); else this._status();
+        if (this._layoutName() !== this.activeName) this._rebuild(); else this._mapCheck();
     }
 
     _diag(name, v, drop) {
@@ -1412,7 +1435,7 @@ class HudApp {
                 if (m) { this.driveMode = m; this.driveVariant = null; }
                 else if (this.demoKeep) { this.driveMode = this.demoKeep.mode; this.driveVariant = this.demoKeep.variant; this.demoKeep = null; }
                 // a calibration layout carries the DEMO tag only while the show plays (CAL_LAYOUTS): Play and Stop rebuild it
-                if (force || this._layoutName() !== this.activeName || CAL_LAYOUTS[this.activeName]) this._rebuild(); else this._status();
+                if (force || this._layoutName() !== this.activeName || CAL_LAYOUTS[this.activeName]) this._rebuild(); else this._mapCheck();
             },
         };
     }

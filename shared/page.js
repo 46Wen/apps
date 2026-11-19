@@ -37,6 +37,7 @@ const RAIL7 = { x: 16, y: 54, w: 252, h: 58, gap: 6 };     // seven tabs or more
 const CX = 300, CR = 1584, CW = CR - CX;
 const MODES = [['inComfort', 'Comfort'], ['inSport', 'Sport'], ['inEco', 'Eco Pro']];
 const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
+const MAP_MODE_KEY = { comfort: 'mapComfort', sport: 'mapSport', eco: 'mapEco' };
 const TAB = {
     look: { icon: 'screen' },
     readouts: { name: 'Readouts', icon: 'lines' },
@@ -209,7 +210,11 @@ class Page {
             const p = this.hud.placeInfo();
             return (p.x || p.y ? 'moved' : 'centred') + ' · ' + Math.round(p.scale * 100) + ' %';
         }
-        if (id === 'map') return this.get('mapInTheme') ? 'Waze map · on' : 'Waze map · off';
+        if (id === 'map') {
+            if (!this.get('mapInTheme')) return 'Waze map · off';
+            const some = this.get('byMode') === true && this.item('mapComfort') && ['mapComfort', 'mapSport', 'mapEco'].some((k) => this.get(k) === false);
+            return some ? 'Waze map · some modes' : 'Waze map · on';
+        }
         if (id === 'badge') return badges.text(this.get('badge'), this.get('badgeBMW') === true) || 'none';
         if (id === 'alerts') { const n = WARN_KEYS.filter((k) => this.get(k) > 0).length; return n ? n + ' warning' + (n > 1 ? 's' : '') + ' on' : 'warnings off'; }
         if (id === 'gmeter') return this.optLabel('gRange', this.get('gRange')) + ' · trail ' + this.optLabel('gTrail', this.get('gTrail')).toLowerCase();
@@ -424,16 +429,25 @@ class Page {
         const info = this.hud.waze ? this.hud.waze.info() : { text: 'Not available in this app', up: false, ok: false };
         let text = info.text;
         if (this.get('mapInTheme') && !this.hud.mapLayout && this.hud.activeName !== 'off') text = 'This theme has no map version (GT3, Sport and M do)';
+        else if (this.get('mapInTheme') && this.hud._mapWanted && !this.hud._mapWanted()) text = 'Off in this drive mode. Waze shows the map in BMW\'s own map view';
         glass(cv, CX, y, w, 46, false);
         cv.circle(CX + 26, y + 23, 7, info.up ? C.live : info.ok ? C.dim : '#e0a340');
         cv.text(text, CX + 46, y + 30, 18, info.up ? C.live : C.text, { literal: true });
         y += 54;
+        // with the theme changing with the drive mode: which modes show the map (all on by default)
+        if (this.get('mapInTheme') === true && this.get('byMode') === true && this.item('mapComfort')) {
+            const now = MAP_MODE_KEY[this.hud.driveMode], cw = (w - 24) / 3;
+            label(cv, CX, y + 22, 'In each drive mode');
+            [['mapComfort', 'Comfort'], ['mapSport', 'Sport'], ['mapEco', 'Eco Pro']].forEach((m, i) =>
+                this.toggleRow(cv, CX + i * (cw + 12), y + 34, cw, m[1] + (m[0] === now ? '  ·  now' : ''), m[0]));
+            y += 34 + 64;
+        }
         note(cv, CX, y + 26, [
             'On: GT3, Sport and M open a window in the middle and Waze on Cluster draws its map in it, above',
             'BMW\'s own map view, so nothing shows twice. When the map goes away the theme fills back in.',
             'While on, Waze\'s map on the HUD is off (the cluster and the HUD share one picture).',
             'Needs robertnisipeanu\'s Waze on Cluster. Turning this off gives Waze its usual place back.',
-        ]);
+        ].concat(this.get('byMode') === true ? ['With the theme changing with the drive mode, each mode has its own switch (all on at first).'] : []));
     }
 
     /* ---------- Badge (cluster) ---------- */

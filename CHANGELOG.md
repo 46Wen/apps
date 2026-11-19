@@ -2,6 +2,10 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 19 2026
+
+- **Cluster Themes 0.19.2:** the Waze map per drive mode. With the theme changing with SPORT / COMFORT / ECO PRO and "Show Waze map inside the theme" on, the Map tab now has a switch for each mode (all on at first, so nothing changes until you turn one off). Turn Sport off, for example, and Sport shows the full theme without the map window while Waze goes back to BMW's own map view; Comfort and Eco Pro keep the map in the theme. The map follows the drive mode as you switch. Tried on the bench; not yet tested on a car.
+
 ## Nov 18 2026
 
 - **Cluster Themes 0.19.1, HUD Widgets 0.15.1:** both install from the Store again. 0.19.0 and 0.15.0 asked for the head unit's now playing (the song in Vector) under the instance name `1`, which the head units don't have: they name it `HMI_CID` (the center screen), so the head unit's app manager refused to install the app (issue #26). Both now ask for `HMI_CID`. Cluster Themes 0.19.1 was installed and run on a car that refused 0.19.0; HUD Widgets 0.15.1 has only been tried on the bench. Whether the song shows with radio, Bluetooth, USB and CarPlay is still to be confirmed.
