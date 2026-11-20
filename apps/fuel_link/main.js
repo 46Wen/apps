@@ -16,6 +16,7 @@
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const os = require('os');
 const mgu = require('./kit/mgu');
 
 mgu.run({
@@ -26,12 +27,45 @@ mgu.run({
         let last = { litres: null, rangeKm: null, l100km: null, at: null };
         try { last = Object.assign(last, JSON.parse(fs.readFileSync(memo, 'utf8'))); } catch (e) { /* first run */ }
 
+        // the page: full width (the kit's canvas screen, 1600 x 520), big readouts and where to reach it
+        const W = 1600, H = 520;
+        const C = { bg: '#0b0e14', card: '#161b24', line: '#2a3140', text: '#eef1f5', dim: '#8d97a8', yellow: '#ffd500', green: '#39c27a', red: '#ff6b5b' };
+        const ago = () => {
+            if (!last.at) return '';
+            const m = Math.round((Date.now() - last.at) / 60000);
+            return m < 1 ? 'just now' : m < 120 ? m + ' min ago' : Math.round(m / 60) + ' h ago';
+        };
+        const ipv4 = () => {
+            const out = [], all = os.networkInterfaces();
+            Object.keys(all).forEach((n) => (all[n] || []).forEach((a) => { if (a.family === 'IPv4' || a.family === 4) out.push(n + ' ' + a.address); }));
+            return out;
+        };
+        const tile = (cv, x, w, label, value, unit, sub) => {
+            cv.roundRect(x, 24, w, 210, 18, C.card);
+            cv.text(label, x + 28, 68, 26, C.dim, { literal: true });
+            cv.text(value, x + 28, 168, 84, C.text, { font: 'bold', literal: true });
+            if (unit) cv.text(unit, x + 28 + cv.textWidth(value, 84, { font: 'bold', literal: true }) + 14, 168, 34, C.dim, { literal: true });
+            if (sub) cv.text(sub, x + 28, 212, 24, C.dim, { literal: true });
+        };
         const show = () => {
-            const t = last.at ? new Date(last.at).toISOString().slice(11, 16) + ' UTC' : '';
-            ctx.ui.cells('ROW_FUEL', 0, { Text2ndCol: last.litres != null ? last.litres + ' L' : '--' });
-            ctx.ui.cells('ROW_RANGE', 0, { Text2ndCol: last.rangeKm != null ? last.rangeKm + ' km' : '--' });
-            ctx.ui.cells('ROW_CONS', 0, { Text2ndCol: last.l100km != null ? last.l100km.toFixed(1) + ' L/100km' : '--' });
-            ctx.ui.cells('ROW_LINK', 0, { Text2ndCol: (serving ? (tailnet ? tailnet + ':' + port : 'on, port ' + port + ', no tailnet yet') : 'off') + (t ? ', ' + t : '') });
+            const cv = ctx.canvas(W, H);
+            cv.clear(C.bg);
+            const tank = cfg.tankLitres || 59;
+            tile(cv, 24, 500, 'Fuel left', last.litres != null ? String(last.litres) : '--', last.litres != null ? 'L' : '',
+                last.litres != null ? Math.round(last.litres / tank * 100) + ' % of ' + tank + ' L' : 'waiting for the car');
+            tile(cv, 548, 500, 'Range', last.rangeKm != null ? String(last.rangeKm) : '--', last.rangeKm != null ? 'km' : '', ago());
+            tile(cv, 1072, 504, 'Consumption', last.l100km != null ? last.l100km.toFixed(1) : '--', last.l100km != null ? 'L/100km' : '', 'fuel left / range');
+            // where to reach it
+            cv.roundRect(24, 258, 1552, 238, 18, C.card);
+            const ok = serving && tailnet;
+            cv.circle(60, 302, 11, ok ? C.green : serving ? C.yellow : C.red);
+            cv.text(ok ? 'On your tailnet:  http://' + tailnet + ':' + port : serving ? 'Running, but no tailnet address on this head unit' : 'Not running: port ' + port + ' could not be opened',
+                84, 312, 34, ok ? C.green : C.text, { font: 'bold', literal: true });
+            cv.text(ok ? 'Enter this address under "车辆地址" on the Shell diesel page, then tap 读取.'
+                : 'Phone and page reach it only through an address on the tailnet (100.x).', 84, 358, 24, C.dim, { literal: true });
+            cv.text('Addresses here:  ' + (ipv4().join('   ') || 'none'), 84, 410, 22, C.dim, { literal: true });
+            cv.text('Local: http://127.0.0.1:' + port + '/fuel ' + (serving ? '(on)' : '(off)') + '    Fuel Link ' + ctx.spec.version, 84, 452, 22, C.dim, { literal: true });
+            ctx.ui.image('MAIN_GFX', cv);
         };
         let serving = false, saved = 0, tailnet = null;
 
@@ -74,7 +108,7 @@ mgu.run({
         };
 
         // loopback always; the tailnet address once it is up (CGNAT 100.64.0.0/10, the range Tailscale gives out)
-        const os = require('os'), bound = {};
+        const bound = {};
         const listen = (host) => {
             if (bound[host]) return;
             bound[host] = true;
@@ -100,7 +134,8 @@ mgu.run({
         listen('127.0.0.1');
         const look = () => { try { const a = tailnetAddr(); if (a) listen(a); } catch (e) { ctx.log.warn('tailnet address: ' + e.message); } };
         look();
-        setInterval(look, 30000);
+        setInterval(() => { look(); show(); }, 30000);
+        if (ctx.ui.onClick) ctx.ui.onClick('BTN_REFRESH', () => { look(); show(); });
         show();
     },
 });

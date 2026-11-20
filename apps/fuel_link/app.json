@@ -2,7 +2,7 @@
   "id": "fuel_link",
   "title": "Fuel Link",
   "description": "Shares the fuel left (litres) and the range with your own phone over your tailnet, read-only, for the Shell diesel page",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "vendor": "custom",
   "loggingId": "OAF1",
   "iconGlyph": "FUL",
@@ -14,28 +14,12 @@
   "screens": [
     {
       "name": "MAIN",
-      "kind": "list",
+      "kind": "canvas",
       "title": "Fuel Link",
-      "items": [
+      "buttons": [
         [
-          "twocol",
-          "ROW_FUEL",
-          "Fuel left"
-        ],
-        [
-          "twocol",
-          "ROW_RANGE",
-          "Range"
-        ],
-        [
-          "twocol",
-          "ROW_CONS",
-          "Consumption"
-        ],
-        [
-          "twocol",
-          "ROW_LINK",
-          "Link"
+          "BTN_REFRESH",
+          "Refresh"
         ]
       ]
     }
