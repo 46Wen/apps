@@ -2,8 +2,9 @@
   "id": "fuel_link",
   "title": "Fuel Link",
   "description": "Shares the fuel left (litres) and the range with your own phone over your tailnet, read-only, for the Shell diesel page",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "vendor": "custom",
+  "startType": "autostart",
   "loggingId": "OAF1",
   "iconGlyph": "FUL",
   "signals": {

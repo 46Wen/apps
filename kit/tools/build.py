@@ -426,6 +426,13 @@ def build(app_id, language='en'):
             'userLoginRequired': False, 'backgroundPriority': 200, 'someipManifest': 'manifest.json',
         },
     }
+    # bimmer-lab addition: app.json "startType" -> package.json "mguAppStartType", which the Store's deploy tool
+    # lists for MainApp (mgu-store deploy/README.md, "App package fields"): "autostart" starts the app with the head
+    # unit and again when it stops; "manually" (the default) waits for a tap on its tile.
+    if spec.get('startType') is not None:
+        if spec['startType'] not in ('autostart', 'lum', 'manually'):
+            sys.exit('app.json "startType" must be autostart, lum or manually, not ' + repr(spec['startType']))
+        pkg['mguAppStartType'] = spec['startType']
     json.dump(pkg, open(os.path.join(src, 'package.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     json.dump(manifest, open(os.path.join(src, 'manifest.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     shutil.copy(os.path.join(KIT, 'platform', 'permissions.json'), os.path.join(src, 'permissions.json'))
