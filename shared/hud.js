@@ -296,12 +296,16 @@ const STATUS_ASK_MS = 2000;      // after a rebuild: ask cluster-render for its 
 // an image layer is "stalled" until its first pixels reach cluster-render, which after a rebuild takes a second or two
 // through the upload budget: normal. Only one still stalled this long is logged as a problem (and its recovery)
 const STALL_WARN_MS = 5000;
-// The switch cover (cluster only): one black full-screen effect layer, put up just before a rebuild drops the old
-// layers and dropped once every new layer is shown, so BMW's own cluster doesn't flash through while the new theme
-// is built (a drive mode change, a map window opening or closing). An effect layer costs no pixel memory; it has a
-// connection of its own (<app id>_cover), so it never takes a layer a theme's connections need.
+// The switch cover (cluster only): one full-screen effect layer, black from just before a rebuild drops the old
+// layers until every new layer is shown, so BMW's own cluster doesn't show through while the new theme is built (a
+// drive mode change, a map window opening or closing). An effect layer costs no pixel memory; it has a connection of
+// its own (<app id>_cover), so it never takes a layer a theme's connections need.
+// Standby: while the theme changes with the drive mode and some mode has a theme, the cover stays up, see-through
+// (u_a 0), also while a mode shows BMW's own cluster. BMW's cluster shows through it, and the cluster's screen stays
+// ours, so a switch from BMW's own to a theme turns it black at once instead of asking BMW for the screen again
+// and showing BMW's own cluster of the new mode while the theme is built.
 const COVER_MAX_MS = 5000;       // the cover comes down by then whatever the new layers say
-const COVER_FS = 'precision mediump float;\nvoid main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }\n';
+const COVER_FS = 'precision mediump float;\nuniform float u_a;\nvoid main() { gl_FragColor = vec4(0.0, 0.0, 0.0, u_a); }\n';
 const LAYER_BUDGET = 8;          // cluster-render's limit per client connection (CompositorLimits.per_client; confirmed on the car Nov 5 2026)
 const MAX_CONN = 4;              // connections a layout may ask for ("conn"): 32 layers service-wide / 8 per connection
 const PIXEL_BYTES = 16 * 1024 * 1024;   // cluster-render's pixel memory for every app's images together (CompositorLimits.pixel_bytes)
@@ -576,6 +580,7 @@ class HudApp {
         this.cover = null;               // the switch cover while it is up: { c, ref, at } (_coverUp)
         this.coverTimer = null;
         this.coverClient = null;         // the cover's own connection to cluster-render (cluster only), from start()
+        this.standbyRef = null;          // the standby layer (the cover, see-through between switches), while up
         this.claimBy = null;             // the id of another kit app holding the HUD now (hud_claim), we step aside
         this.testAt = null;              // the shift-light test's start (Date.now()), while it runs
         this.nightOn = false;            // the layout was built with the night colours (nightDim)
@@ -946,7 +951,12 @@ class HudApp {
         if (this.waze) { this.waze.start(); this._wazeWant(); }
         if (this.target === 'panel') {
             this.coverClient = new ClusterRender(this.ctx.spec.id + '_cover', this.socketPath);
-            this.coverClient.on('refused', (op, ref, reason) => this.log.warn('switch cover: ' + op + ' refused: ' + reason));
+            this.coverClient.on('refused', (op, ref, reason) => {
+                this.log.warn('switch cover: ' + op + ' refused: ' + reason);
+                if (ref && ref === this.standbyRef) this.standbyRef = null;
+            });
+            // the client makes its layers again after a reconnect; the first time, the standby goes up now
+            this.coverClient.on('ready', () => this._guard('standby', () => this._standby()));
             this.coverClient.connect();
         }
         this.screen.start();
@@ -1286,6 +1296,7 @@ class HudApp {
     }
 
     _status() {
+        this._guard('standby', () => this._standby());
         // the Waze map's state rides along while that setting is on (and redraws the page's Map tab when it changes)
         const s = this.statusText() + (this.waze && this._mapWanted() ? '; Waze: ' + this.waze.info().text : '');
         const d = this.modeDiagLines().join('\n');
@@ -1897,14 +1908,49 @@ class HudApp {
      */
     _coverUp() {
         if (this.target !== 'panel' || this.cover || !this.started) return;
-        if (!this._layerRefs().length || this._layoutName() === 'off') return;
-        const c = this.coverClient;
-        if (!c || !c.ready) return;
-        const [w, h] = TARGET_SIZES.panel;
-        const ref = c.effect({ target: 'panel', klass: 'overlay', z: 1000, x: 0, y: 0, w, h, fs: COVER_FS });
-        if (!ref) return;
-        this.cover = { c, ref, at: Date.now() };
+        if (this._layoutName() === 'off') return;
+        if (this.standbyRef) {
+            // the standby layer is up (see-through): black at once
+            this.coverClient.uniform(this.standbyRef, 'u_a', [1]);
+            this.cover = { c: this.coverClient, ref: this.standbyRef, at: Date.now(), standby: true };
+        } else {
+            if (!this._layerRefs().length) return;
+            const c = this.coverClient;
+            if (!c || !c.ready) return;
+            const [w, h] = TARGET_SIZES.panel;
+            const ref = c.effect({ target: 'panel', klass: 'overlay', z: 1000, x: 0, y: 0, w, h, fs: COVER_FS });
+            if (!ref) return;
+            c.uniform(ref, 'u_a', [1]);
+            this.cover = { c, ref, at: Date.now(), standby: false };
+        }
         this.coverTimer = setTimeout(() => this._guard('switch cover', () => this._coverDown('timed out')), COVER_MAX_MS);
+    }
+
+    /** Standby wanted: the cluster, the theme changing with the drive mode, some mode with a theme, nothing holding us back. */
+    _standbyWanted() {
+        if (this.target !== 'panel' || !this.started || this.setting('byMode') !== true) return false;
+        if (this.scenesApart === false || this.claimBy || this.screen.yielded) return false;   // the HUD needs the shared scene
+        if (this.vstate.hold() || this.vstate.drop()) return false;                            // switching off: let go of everything
+        return ['inComfort', 'inSport', 'inEco'].some((k) => { const v = this.setting(k); return v && v !== 'off'; });
+    }
+
+    /** The standby layer up or down as wanted (cheap; from every status update). */
+    _standby() {
+        const want = this._standbyWanted();
+        if (want && !this.standbyRef) {
+            const c = this.coverClient;
+            if (!c || !c.ready) return;
+            const [w, h] = TARGET_SIZES.panel;
+            const ref = c.effect({ target: 'panel', klass: 'overlay', z: 1000, x: 0, y: 0, w, h, fs: COVER_FS });
+            if (!ref) return;
+            c.uniform(ref, 'u_a', [0]);
+            this.standbyRef = ref;
+            this.log.info('standby: holding the cluster\'s screen (see-through) for quick theme switches');
+        } else if (!want && this.standbyRef && !(this.cover && this.cover.standby)) {
+            try { this.coverClient.drop(this.standbyRef); } catch (e) { /* the connection went */ }
+            this.standbyRef = null;
+            this.log.info('standby: off, the cluster\'s screen goes back to BMW when no theme shows');
+        }
     }
 
     /** The cover down once every layer of the new layout is shown (or there is none to wait for). */
@@ -1920,7 +1966,8 @@ class HudApp {
         clearTimeout(this.coverTimer); this.coverTimer = null;
         const k = this.cover;
         this.cover = null;
-        try { k.c.drop(k.ref); } catch (e) { /* the connection went; nothing to drop */ }
+        try { if (k.standby) k.c.uniform(k.ref, 'u_a', [0]); else k.c.drop(k.ref); } catch (e) { /* the connection went; nothing to drop */ }
+        this._standby();
         this.log.info('switch cover down after ' + (Date.now() - k.at) + ' ms (' + why + ')');
     }
 

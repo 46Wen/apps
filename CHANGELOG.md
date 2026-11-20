@@ -2,7 +2,9 @@
 
 Newest first. Dates are when the build was pushed.
 
-## Nov 19 2026
+## Nov 20 2026
+
+- **Cluster Themes 0.19.3:** a smoother switch from BMW's own cluster to a theme. With the theme changing with the drive mode and some mode set to BMW's own (for example Comfort and Eco Pro on BMW's own, Sport on M), the app now keeps the cluster's screen while BMW's own shows, under a see-through layer, so BMW's cluster looks exactly as before. Pressing SPORT turns the cluster black at once and the theme shows when it is drawn, instead of BMW's own Sport cluster showing for a second while the app asks for the screen again and builds the theme. Going back to a mode on BMW's own shows BMW's cluster at once. Tried on the bench; not yet tested on a car.
 
 - **Cluster Themes 0.19.2:** the Waze map per drive mode. With the theme changing with SPORT / COMFORT / ECO PRO and "Show Waze map inside the theme" on, the Map tab now has a switch for each mode (all on at first, so nothing changes until you turn one off). Turn Sport off, for example, and Sport shows the full theme without the map window while Waze goes back to BMW's own map view; Comfort and Eco Pro keep the map in the theme. The map follows the drive mode as you switch. Tried on the bench; not yet tested on a car.
 
