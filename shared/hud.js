@@ -302,6 +302,13 @@ const STALL_WARN_MS = 5000;
 // of the new mode showing while the theme would be built. A hidden layer doesn't hold the cluster's screen, so a
 // see-through hold layer does (its own connection, <app id>_cover; an effect layer costs no pixel memory); with the
 // screen let go, BMW would show again only once the theme has asked for it back.
+// At start, with the theme changing with the drive mode, BMW's own cluster stays until the car says which mode it is
+// in (a theme for the wrong mode would flash up first); without a mode by then, the usual rules ("hudLayout").
+const MODE_WAIT_MS = 60000;
+// A layout kept ready is not hidden but parked: every layer drawn 1 x 1 px at the top-left corner, under the hood line
+// where the driver sees nothing (shared/visible.js), so its shaders are compiled and its pictures sent before the
+// first switch to it, which then only moves the layers back.
+const PARK = { x: 0, y: 0, w: 1, h: 1 };
 const HOLD_FS = 'precision mediump float;\nvoid main() { gl_FragColor = vec4(0.0); }\n';
 const LAYER_BUDGET = 8;          // cluster-render's limit per client connection (CompositorLimits.per_client; confirmed on the car Nov 5 2026)
 const MAX_CONN = 4;              // connections a layout may ask for ("conn"): 32 layers service-wide / 8 per connection
@@ -944,6 +951,12 @@ class HudApp {
         this._status();
         this._startDme();
         if (this.waze) { this.waze.start(); this._wazeWant(); }
+        this.modeWaitUntil = Date.now() + MODE_WAIT_MS;
+        this.modeWaitTimer = setTimeout(() => this._guard('drive mode wait', () => {
+            if (this.driveMode || this.setting('byMode') !== true) return;
+            this.log.info('no drive mode from the car after ' + MODE_WAIT_MS / 1000 + ' s: the "otherwise" layout');
+            if (this._buildName() !== this.activeName) this._rebuild(); else { this._applyHidden(); this._mapCheck(); }
+        }), MODE_WAIT_MS + 100);
         if (this.target === 'panel') {
             this.coverClient = new ClusterRender(this.ctx.spec.id + '_cover', this.socketPath);
             this.coverClient.on('refused', (op, ref, reason) => {
@@ -1049,6 +1062,7 @@ class HudApp {
         clearInterval(this.claimTimer);
         clearTimeout(this.statusAskT);
         clearTimeout(this.diagTimer); this.diagTimer = null;
+        clearTimeout(this.modeWaitTimer);
         if (this.coverClient) this._guard('hold layer stop', () => this.coverClient.close());
         this.vstate.stop();
         this.stallTimers.forEach((t) => clearTimeout(t)); this.stallTimers.clear();
@@ -1146,6 +1160,8 @@ class HudApp {
     }
     /** The layout the driver picked for now, before anything that makes us step aside. */
     _chosenName() {
+        // just started, the drive mode not known yet: BMW's own for now (MODE_WAIT_MS), not the "otherwise" layout
+        if (this.setting('byMode') === true && !this.driveMode && this.modeWaitUntil && Date.now() < this.modeWaitUntil) return 'off';
         if (this.setting('byMode') === true && this.driveMode && MODE_KEY[this.driveMode]) {
             const v = this.setting(MODE_KEY[this.driveMode]);
             if (v) return v;
@@ -1915,12 +1931,12 @@ class HudApp {
     /** The layout on the cluster now ('off' while BMW's own shows, also with a theme ready in the background). */
     shownLayout() { return this.hidden ? 'off' : this.activeName; }
 
-    /** Hide or show the layout built as wanted (a drive mode switch between BMW's own and the theme ready). */
+    /** Park or show the layout built as wanted (a drive mode switch between BMW's own and the theme ready). */
     _applyHidden() {
         const want = this.activeName !== 'off' && !!this._prebuildName();
         if (want === this.hidden) return;
         this.hidden = want;
-        this._layerRefs().forEach((r) => r.c.set(r.ref, { visible: !want }));
+        this.placed.forEach((l) => l.c.set(l.ref, want ? PARK : { x: l.x, y: l.y, w: l.w, h: l.h }));
         this._wazeWant();
         if (want) { this.log.info('"' + this.activeName + '" ready in the background, BMW\'s own cluster shows'); return; }
         this.log.info('"' + this.activeName + '" shown from the background');
@@ -2135,7 +2151,7 @@ class HudApp {
     /** One image layer for a sheet: every member painted into a local buffer, then sent whole once. */
     _createSheet(s) {
         const c = this._clientAt(s.conn);
-        const ref = c.image({ target: this.target, klass: s.klass, z: s.z, x: s.x, y: s.y, w: s.w, h: s.h, iw: s.w, ih: s.h, visible: !this.hidden });
+        const ref = c.image(Object.assign({ target: this.target, klass: s.klass, z: s.z, x: s.x, y: s.y, w: s.w, h: s.h, iw: s.w, ih: s.h }, this.hidden ? PARK : null));
         if (!ref) { this.log.warn('sheet ' + s.klass + '/' + s.z + ' at ' + s.x + ',' + s.y + ' ' + s.w + 'x' + s.h + ': layer refused'); return; }
         s.ref = ref; s.c = c; s.ci = s.conn;
         this.placed.push({ c, ref, x: s.x, y: s.y, w: s.w, h: s.h });
@@ -2194,7 +2210,7 @@ class HudApp {
         if (sheet) { ref = sheet.ref; c = sheet.c; }
         else {
             c = this._clientAt(this._connOf(w));
-            const base = { target: this.target, klass: w.class || 'content', z: w.z || 0, x: w.x, y: w.y, w: w.w, h: w.h, visible: !this.hidden };
+            const base = Object.assign({ target: this.target, klass: w.class || 'content', z: w.z || 0, x: w.x, y: w.y, w: w.w, h: w.h }, this.hidden ? PARK : null);
             if (IMAGE_TYPES[w.type]) ref = c.image(Object.assign({ iw: w.w, ih: w.h }, w.type === 'nav' ? this._navImage(w) : null, base));
             else ref = c.effect(Object.assign({ fs: w.type === 'swatch' ? calibration.SWATCH : shaders[w.type] }, base));
             if (!ref) { this.log.warn('widget "' + w.id + '": layer refused'); return; }
