@@ -604,16 +604,18 @@ class Page {
     settingsTab(cv, bottom) {
         label(cv, CX, 70, 'Settings');
         const keys = this.cfg.settings.filter((k) => this.item(k));
-        const colW = (CW - 24) / 2, per = Math.ceil(keys.length / 2);
+        const colW = (CW - 24) / 2, half = Math.ceil(keys.length / 2);
         // issue #8: the drive mode check (raw signal values, only the signals this app listens to: cfg.modeCheck)
         // under the right column while "Change with the drive mode" is on
         const diag = this.hud.modeDiagLines ? this.hud.modeDiagLines(this.cfg.modeCheck || []) : [];
         // the page's room depends on the screen (bottom 512 without extra room below it): compact rows (46 high,
         // 52 apart) when the full ones, the drive mode check and the status line don't all fit, tight ones (40, 46)
-        // when even those don't (Cluster Themes' 14 rows with the check on)
-        const fits = (h, pitch) => 84 + (per - 1) * pitch + h <= bottom - 24 &&
+        // when even those don't, and last one more row on the left with the rows 44 apart, so the check has room
+        // under the right column (Cluster Themes' 16 rows with the check on)
+        const fits = (h, pitch, per) => 84 + (per - 1) * pitch + h <= bottom - 24 &&
             84 + (keys.length - per) * pitch + 10 + 20 * diag.length <= bottom - 24;
-        const [h, pitch] = fits(56, 64) ? [56, 64] : fits(46, 52) ? [46, 52] : [40, 46];
+        const tiers = [[56, 64, half], [46, 52, half], [40, 46, half], [40, 44, half + 1]];
+        const [h, pitch, per] = tiers.find((t) => fits(t[0], t[1], t[2])) || tiers[tiers.length - 1];
         keys.forEach((k, i) => {
             const x = CX + (i < per ? 0 : colW + 24), y = 84 + (i % per) * pitch;
             if (y + h > bottom) return;
