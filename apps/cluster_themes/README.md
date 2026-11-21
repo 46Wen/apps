@@ -132,7 +132,7 @@ More themes are on the way.
 - **Off (BMW's own cluster):** pick it as the theme and the app draws nothing, so BMW's cluster comes back.
 - **Change with SPORT / COMFORT / ECO PRO** (on by default): the cluster follows the drive mode buttons, with a theme for each mode. Out of the box, Sport shows GT3, and Comfort and Eco Pro show BMW's own cluster. Until the car reports a mode, the plain theme setting is used.
 - **M cars:** Efficient, Sport and Sport+ from M Setup switch the theme too.
-- **Plug-in hybrids:** Sport and Sport Plus switch to your Sport theme; Hybrid, Electric and Battery Control count as Comfort, and Hybrid Eco Pro as Eco Pro.
+- **Plug-in hybrids:** Sport and Sport Plus switch to your Sport theme; Hybrid, Electric and Battery Control count as Comfort, and Hybrid Eco Pro as Eco Pro. You can also give Hybrid and Electric themes of their own (In Hybrid, In Electric on the Themes tab); Battery Control counts as Hybrid there.
 - **With HUD Widgets:** on cluster-render 0.5.1 and newer, a cluster theme and a HUD layout show at the same time. On older cluster-render they share one screen slot and take turns: pick a theme while the HUD is on and the page asks whether to turn HUD Widgets off, and it asks the same the other way round.
 
 ## Settings
