@@ -426,7 +426,8 @@ function driveModeName(raw) {
 
 function driveVariantOf(raw) {
     const u = driveModeName(raw);
-    return !u ? null : /PLUS|EXPERT/.test(u) ? 'plus' : /INDIVID/.test(u) ? 'individual' : null;
+    // 'adaptive': Adaptive (10) uses the Comfort slot but is named as itself next to the gear (issue #29)
+    return !u ? null : /PLUS|EXPERT/.test(u) ? 'plus' : /INDIVID/.test(u) ? 'individual' : u.indexOf('ADAPTIVE') === 0 ? 'adaptive' : null;
 }
 
 /** The M theme's setup rows: what each part is set to in a drive mode (they follow the mode buttons). */
@@ -529,7 +530,7 @@ class HudApp {
         this.tripT = 0;
         this.driveMode = null;           // 'comfort' | 'sport' | 'eco', once the car has said
         this.driveRaw = null;            // a drive mode value the car sent that we don't know (shown in the status)
-        this.driveVariant = null;        // 'plus' (Sport+ / Comfort+ / Eco Pro+), 'individual', or null
+        this.driveVariant = null;        // 'plus' (Sport+ / Comfort+ / Eco Pro+), 'individual', 'adaptive' (Comfort), or null
         this.carUnits = { press: null, temp: null, psiSeen: false };   // the car's display units, for the TPMS values
         this.program = null;             // 'S' / 'M' from the MDrive gearbox display, else null (D)
         this.gradeMode = null;           // the same display for the shift grades: D / S / M, null while unknown
@@ -1785,6 +1786,7 @@ class HudApp {
             }
             case 'mode': {
                 if (!this.driveMode) return '';
+                if (this.driveVariant === 'adaptive') return 'ADAPTIVE';
                 const base = this.driveMode === 'sport' ? 'SPORT' : this.driveMode === 'eco' ? 'ECO PRO' : 'COMFORT';
                 return base + (this.driveVariant === 'plus' ? ' PLUS' : this.driveVariant === 'individual' ? ' INDIVIDUAL' : '');
             }
