@@ -4,6 +4,12 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 20 2026
 
+- **Cluster Themes 0.19.2, HUD Widgets 0.15.2:**
+  - **Plug-in hybrids switch with the drive mode** (issue #31): Sport and Sport Plus pick your Sport theme or layout, Hybrid, Electric and Battery Control count as Comfort, and Hybrid Eco Pro as Eco Pro. Before, a plug-in hybrid's modes weren't recognised and nothing switched. Thanks to the reporter of #31 for finding the values on a 330e. Other cars switch as before.
+  - **Temperature and pressure units of their own** (issues #24, #32): two new settings under Units in Cluster Themes, Temperature (°C or °F) and Pressure (bar or psi), for mph with °C and psi as in the UK. Both start on Match speed, so nothing changes until you pick one. HUD Widgets keeps its one Units setting.
+  - **Leave BMW's bottom strip clear** (Cluster Themes, off by default): for cars where BMW still draws two black boxes over the theme, like M cars and the G22 4 Series (issues #11, #1). The theme then ends just above BMW's bottom strip, and BMW shows its own clock, range and outside temperature there. Nothing is squeezed or shrunk.
+  - The Settings tab's rows get a little shorter on smaller screens so all of them fit.
+  - Not yet tested on a car.
 - **Cluster Themes 0.19.1, HUD Widgets 0.15.1:** fixes the Store refusing to install 0.19.0 and 0.15.0 on some cars ("instance "1" is not on this unit"). The music panel now asks the car for the front screen's now playing by the name the car uses. Nothing else changes. Not yet tested on a car.
 
 ## Nov 15 2026
