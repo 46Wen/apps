@@ -2,6 +2,10 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 21 2026
+
+- **Cluster Themes 0.19.3, HUD Widgets 0.15.3:** a safety net for installing. When the Store builds the app on your car, anything your car's software doesn't have (a signal, or one way of reading it) is now left out of that build, instead of the Store refusing the whole app as it did with 0.19.0. The app then runs without that one readout and says so in its log. Nothing changes on cars that have everything. This comes from the MGU App Kit, which alexpereap pointed to in #26. Not yet tested on a car.
+
 ## Nov 20 2026
 
 - **Cluster Themes 0.19.2, HUD Widgets 0.15.2:**
