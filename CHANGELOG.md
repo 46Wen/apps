@@ -4,6 +4,7 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 21 2026
 
+- **Cluster Themes 0.19.8:** Cruise's clock, range and outside temperature along the bottom are now as big as the fuel and oil figures, about twice their old height, so they read at a glance (issue #33). Not yet tested on a car.
 - **Cluster Themes 0.19.7, HUD Widgets 0.15.7:** plug-in hybrids get **In Hybrid** and **In Electric** next to Comfort, Sport and Eco Pro on the Themes tab (issue #31). Hybrid, Hybrid Eco Pro and Battery Control use the Hybrid theme, Electric uses the Electric one. Both start on "Same as the drive mode", so nothing changes until you pick one. They show once the car has sent a plug-in hybrid mode. The idea comes from FDX100's KurdBimmer Themes. Not yet tested on a car.
 - **Cluster Themes 0.19.6, HUD Widgets 0.15.6:** a **Start with the car** switch on the Settings tab, on by default. Turn it off and the app waits until you open it before it draws anything, as it did before 0.19.4. On smaller screens the Settings tab's rows sit a little closer together so all of them fit.
 - **Cluster Themes 0.19.5, HUD Widgets 0.15.5:** in Adaptive, the themes and layouts now say ADAPTIVE next to the gear instead of COMFORT (issue #29). Adaptive still uses your Comfort theme or layout.
