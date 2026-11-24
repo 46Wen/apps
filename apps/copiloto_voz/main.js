@@ -3,9 +3,7 @@
  * Copiloto de voz: el coche habla. Frases grabadas (voces/<aviso>.m4a), de usted, cuando pasa algo; por prioridad
  * (engine.js EVENTS), de una en una, nunca durante una llamada (announcer.js):
  *
- *    1 combustible     autonomía de 50 km o menos (ajuste); el coche busca la Shell más conveniente con el algoritmo de
- *                      shell-diesel (fuel.js: GPS del coche, precios del Ministerio, coste de llenar + trayecto) y la
- *                      ofrece en el iDrive: «Shell … ¿Ir?»
+ *    1 combustible     autonomía de 50 km o menos (ajuste), una vez hasta repostar
  *    2 neumaticos      el aviso de presión de BMW (Check Control), una vez por viaje
  *    3 hielo           3 °C o menos fuera, conduciendo, una vez por viaje
  *    4 motor_frio      aceite por debajo de 80 °C y más de 2.500 rpm, una vez por viaje
@@ -18,9 +16,8 @@
  *   11 motor_caliente  el aceite llega a 80 °C (en un viaje que empezó en frío), siempre el último
  *
  * Arranca con el coche (app.json "autostart"): todo corre en background(), con o sin la pantalla abierta. Solo lee
- * del coche (la batería, con diagnosis de solo lectura: kit/readonly-diag.js); lo único que hace es reproducir sonido
- * y mandar el aviso al iPhone. La pantalla (start): cada aviso con su icono, si está activo y cuándo sonó, y el estado
- * de la voz, el iPhone y el coche. Node 8 (el del coche, 8.16.2).
+ * del coche (la batería, con diagnosis de solo lectura: kit/readonly-diag.js); lo único que hace es reproducir sonido. La pantalla (start): cada aviso con su icono, si está activo y cuándo sonó, y el estado
+ * de la voz y el coche. Node 8 (el del coche, 8.16.2).
  */
 const fs = require('fs');
 const path = require('path');
@@ -30,11 +27,6 @@ const { ReadOnlyDiag } = require('./kit/readonly-diag');
 const { Engine, EVENTS, PRIORITY, KEEP } = require('./engine');
 const { Announcer } = require('./announcer');
 const { Speaker } = require('./speaker');
-const { Notifier } = require('./notify');
-const { Net } = require('./net');
-const { FuelFinder } = require('./fuel');
-const navcat = require('./navcat');
-const tz = require('./tz');
 const { phraseFor } = require('./phrases');
 const D = require('./decode');
 
@@ -51,16 +43,8 @@ const DME = 0x12;
 
 mgu.run({
     async background(bg) {
-        const log = bg.log, settings = bg.settings, cfg = bg.spec.config || {};
-        const net = new Net(bg.dataDir);
-        const finder = new FuelFinder({ net, log, dataDir: bg.dataDir });
-        let pos = { nav: null, gnss: null };          // { lat, lon, at }
-        const where = () => { const t = Date.now(); const ok = (p) => p && t - p.at < 120000; return ok(pos.nav) ? pos.nav : ok(pos.gnss) ? pos.gnss : (pos.nav || pos.gnss); };
-        // the fuel search: state 'idle' | 'searching' | 'ok' | 'error'; the page and the pop-up show it
-        const fuel = { state: 'idle', result: null, error: null, at: 0 };
-        let ui = null;                                 // the screens' ui, once start() has it (for the pop-up)
+        const log = bg.log, settings = bg.settings;
         const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: [path.join(__dirname, 'voces')] });
-        const notifier = new Notifier({ net, dataDir: bg.dataDir, log });
         const memoFile = path.join(bg.dataDir, 'memo.json');
         const listeners = [];
         const changed = () => listeners.forEach((fn) => { try { fn(); } catch (e) { /* the page */ } });
@@ -77,7 +61,6 @@ mgu.run({
             cfg: { fuelKm: settings.get('fuelKm') || 50 },
             say: (ev, info) => {
                 announcer.add(ev);
-                if (ev === 'combustible') searchFuel(info);
                 changed();
             },
         });
@@ -90,44 +73,6 @@ mgu.run({
             try { fs.writeFileSync(memoFile, s); } catch (e) { log.warn('memo: ' + e.message); }
         };
         settings.onChange((key) => { if (key === 'fuelKm') engine.cfg.fuelKm = settings.get('fuelKm') || 50; });
-
-        // the best Shell from where the car is (fuel.js), offered in a pop-up: «Shell … ¿Ir?»
-        const showPop = () => {
-            if (!ui || fuel.state !== 'ok' && fuel.state !== 'error') return;
-            const p = fuel.result && fuel.result.pick;
-            const text = fuel.state === 'ok' ? p.name + ' · ' + p.line + '. ' + p.address + '. ¿Ir?' : 'No he podido buscar gasolinera: ' + fuel.error;
-            ui.open('FUEL_POP').then(() => ui.text('FUEL_POP_TEXT', text));
-            setTimeout(() => ui.close('FUEL_POP'), 60000);
-        };
-        const searchFuel = (info) => {
-            if (fuel.state === 'searching') return;
-            const here = where();
-            fuel.state = 'searching'; fuel.at = Date.now(); changed();
-            const st = engine.state(), litres = info && info.litres !== undefined ? info.litres : st.litres, range = info && info.range !== undefined ? info.range : st.range;
-            const l100 = litres > 0 && range > 20 ? litres / range * 100 : (cfg.l100 || 6.5);
-            const go = here ? finder.find({ lat: here.lat, lon: here.lon, fuel: settings.get('fuelType') === 'gp' ? 'gp' : 'ga', litresLeft: litres || 0,
-                rangeKm: range, tank: settings.get('tank') || 59, l100: l100, radiusKm: settings.get('radiusKm') || 25,
-                offsetMin: tz.offset(settings.get('timeZone'), Date.now()) || 0 }) : Promise.reject(new Error('el coche aún no tiene su posición GPS'));
-            go.then((r) => {
-                fuel.state = 'ok'; fuel.result = r; fuel.error = null;
-                log.info('fuel: ' + r.pick.name + ' ' + r.pick.line + ' (' + r.pick.why + '; ' + r.count + ' Shell, ' + r.how + ', precios ' + r.pricesDate + ')');
-                if (settings.get('phone') === true) notifier.station(r.pick).then(changed);
-            }, (e) => {
-                fuel.state = 'error'; fuel.error = String(e && e.message || e); log.warn('fuel: ' + fuel.error);
-            }).then(() => { changed(); showPop(); });
-        };
-        // «Ir»: BMW's navigation to the station. Which call does it is being found out (navcat.js: the catalog); until then
-        // the station stays on the page, with its address, and goes to the iPhone when that is on
-        const goFuel = () => {
-            if (ui) ui.close('FUEL_POP');
-            const p = fuel.result && fuel.result.pick;
-            if (!p) return;
-            log.info('fuel: Ir -> ' + p.name + ' ' + p.station.lat + ',' + p.station.lon + ' (BMW navigation: not wired yet, see navegador.json)');
-            fuel.go = Date.now();
-            changed();
-        };
-        // the navigation's catalog, read once for this version, a few minutes after the start
-        setTimeout(() => navcat.explore(bg.dataDir, bg.spec.version, log).then((t) => { if (t) { fuel.nav = t; changed(); } }), 3 * 60000);
 
         const missing = PHRASES.filter((p) => !speaker.file(p));
         log.info('recordings: ' + (PHRASES.length - missing.length) + ' of ' + PHRASES.length + (missing.length ? ', missing ' + missing.join(' ') : ''));
@@ -200,16 +145,10 @@ mgu.run({
             engine.openings(D.openingsOf(v));
             changed();
         } });
-        // where the car is: the navigation's position (best), else the GPS
-        bg.signals.watch('de.bmw.infotainment.navigation.positioning.Positioning', 'Main_Instance', { currentLocation: (v) => {
-            const p = D.navPositionOf(v); if (p) { p.at = Date.now(); pos.nav = p; }
-        } }, log).then((r) => { if (r.error) log.warn('positioning: ' + r.error); });
-        await W('de.bmw.infotainment.GPSData', { GPSPositionCAN: (v) => { const p = D.gnssPositionOf(v); if (p) { p.at = Date.now(); pos.gnss = p; } } });
         // the audio side ready before the first phrase
         speaker.init().catch(() => {});
         setInterval(() => { engine.tick(); announcer.pump(); saveMemo(); }, 5000);
-        return { engine, speaker, notifier, announcer, fuel, searchFuel, goFuel, where, inCall: () => call > 0, onChange: (fn) => listeners.push(fn),
-            setUi: (u) => { ui = u; u.onClick('FUEL_POP_OK', goFuel); } };
+        return { engine, speaker, announcer, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
     },
 
     async start(ctx) {
@@ -225,8 +164,7 @@ mgu.run({
             ctx.ui.image('MAIN_GFX', cv);
             return;
         }
-        const { engine, speaker, notifier, announcer, fuel } = bgs;
-        bgs.setUi(ctx.ui);
+        const { engine, speaker, announcer } = bgs;
         let testIdx = 0, note = '';
         const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'ahora' : m < 120 ? 'hace ' + m + ' min' : m < 2880 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.round(m / 1440) + ' días'; };
         const fit = (cv, s, size, w, o) => { s = String(s); o = Object.assign({ literal: true }, o || {}); if (cv.textWidth(s, size, o) <= w) return s; while (s.length > 1 && cv.textWidth(s + '…', size, o) > w) s = s.slice(0, -1); return s + '…'; };
@@ -266,8 +204,6 @@ mgu.run({
             let x = 1576;
             x = chip(cv, x, a.call ? 'En llamada: espera' : a.speaking ? 'Hablando: ' + TITLES[a.speaking] : 'Voz: ' + (speaker.lastError ? 'error' : have + '/' + PHRASES.length + ' frases'),
                 !speaker.lastError && have === PHRASES.length && !a.call, !speaker.lastError);
-            const here = bgs.where();
-            x = chip(cv, x, 'GPS ' + (here ? 'sí' : 'no') + ' · Internet ' + (notifier.online() ? 'sí' : 'no'), !!here && notifier.online(), !!here || notifier.online());
             chip(cv, x, 'Coche: ' + (s.cond === null ? 'esperando' : COND_TEXT[s.cond] || s.cond), s.cond !== null, true);
 
             // the notices: 4 x 3 tiles, in their order of priority
@@ -288,26 +224,15 @@ mgu.run({
                     cv.text('sin grabación', tx + 84, ty + 104, 15, C.amber, { literal: true });
                 }
             });
-            // the twelfth tile: the fuel station
+            // the twelfth tile: what the app reads from the car
+            const f = (v, u, d) => (v === null || v === undefined ? '--' : (d ? v.toFixed(d).replace('.', ',') : Math.round(v)) + u);
             const tx = GX + 3 * (TW + GAP), ty = GY + 2 * (TH + GAP);
             cv.roundRect(tx, ty, TW, TH, 12, C.tile);
-            cv.fillRect(tx, ty + 14, 4, TH - 28, fuel.state === 'ok' ? C.green : fuel.state === 'error' ? C.red : C.faint);
-            cv.text('Gasolinera', tx + 20, ty + 30, 18, C.dim, { literal: true });
-            if (fuel.state === 'ok') {
-                const p = fuel.result.pick;
-                cv.text(fit(cv, p.name, 23, TW - 40, { font: 'bold' }), tx + 20, ty + 60, 23, C.text, { font: 'bold', literal: true });
-                cv.text(fit(cv, p.line, 16, TW - 40), tx + 20, ty + 84, 16, C.light, { literal: true });
-                cv.text(fit(cv, p.address, 15, TW - 40), tx + 20, ty + 106, 15, C.dim, { literal: true });
-            } else {
-                const t = fuel.state === 'searching' ? 'Buscando la Shell más conveniente…' : fuel.state === 'error' ? fuel.error : 'Se busca sola con poco combustible';
-                cv.text(fit(cv, t, 18, TW - 40), tx + 20, ty + 64, 18, fuel.state === 'error' ? C.red : C.dim, { literal: true });
-                if (fuel.nav) cv.text(fit(cv, fuel.nav, 15, TW - 40), tx + 20, ty + 100, 15, C.faint, { literal: true });
-            }
-            // the car, in one line
-            const f = (v, u, d) => (v === null || v === undefined ? '--' : (d ? v.toFixed(d) : Math.round(v)) + u);
-            const carLine = 'Combustible ' + f(s.litres, ' L') + ' · autonomía ' + f(s.range, ' km') + ' · aceite ' + f(s.oil, ' °C') + ' · fuera ' + f(s.outside, ' °C', 1)
-                + ' · batería ' + f(s.volts, ' V', 2) + (s.open.length ? ' · abierto: ' + s.open.join(', ') : '') + (note ? '   ' + note : '');
-            cv.text(fit(cv, carLine, 18, 1550), 26, 506, 18, note ? C.amber : C.dim, { literal: true });
+            cv.text('El coche', tx + 20, ty + 30, 18, C.dim, { literal: true });
+            cv.text(fit(cv, 'Combustible ' + f(s.litres, ' L') + ' · ' + f(s.range, ' km'), 18, TW - 40), tx + 20, ty + 56, 18, C.text, { literal: true });
+            cv.text(fit(cv, 'Aceite ' + f(s.oil, ' °C') + ' · fuera ' + f(s.outside, ' °C', 1), 18, TW - 40), tx + 20, ty + 80, 18, C.text, { literal: true });
+            cv.text(fit(cv, 'Batería ' + f(s.volts, ' V', 2) + (s.open.length ? ' · abierto: ' + s.open.join(', ') : ''), 18, TW - 40), tx + 20, ty + 104, 18, C.text, { literal: true });
+            if (note) cv.text(fit(cv, note, 18, 1550), 26, 506, 18, C.amber, { literal: true });
             ctx.ui.image('MAIN_GFX', cv);
         };
         bgs.onChange(show);
@@ -318,7 +243,6 @@ mgu.run({
                 show();
                 speaker.say(p).then(() => { note = speaker.lastError ? 'Error: ' + speaker.lastError : ''; show(); });
             });
-            ctx.ui.onClick('BTN_FUEL', () => { note = 'Buscando gasolinera…'; show(); bgs.searchFuel(null); setTimeout(() => { note = ''; show(); }, 4000); });
         }
         setInterval(show, 15000);
         show();

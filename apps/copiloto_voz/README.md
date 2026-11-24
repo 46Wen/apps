@@ -11,7 +11,7 @@ salvo el de combustible y el de neumáticos.
 
 | # | Aviso | Cuándo | Cada cuánto |
 |---|---|---|---|
-| 1 | Combustible | autonomía de 50 km o menos (ajuste); el coche busca la mejor Shell y pregunta «¿Ir?» | una vez, hasta repostar |
+| 1 | Combustible | autonomía de 50 km o menos (ajuste): «Nivel de combustible bajo» | una vez, hasta repostar |
 | 2 | Neumáticos | el propio BMW avisa de presión baja | una vez por viaje |
 | 3 | Posible hielo | 3 °C o menos fuera, conduciendo | una vez por viaje |
 | 4 | Motor frío | aceite por debajo de 80 °C y más de 2.500 rpm | una vez por viaje |
@@ -25,45 +25,15 @@ salvo el de combustible y el de neumáticos.
 
 Cada aviso se activa o desactiva en **Ajustes**, donde también se elige la autonomía del aviso de combustible.
 
-Solo lee del coche (la batería, con diagnosis de solo lectura). Lo único que hace es reproducir sonido y mandar el
-aviso al iPhone.
+Solo lee del coche (la batería, con diagnosis de solo lectura). Lo único que hace es reproducir sonido. No necesita
+internet ni el móvil.
 
 ## La pantalla
 
 Estilo BMW: un recuadro por aviso, con su icono, su número de prioridad y si está activo, en cola, hablando o cuándo
-sonó por última vez; «sin grabación» si falta su frase. Arriba, el estado del coche, del iPhone y de la voz (o «En
-llamada: espera»); abajo, lo que lee del coche (combustible, autonomía, aceite, temperatura exterior, batería,
-ventanillas abiertas). **Probar la siguiente frase** reproduce las frases una a una; **Buscar gasolinera ahora**
-hace la búsqueda de combustible.
-
-## Combustible: la mejor Shell, elegida en el coche
-
-Con el aviso de combustible, **el coche busca solo** la Shell más conveniente, con el mismo algoritmo que su página
-shell-diesel, sin tocar el móvil:
-
-1. **Dónde está:** la posición del navegador del coche (GPS + estima), o el GPS.
-2. **Precios:** los del Ministerio de Industria (Geoportal de Gasolineras), solo Shell y sin Shell Express, tal como
-   los guarda cada hora su repositorio shell-diesel (`data/shell.json`). La última copia se guarda en el coche y sirve
-   sin internet (con su fecha).
-3. **Candidatas:** las 45 más baratas a menos de 25 km (ajuste *Buscar a menos de*).
-4. **Trayecto:** km y minutos reales por carretera (OSRM); sin internet, la línea recta × 1,3 a 50 km/h.
-5. **Coste:** llenar (depósito − litros que quedan) × precio + el combustible del trayecto (km × consumo × precio). El
-   consumo es el del coche (litros / autonomía).
-6. **Elección:** abierta cuando llegue (su horario, hora local) y a menos de la mitad de la autonomía por carretera, la
-   de menor coste; si no hay ninguna tan cerca, la más cercana abierta, para llegar seguro.
-
-El resultado sale en una **ventana del iDrive**: «Shell Getafe · 1,669 €/L · 15,7 km · 19 min · total 91,95 €. Calle
-…, ¿Ir?» y en el recuadro *Gasolinera* de la pantalla de la app. **Buscar gasolinera ahora** la prueba en cualquier
-momento. En Ajustes: diésel normal o premium, el depósito (59 L) y el radio.
-
-**«Ir» todavía no arranca el navegador de BMW:** ninguna app lo ha hecho aún. Esta versión lee (sin cambiar nada) el
-catálogo de servicios del iDrive unos minutos después de arrancar y guarda en `navegador.json` y en el registro qué
-ofrece el navegador para recibir un destino. Con ese archivo de su coche se conecta «Ir» en la siguiente versión.
-Mientras, la gasolinera elegida y su dirección quedan en pantalla. Opcional: *Copia de la gasolinera al iPhone (ntfy)*,
-apagado por defecto.
-
-El coche necesita internet para precios frescos y rutas reales: el *uplink* del MGU Store (MGU Store → Ajustes →
-Wi-Fi, el punto de acceso del iPhone).
+sonó por última vez; «sin grabación» si falta su frase. Arriba, el estado del coche y de la voz (o «En llamada: espera»);
+en el último recuadro, lo que lee del coche (combustible, autonomía, aceite, temperatura exterior, batería, ventanillas
+abiertas). **Probar la siguiente frase** reproduce las frases una a una.
 
 ## Las voces
 
@@ -107,4 +77,4 @@ Sin la pantalla abierta no dibuja nada. El sonido lo reproduce el reproductor de
 ## Pruebas
 
 `node tools/test_copiloto_voz.js`: los 11 avisos, la cola (prioridad, de una en una, llamadas, avisos caducados), la
-lectura de las señales, la frase según la hora, el enlace a shell-diesel y la secuencia del audio la búsqueda de gasolinera (68 comprobaciones).
+lectura de las señales, la frase según la hora y la secuencia del audio (53 comprobaciones).
