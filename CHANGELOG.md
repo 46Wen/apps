@@ -4,6 +4,7 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 24 2026
 
+- **Copiloto de voz 0.1.0 (new):** the car speaks recorded phrases when something happens: a welcome when getting in (by the time of day), the end of the trip when switching off, low fuel (with an ntfy notification on the iPhone that opens Waze to the nearest Shell), a refuel, possible ice (3 °C or less) and a break every 2 hours. Sound as RideTube plays it (Audio Manager connect + BMW MediaPlayer playFile), the music pausing meanwhile. The kit's build now takes "mguInternet", a `voces/` folder of sound files and "fonts": "es" (Spanish letters). Bench and tests only; not yet tested on a car.
 - **Cluster Themes 0.20.0:** bimmer-lab's newest Cluster Themes (their 0.19.9 of Nov 22: plug-in hybrid theme slots, separate temperature and pressure units, ADAPTIVE label, Start with the car switch, Cruise's bigger readouts, round M view scale lines, the holiday lights redone) together with this repository's own 0.19.2 to 0.19.6: the Waze map per drive mode, the theme kept ready in the background and BMW's own cluster at start until the drive mode is known. Not yet tested on a car.
 - **HUD Widgets removed:** this repository is for a car without a head-up display.
 

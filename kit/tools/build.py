@@ -539,6 +539,9 @@ def build(app_id, language='en'):
     start = spec.get('startType')
     if start is None and spec.get('autostart'):
         start = 'autostart'
+    # app.json "mguInternet": true: the app gets the internet through the Store's mgu-uplink (mgu-store PUBLISHING.md)
+    if spec.get('mguInternet') is True:
+        pkg['mguInternet'] = True
     if start is not None:
         if start not in ('autostart', 'lum', 'manually'):
             sys.exit('app.json "startType" must be autostart, lum or manually, not ' + repr(start))
@@ -570,6 +573,10 @@ def build(app_id, language='en'):
         elif f.endswith(('.wasm', '.wad')) or f in ('LICENSE', 'NOTICE'):
             # files the app reads as they are (doom: the game as WebAssembly, its data, its licences)
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
+        elif f == 'voces' and os.path.isdir(os.path.join(adir, f)):
+            # 46Wen: sound files the head unit's media player opens by path (Copiloto de voz): as they are, not packed
+            shutil.copytree(os.path.join(adir, f), os.path.join(src, 'javascript', f),
+                            ignore=lambda d, names: [n for n in names if not n.lower().endswith(('.m4a', '.mp3', '.aac', '.wav'))])
         elif os.path.isdir(os.path.join(adir, f)):
             # data folders go along as one compressed file, read with kit/runtime/pack.js
             # (e.g. dtc_scanner/dtc_db, the fault text database -> dtc_db.pack)
@@ -595,6 +602,12 @@ def build(app_id, language='en'):
             shutil.copytree(p, os.path.join(src, 'javascript', 'kit', f))
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
+    if spec.get('fonts') == 'es':
+        # 46Wen: app.json "fonts": "es" - the Latin atlases with the Spanish letters (á é í ó ú ñ ¿ ¡), from
+        # cauliflowermossgrape/idrive7-apps (kit/localization/fonts/es, MIT); their own cacheKey keeps them apart
+        # from the English atlases in the shared renderer
+        for name in ('label.json', 'bold.json', 'light.json', 'num.json'):
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'es', name), os.path.join(src, 'javascript', 'kit', 'fonts', name))
     if missing:
         # what fit_to_unit took out: the app logs it at each start (kit/runtime/mgu.js)
         json.dump(missing, open(os.path.join(src, 'javascript', 'kit', 'missing-interfaces.json'), 'w', encoding='utf-8', newline='\n'), indent=1)

@@ -10,6 +10,7 @@
 |---|---|---|---|
 | **Cluster Themes** (`cluster_themes`) | Redibuja el cuadro de instrumentos con un tema (GT3, M, M view, Vector, Sport, Cruise...), también según el modo de conducción | [bimmer-lab/apps](https://github.com/bimmer-lab/apps) + cambios propios | MIT |
 | **Fuel Link** (`fuel_link`) | Combustible y autonomía en el móvil por la tailnet | propia | MIT |
+| **Copiloto de voz** (`copiloto_voz`) | Frases grabadas cuando pasa algo: bienvenida, fin del viaje, poco combustible (con la gasolinera más cercana en Waze en el iPhone), repostaje, hielo, pausa. [Cómo ponerle voz](apps/copiloto_voz/README.md) | propia | MIT |
 | **Redline** (`redline`) | Cuentarrevoluciones a pantalla completa con luces de cambio, marcha y puntuación de cambios. Sin la parte de HUD | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | MIT |
 | **Drag Timer** (`draggy`) | 0-100, ¼ de milla, 100-200, mejores tiempos | cauliflowermossgrape/idrive7-apps | MIT |
 | **Virtual Dyno** (`dyno`) | Curvas de potencia y par a partir de una aceleración a fondo | cauliflowermossgrape/idrive7-apps | MIT |

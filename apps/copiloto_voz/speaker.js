@@ -1,0 +1,181 @@
+'use strict';
+/**
+ * speaker.js - Copiloto de voz: plays one recorded phrase on the car's speakers, the way RideTube's service does it
+ * (JustAnotherPU/ridetube, native/jap-ridetube-d/ytd.js, car-tested on an X5 G05): the Audio Manager connects the
+ * apps' media source to the main sink (CommandControl.connect 1046 -> 1024), BMW's MediaPlayer (instance
+ * OapGenericMedia) plays the file (playFile), and the connection is dropped again (STOP, disconnect). While it
+ * speaks, the music pauses; the source that was on before (radio, CarPlay...) is connected again afterwards if the
+ * Audio Manager did not bring it back by itself.
+ *
+ * The media player runs as its own user: it must be able to open the file. The phrase is tried where the app was
+ * installed, then from a copy in the app's data folder made readable for it; what worked is remembered.
+ * Node 8. Never throws out of say(): what went wrong is in status().
+ */
+const fs = require('fs');
+const path = require('path');
+
+const CC = 'org.genivi.am.commandinterface.CommandControl';
+const MP = 'de.bmw.infotainment.entertainment.mediaplayer.MediaPlayer';
+const SOURCE_ID = 1046, SINK_ID = 1024;     // the apps' media source and the main sink (as RideTube)
+const LANG = 7695972;                       // the languageCode RideTube passes to playFile
+const MAX_PHRASE_MS = 20000;                // a phrase that has not ended by then is stopped
+const EXT = ['.m4a', '.mp3', '.aac', '.wav'];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const errText = (e) => String(e && e.message || e).slice(0, 160);
+
+class Speaker {
+    constructor(opts) {
+        this.signals = opts.signals;
+        this.log = opts.log;
+        this.dirs = opts.dirs;              // folders the phrases are looked for in, in order
+        this.dataDir = opts.dataDir;
+        this.cc = null; this.mp = null;
+        this.ready = null;                  // the init promise
+        this.queue = Promise.resolve();
+        this.busy = false;
+        this.lastError = null;
+        this.lastSaid = null;
+        this.state = null;                  // the player's state, as it says it
+        this.time = null;                   // {elapsed, total}
+        this.ended = null;                  // resolves the phrase playing now
+        this.useCopy = false;               // the copy in the data folder worked where the installed file did not
+    }
+
+    /** The file for a phrase (bienvenida -> bienvenida.m4a ...), or null. */
+    file(name) {
+        for (let i = 0; i < this.dirs.length; i++) {
+            for (let j = 0; j < EXT.length; j++) {
+                const f = path.join(this.dirs[i], name + EXT[j]);
+                if (fs.existsSync(f)) return f;
+            }
+        }
+        return null;
+    }
+
+    /** Which phrases have a file: { name: true | false }. */
+    found(names) {
+        const out = {};
+        names.forEach((n) => { out[n] = !!this.file(n); });
+        return out;
+    }
+
+    init() {
+        if (!this.ready) {
+            this.ready = (async () => {
+                if (!this.signals.hasNative()) throw new Error('sin conexión con el coche (SOME/IP)');
+                this.cc = await this.signals.proxy(CC, '1');
+                this.mp = await this.signals.proxy(MP, 'OapGenericMedia');
+                const watch = (name, fn) => this.signals.on(this.mp, name, fn, { warn: (m) => this.log.warn(m) }).catch((e) => this.log.warn('subscribe ' + name + ': ' + errText(e)));
+                await watch('playerState', (v) => {
+                    this.state = typeof v === 'object' && v ? (v.playerState || JSON.stringify(v)) : v;
+                    if (this.ended && /STOP/.test(String(this.state)) && this.started) this.ended('player stopped');
+                    if (/PLAY/.test(String(this.state))) this.started = true;
+                });
+                await watch('currentItemTime', (v) => {
+                    this.time = v;
+                    if (this.ended && v && v.total > 0 && v.elapsed >= v.total - 150) this.ended('end of the phrase');
+                });
+                await watch('playbackErrorEvent', (v) => {
+                    const ev = v && (v.event !== undefined ? v.event : v);
+                    if (String(ev) !== 'NO_ERROR' && String(ev) !== '0' && this.ended) this.ended('error ' + ev);
+                });
+                this.log.info('speaker: CommandControl and MediaPlayer ready');
+            })();
+            this.ready.catch((e) => { this.lastError = 'audio: ' + errText(e); this.ready = null; });
+        }
+        return this.ready;
+    }
+
+    /** Say a phrase (queued: one at a time). Resolves when it is done or failed; never rejects. */
+    say(name) {
+        const p = this.queue.then(() => this._say(name)).catch((e) => {
+            this.lastError = name + ': ' + errText(e);
+            this.log.warn('speaker: ' + this.lastError);
+        });
+        this.queue = p;
+        return p;
+    }
+
+    async _say(name) {
+        const file = this.file(name);
+        if (!file) throw new Error('falta la grabación ' + name);
+        await this.init();
+        this.busy = true;
+        let connId = null, before = null;
+        try {
+            const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+            const conns = Array.isArray(list) ? list : [];
+            // RideTube (the same source) is playing: never talk over a video
+            if (conns.some((c) => c && c.sourceID === SOURCE_ID)) throw new Error('RideTube está sonando: no habla encima');
+            before = conns.filter((c) => c && c.sinkID === SINK_ID)[0] || null;
+            const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
+            if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
+            connId = r.mainConnectionID;
+            const tries = this.useCopy ? ['copy'] : ['installed', 'copy'];
+            let reason = null;
+            for (let i = 0; i < tries.length; i++) {
+                const f = tries[i] === 'copy' ? this._copy(file) : file;
+                reason = await this._play(f);
+                if (!/^error/.test(reason)) { if (tries[i] === 'copy') this.useCopy = true; break; }
+                this.log.warn('speaker: ' + path.basename(f) + ' (' + tries[i] + '): ' + reason);
+            }
+            if (/^error/.test(reason)) throw new Error('el reproductor no pudo con el archivo (' + reason + ')');
+            this.lastSaid = { name: name, at: Date.now() };
+            this.lastError = null;
+            this.log.info('speaker: said ' + name + ' (' + reason + ')');
+        } finally {
+            if (connId !== null) {
+                await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
+                const d = await this.signals.call(this.cc, 'disconnect', { mainConnectionID: connId }, 5000).catch((e) => errText(e));
+                this.log.info('speaker: disconnect ' + JSON.stringify(d));
+                if (before) await this._restore(before);
+            }
+            this.busy = false;
+        }
+    }
+
+    // playFile and wait for its end; -> why it ended ('error ...' when it did not play)
+    async _play(file) {
+        this.started = false;
+        const done = new Promise((resolve) => { this.ended = resolve; });
+        const r = await this.signals.call(this.mp, 'playFile', { path: file, languageCode: LANG }, 5000);
+        if (!r || r.EntError !== 'OK') { this.ended = null; return 'error playFile ' + (r && r.EntError); }
+        const why = await Promise.race([done, sleep(MAX_PHRASE_MS).then(() => 'time limit')]);
+        this.ended = null;
+        await sleep(250);     // the last syllable out of the amplifier before the source goes
+        return why;
+    }
+
+    // the phrase copied into the data folder, readable by the media player's user
+    _copy(file) {
+        const dir = path.join(this.dataDir, 'voces');
+        try { fs.mkdirSync(dir); } catch (e) { /* there */ }
+        try { fs.chmodSync(this.dataDir, 0o711); fs.chmodSync(dir, 0o711); } catch (e) { /* not ours to change */ }
+        const out = path.join(dir, path.basename(file));
+        try {
+            if (!fs.existsSync(out) || fs.statSync(out).size !== fs.statSync(file).size) fs.writeFileSync(out, fs.readFileSync(file));
+            fs.chmodSync(out, 0o644);
+        } catch (e) { this.log.warn('speaker: copy ' + path.basename(file) + ': ' + errText(e)); }
+        return out;
+    }
+
+    // the source that was on before (radio, CarPlay ...) back, if the Audio Manager did not bring it back itself
+    async _restore(before) {
+        await sleep(800);
+        const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+        if (!Array.isArray(list)) return;
+        if (list.some((c) => c && c.sourceID === before.sourceID && c.sinkID === SINK_ID)) return;
+        const r = await this.signals.call(this.cc, 'connect', { sourceID: before.sourceID, sinkID: SINK_ID }, 5000).catch((e) => errText(e));
+        this.log.info('speaker: source ' + before.sourceID + ' connected again: ' + JSON.stringify(r));
+    }
+
+    status() {
+        if (this.busy) return 'hablando';
+        if (this.lastError) return this.lastError;
+        if (this.lastSaid) return 'última: ' + this.lastSaid.name;
+        return this.cc ? 'listo' : 'sin probar todavía';
+    }
+}
+
+module.exports = { Speaker, SOURCE_ID, SINK_ID };
