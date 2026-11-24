@@ -1,56 +1,23 @@
 'use strict';
 /**
- * notify.js - Copiloto de voz: a notification on the driver's iPhone through ntfy (https://ntfy.sh, the free ntfy app
- * from the App Store). Tapped, it opens the shell-diesel page (pageLink), which picks the Shell and opens Waze; with
- * CarPlay connected, Waze shows on the car's screen. (iOS lets nothing open an app without a tap.)
- *
- * The internet comes through the MGU Store's mgu-uplink (app.json "mguInternet": true). The head unit's own resolver
- * does not reach the internet, so ntfy.sh is looked up with the DNS servers of this app's uplink lease
- * (<data>/uplink.json, which mgu-uplink writes while it is online, else /run/mgu-uplink/lease.json), and only ntfy.sh,
- * on port 443, at a public address, with its certificate checked against its name. Node 8.
+ * notify.js - Copiloto de voz: optional, a copy of the chosen fuel station on the iPhone through ntfy (https://ntfy.sh,
+ * the free ntfy app), with its Waze link. Off by default: the station is chosen and offered in the car (fuel.js and the
+ * iDrive pop-up). Through net.js (the Store's uplink). Node 8.
  */
 const crypto = require('crypto');
-const dns = require('dns');
 const fs = require('fs');
-const https = require('https');
-const net = require('net');
 const path = require('path');
 
-const HOST = 'ntfy.sh';
-const TIMEOUT_MS = 10000;
-
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return null; } };
-
-function publicIpv4(ip) {
-    if (net.isIP(ip) !== 4) return false;
-    const n = ip.split('.').map(Number), a = n[0], b = n[1];
-    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
-    if (a === 100 && b >= 64 && b <= 127) return false;
-    if (a === 169 && b === 254) return false;
-    if (a === 172 && b >= 16 && b <= 31) return false;
-    if (a === 192 && b === 168) return false;
-    return true;
-}
-
-/**
- * The link to 46Wen's shell-diesel page in its car mode: it finds the best Shell around the phone (the cheapest to fill
- * up, detour included, within the page's radius and half the range left) and opens Waze to it by itself.
- *   <page>?auto=1&km=<range>#car=<litres>,<l100km>,<at>,<now>   (the #car= part is what Fuel Link's /go hands over)
- */
-function pageLink(page, litres, rangeKm, now) {
-    now = now || Date.now();
-    const l100 = typeof litres === 'number' && typeof rangeKm === 'number' && rangeKm > 20 ? Math.round(litres / rangeKm * 1000) / 10 : '';
-    const car = [typeof litres === 'number' ? litres : '', l100, now, now].join(',');
-    return page.split('#')[0].split('?')[0] + '?auto=1' + (typeof rangeKm === 'number' ? '&km=' + rangeKm : '') + '#car=' + car;
-}
+const wazeLink = (s) => 'https://waze.com/ul?ll=' + s.lat + ',' + s.lon + '&navigate=yes';
 
 class Notifier {
     constructor(opts) {
-        this.dataDir = opts.dataDir;
+        this.net = opts.net;
         this.log = opts.log;
         this.lastError = null;
         this.lastSent = null;
-        const file = path.join(this.dataDir, 'ntfy.json');
+        const file = path.join(opts.dataDir, 'ntfy.json');
         const saved = readJson(file);
         if (saved && /^[a-z0-9-]{12,64}$/.test(saved.topic || '')) this.topic = saved.topic;
         else {
@@ -60,69 +27,28 @@ class Notifier {
         }
     }
 
-    lease() {
-        return readJson(path.join(this.dataDir, 'uplink.json')) || readJson('/run/mgu-uplink/lease.json');
-    }
+    online() { return this.net.online(); }
 
-    online() {
-        const l = this.lease();
-        return !!(l && Array.isArray(l.dns) && l.dns.length);
-    }
-
-    _resolve() {
-        const l = this.lease();
-        const servers = l && Array.isArray(l.dns) ? l.dns.filter((ip) => net.isIP(ip)).slice(0, 4) : [];
-        if (!servers.length) return Promise.reject(new Error('sin internet (MGU Store > Wi-Fi / uplink)'));
-        return new Promise((resolve, reject) => {
-            const r = new dns.Resolver();
-            r.setServers(servers);
-            const timer = setTimeout(() => reject(new Error('DNS: no answer')), TIMEOUT_MS);
-            r.resolve4(HOST, (err, ips) => {
-                clearTimeout(timer);
-                const ip = !err && Array.isArray(ips) ? ips.filter(publicIpv4)[0] : null;
-                if (!ip) return reject(new Error('DNS: ' + (err ? err.code || err.message : 'no public address')));
-                resolve(ip);
-            });
-        });
-    }
-
-    /** Publish {title, message, click, actions, tags, priority} to our topic; resolves true, or false (lastError). */
     send(msg) {
-        const body = Buffer.from(JSON.stringify(Object.assign({ topic: this.topic }, msg)));
-        return this._resolve().then((ip) => new Promise((resolve, reject) => {
-            const req = https.request({ host: ip, servername: HOST, port: 443, method: 'POST', path: '/', agent: false,
-                headers: { Host: HOST, 'Content-Type': 'application/json', 'Content-Length': body.length } }, (res) => {
-                res.resume();
-                if (res.statusCode >= 200 && res.statusCode < 300) resolve(true);
-                else reject(new Error('ntfy answered ' + res.statusCode));
-            });
-            req.setTimeout(TIMEOUT_MS, () => req.abort());
-            req.on('error', reject);
-            req.end(body);
-        })).then(() => {
+        return this.net.request('POST', 'ntfy.sh', '/', JSON.stringify(Object.assign({ topic: this.topic }, msg))).then((r) => {
+            if (r.status < 200 || r.status >= 300) throw new Error('ntfy respondió ' + r.status);
             this.lastSent = { title: msg.title, at: Date.now() };
             this.lastError = null;
             this.log.info('ntfy: sent "' + msg.title + '"');
             return true;
-        }, (e) => {
+        }).catch((e) => {
             this.lastError = 'aviso no enviado: ' + String(e && e.message || e).slice(0, 100);
             this.log.warn('ntfy: ' + this.lastError);
             return false;
         });
     }
 
-    /** The fuel notification: a tap opens the shell-diesel page, which opens Waze to the best Shell. */
-    fuel(page, litres, rangeKm) {
-        const url = pageLink(page, litres, rangeKm);
-        return this.send({
-            title: 'Combustible bajo',
-            message: (typeof rangeKm === 'number' ? 'Autonomía: ' + rangeKm + ' km. ' : '') + 'Toque para ir a la Shell más conveniente.',
-            click: url,
-            actions: [{ action: 'view', label: 'Ir a la Shell', url: url, clear: true }],
-            tags: ['fuelpump'],
-            priority: 5,
-        });
+    /** The chosen station (fuel.js pick) on the iPhone, with its Waze link. */
+    station(p) {
+        const url = wazeLink(p.station);
+        return this.send({ title: 'Gasolinera: ' + p.name, message: p.line, click: url,
+            actions: [{ action: 'view', label: 'Ir con Waze', url: url, clear: true }], tags: ['fuelpump'], priority: 4 });
     }
 }
 
-module.exports = { Notifier, pageLink };
+module.exports = { Notifier, wazeLink };

@@ -19,7 +19,8 @@ const { Engine, EVENTS, PRIORITY, KEEP } = require(path.join(APP, 'engine'));
 const { Announcer, KEEP_MS } = require(path.join(APP, 'announcer'));
 const { phraseFor } = require(path.join(APP, 'phrases'));
 const { Speaker } = require(path.join(APP, 'speaker'));
-const { pageLink } = require(path.join(APP, 'notify'));
+const F = require(path.join(APP, 'fuel'));
+const { wazeLink } = require(path.join(APP, 'notify'));
 const D = require(path.join(APP, 'decode'));
 
 let checks = 0, fails = 0;
@@ -163,7 +164,53 @@ ok(r.said.length === 0, 'welcome off in the settings');
     ok(phraseFor('bienvenida', settings, have(['bienvenida_manana']), jan + 7 * 3600000) === 'bienvenida_manana', 'morning welcome');
     ok(phraseFor('bienvenida', settings, have(['bienvenida_manana']), jan + 19 * 3600000) === 'bienvenida', 'no evening recording: the plain one');
     ok(phraseFor('motor_frio', settings, have([]), jan) === 'motor_frio', 'other notices: their own name');
-    ok(pageLink('https://46wen.github.io/shell-diesel/', 6, 50, 1000) === 'https://46wen.github.io/shell-diesel/?auto=1&km=50#car=6,12,1000,1000', 'page link, got ' + pageLink('https://46wen.github.io/shell-diesel/', 6, 50, 1000));
+    ok(wazeLink({ lat: 40.1, lon: -3.2 }) === 'https://waze.com/ul?ll=40.1,-3.2&navigate=yes', 'waze link');
+
+    // ---------- where the car is ----------
+    ok(JSON.stringify(D.navPositionOf({ coordinatesValid: true, latitude: 40.4, longitude: -3.7 })) === '{"lat":40.4,"lon":-3.7}' && D.navPositionOf({ coordinatesValid: false, latitude: 40.4, longitude: -3.7 }) === null, 'navigation position');
+    const raw = (deg) => Math.round((deg * 3600 + 2147483.648) * 1000);
+    const g = D.gnssPositionOf({ statusGPSLatitudeCAN: raw(40.4168), statusGPSLongitudeCAN: raw(-3.7038) });
+    ok(g && Math.abs(g.lat - 40.4168) < 1e-5 && Math.abs(g.lon + 3.7038) < 1e-5 && D.gnssPositionOf({ statusGPSLatitudeCAN: 4294967295, statusGPSLongitudeCAN: 1 }) === null, 'GPS position, got ' + JSON.stringify(g));
+
+    // ---------- the fuel station: shell-diesel's algorithm in the car ----------
+    ok(F.parseHours('L-D: 24H') && F.hoursAt(F.parseHours('L-D: 24H'), 3, 600).always, '24 h');
+    const iv = F.parseHours('L-V: 07:00-22:00; S-D: 08:00-14:00');
+    ok(F.hoursAt(iv, 2, 8 * 60).open && !F.hoursAt(iv, 0, 15 * 60).open && F.parseHours('L: 08:00-20:00') === null, 'opening hours');
+    ok(F.openOnArrival({ h: 'L-D: 07:00-22:00' }, 2, 21 * 60 + 50, 15) === 2 && F.openOnArrival({ h: 'L-D: 07:00-22:00' }, 2, 6 * 60 + 50, 15) === 0, 'open on arrival');
+    ok(F.nice('AVENIDA DE AMERICA, 25') === 'Avenida de America, 25' && F.nice('LEGANÉS') === 'Leganés', 'names, got ' + F.nice('AVENIDA DE AMERICA, 25'));
+    const lt = F.localTime(Date.UTC(2026, 10, 24, 22, 30), 60);
+    ok(lt.weekday === 2 && lt.minute === 23 * 60 + 30, 'local time, got ' + JSON.stringify(lt));
+    const st = (id, ga, h) => ({ id: id, n: 'SHELL', a: 'CALLE ' + id, mun: 'PUEBLO ' + id, lat: 40, lon: -3, ga: ga, gp: ga + 0.1, h: h || 'L-D: 24H' });
+    const o = { fuel: 'ga', litresLeft: 9, tank: 59, l100: 6, rangeKm: 50, weekday: 2, minute: 600 };
+    // the cheapest within half the range wins, even with a dearer one nearer; one further than half the range is left out
+    let c = F.choose([st('a', 1.60), st('b', 1.50), st('c', 1.40)], [{ m: 2000, s: 180 }, { m: 12000, s: 900 }, { m: 40000, s: 2400 }], o);
+    ok(c.pick.s.id === 'b', 'cheapest within half the range, got ' + (c.pick && c.pick.s.id));
+    // a closed one is not picked
+    c = F.choose([st('a', 1.60), st('b', 1.50, 'L-D: 20:00-21:00')], [{ m: 2000, s: 180 }, { m: 3000, s: 240 }], o);
+    ok(c.pick.s.id === 'a', 'not a closed one, got ' + c.pick.s.id);
+    // none within half the range: the nearest open one
+    c = F.choose([st('a', 1.40), st('b', 1.30)], [{ m: 30000, s: 1800 }, { m: 60000, s: 3600 }], o);
+    ok(c.pick.s.id === 'a' && /más cercana/.test(c.why), 'none that close: the nearest, got ' + c.pick.s.id + ' ' + c.why);
+    // the cost: fill (59 - 9 = 50 L) + the drive (12 km at 6 L/100 km)
+    c = F.choose([st('b', 1.50)], [{ m: 12000, s: 900 }], o);
+    ok(Math.abs(c.pick.total - (50 * 1.5 + 12 * 6 / 100 * 1.5)) < 1e-9, 'cost = fill + drive, got ' + c.pick.total);
+    // find(): the prices from shell-diesel, the drive from OSRM, as the car does it (a stand-in network)
+    const prices = { fecha: '24/11/2026', updated: Date.now() / 1000, stations: [
+        Object.assign(st('near', 1.70), { lat: 40.42, lon: -3.70 }), Object.assign(st('cheap', 1.55), { lat: 40.33, lon: -3.76 }),
+        Object.assign(st('far', 1.40), { lat: 41.6, lon: -0.9 }), Object.assign(st('express', 0), { lat: 40.41, lon: -3.70 })] };
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cvf-'));
+    const asked = [];
+    const fakeNet = { online: () => true, getJson: (host, p) => { asked.push(host); return Promise.resolve(host === 'router.project-osrm.org'
+        ? { code: 'Ok', distances: [[0, 1500, 14000]], durations: [[0, 180, 1000]] } : prices); } };
+    const ff = new F.FuelFinder({ net: fakeNet, log: { info: () => {}, warn: () => {} }, dataDir: tmp });
+    ff.data = Object.assign({}, prices, { updated: 0 });
+    const res = await ff.find({ lat: 40.4168, lon: -3.7038, fuel: 'ga', litresLeft: 8, rangeKm: 50, tank: 59, l100: 6.2, radiusKm: 25, offsetMin: 60 });
+    ok(res.pick.station.id === 'cheap' && res.how === 'por carretera' && asked.join() === 'raw.githubusercontent.com,router.project-osrm.org', 'find: the cheapest by road, got ' + res.pick.station.id + ' ' + asked);
+    ok(/^Shell Pueblo Cheap$/.test(res.pick.name) && /€\/L/.test(res.pick.line) && fs.existsSync(path.join(tmp, 'shell.json')), 'find: name, line, prices kept, got ' + res.pick.name + ' | ' + res.pick.line);
+    // without internet: the last prices and the straight line
+    const ff2 = new F.FuelFinder({ net: { online: () => false }, log: { info: () => {}, warn: () => {} }, dataDir: tmp });
+    const res2 = await ff2.find({ lat: 40.4168, lon: -3.7038, fuel: 'ga', litresLeft: 8, rangeKm: 50, tank: 59, l100: 6.2, radiusKm: 25, offsetMin: 60 });
+    ok(res2.how === 'línea recta' && res2.pick, 'find offline: straight line, got ' + res2.how);
 
     // ---------- the speaker: connect, play, wait for the end, stop, disconnect, the radio back ----------
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cv-'));

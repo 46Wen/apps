@@ -8,7 +8,7 @@ Por prioridad: si dos coinciden, suena antes la de número más bajo, y nunca do
 
 | # | Archivo | Cuándo | Texto propuesto |
 |---|---|---|---|
-| 1 | `combustible.m4a` | autonomía de 50 km o menos | Nivel de combustible bajo. Le he enviado al iPhone la gasolinera Shell más conveniente. |
+| 1 | `combustible.m4a` | autonomía de 50 km o menos | Nivel de combustible bajo. Le muestro en pantalla la gasolinera Shell más conveniente. |
 | 2 | `neumaticos.m4a` | el aviso de presión de BMW | Atención: el sistema indica presión baja en un neumático. Revíselo en cuanto pueda. |
 | 3 | `hielo.m4a` | 3 °C o menos fuera, conduciendo | Atención: la temperatura exterior es baja. Puede haber hielo en la carretera. |
 | 4 | `motor_frio.m4a` | aceite por debajo de 80 °C y más de 2.500 rpm | El motor aún está frío. Le recomiendo no superar las dos mil quinientas revoluciones. |

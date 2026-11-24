@@ -11,7 +11,7 @@ salvo el de combustible y el de neumáticos.
 
 | # | Aviso | Cuándo | Cada cuánto |
 |---|---|---|---|
-| 1 | Combustible | autonomía de 50 km o menos (ajuste) | una vez, hasta repostar |
+| 1 | Combustible | autonomía de 50 km o menos (ajuste); el coche busca la mejor Shell y pregunta «¿Ir?» | una vez, hasta repostar |
 | 2 | Neumáticos | el propio BMW avisa de presión baja | una vez por viaje |
 | 3 | Posible hielo | 3 °C o menos fuera, conduciendo | una vez por viaje |
 | 4 | Motor frío | aceite por debajo de 80 °C y más de 2.500 rpm | una vez por viaje |
@@ -33,20 +33,37 @@ aviso al iPhone.
 Estilo BMW: un recuadro por aviso, con su icono, su número de prioridad y si está activo, en cola, hablando o cuándo
 sonó por última vez; «sin grabación» si falta su frase. Arriba, el estado del coche, del iPhone y de la voz (o «En
 llamada: espera»); abajo, lo que lee del coche (combustible, autonomía, aceite, temperatura exterior, batería,
-ventanillas abiertas). **Probar la siguiente frase** reproduce las frases una a una; **Probar el aviso al iPhone**
-manda el aviso de combustible.
+ventanillas abiertas). **Probar la siguiente frase** reproduce las frases una a una; **Buscar gasolinera ahora**
+hace la búsqueda de combustible.
 
-## Combustible: la mejor Shell en Waze
+## Combustible: la mejor Shell, elegida en el coche
 
-1. Instale **ntfy** en el iPhone (gratis, App Store) y suscríbase al tema que muestra la pantalla de la app
-   (`bmw-…`, en el servidor `ntfy.sh`). Es un nombre al azar que solo conoce su coche: no lo comparta.
-2. Cuando falta combustible, además de la frase, llega «Combustible bajo» al iPhone. Al tocarlo se abre su página
-   **shell-diesel** en modo coche, con los litros y el consumo del coche: busca alrededor de usted (el «radio
-   cercano» de la página), elige la Shell más barata (llenar + trayecto) abierta cuando llegue y a menos de la mitad
-   de su autonomía, y abre Waze (iOS pregunta «¿Abrir en Waze?»: toque *Abrir*). Con CarPlay, Waze sale en el coche.
-3. El coche necesita internet: el *uplink* del MGU Store (MGU Store → Ajustes → Wi-Fi, el punto de acceso del iPhone).
+Con el aviso de combustible, **el coche busca solo** la Shell más conveniente, con el mismo algoritmo que su página
+shell-diesel, sin tocar el móvil:
 
-El iPhone no deja que nada abra una app o una página sin un toque: por eso es un aviso que se toca.
+1. **Dónde está:** la posición del navegador del coche (GPS + estima), o el GPS.
+2. **Precios:** los del Ministerio de Industria (Geoportal de Gasolineras), solo Shell y sin Shell Express, tal como
+   los guarda cada hora su repositorio shell-diesel (`data/shell.json`). La última copia se guarda en el coche y sirve
+   sin internet (con su fecha).
+3. **Candidatas:** las 45 más baratas a menos de 25 km (ajuste *Buscar a menos de*).
+4. **Trayecto:** km y minutos reales por carretera (OSRM); sin internet, la línea recta × 1,3 a 50 km/h.
+5. **Coste:** llenar (depósito − litros que quedan) × precio + el combustible del trayecto (km × consumo × precio). El
+   consumo es el del coche (litros / autonomía).
+6. **Elección:** abierta cuando llegue (su horario, hora local) y a menos de la mitad de la autonomía por carretera, la
+   de menor coste; si no hay ninguna tan cerca, la más cercana abierta, para llegar seguro.
+
+El resultado sale en una **ventana del iDrive**: «Shell Getafe · 1,669 €/L · 15,7 km · 19 min · total 91,95 €. Calle
+…, ¿Ir?» y en el recuadro *Gasolinera* de la pantalla de la app. **Buscar gasolinera ahora** la prueba en cualquier
+momento. En Ajustes: diésel normal o premium, el depósito (59 L) y el radio.
+
+**«Ir» todavía no arranca el navegador de BMW:** ninguna app lo ha hecho aún. Esta versión lee (sin cambiar nada) el
+catálogo de servicios del iDrive unos minutos después de arrancar y guarda en `navegador.json` y en el registro qué
+ofrece el navegador para recibir un destino. Con ese archivo de su coche se conecta «Ir» en la siguiente versión.
+Mientras, la gasolinera elegida y su dirección quedan en pantalla. Opcional: *Copia de la gasolinera al iPhone (ntfy)*,
+apagado por defecto.
+
+El coche necesita internet para precios frescos y rutas reales: el *uplink* del MGU Store (MGU Store → Ajustes →
+Wi-Fi, el punto de acceso del iPhone).
 
 ## Las voces
 
@@ -90,4 +107,4 @@ Sin la pantalla abierta no dibuja nada. El sonido lo reproduce el reproductor de
 ## Pruebas
 
 `node tools/test_copiloto_voz.js`: los 11 avisos, la cola (prioridad, de una en una, llamadas, avisos caducados), la
-lectura de las señales, la frase según la hora, el enlace a shell-diesel y la secuencia del audio (54 comprobaciones).
+lectura de las señales, la frase según la hora, el enlace a shell-diesel y la secuencia del audio la búsqueda de gasolinera (68 comprobaciones).

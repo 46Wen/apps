@@ -1,8 +1,8 @@
 {
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
-  "description": "Su copiloto con voz: bienvenida al arrancar, fin del viaje, combustible (con la mejor Shell en Waze desde el iPhone), neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas",
-  "version": "0.2.0",
+  "description": "Su copiloto con voz: bienvenida al arrancar, fin del viaje, combustible (el coche busca la Shell más conveniente y la ofrece en el iDrive), neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas",
+  "version": "0.3.0",
   "vendor": "custom",
   "autostart": true,
   "mguInternet": true,
@@ -25,6 +25,15 @@
     "de.bmw.infotainment.KombiIF": {
       "_optional": "combustible y autonomía",
       "statusRangeTankStatus": "rs"
+    },
+    "de.bmw.infotainment.navigation.positioning.Positioning": {
+      "_optional": "dónde está el coche (navegador: GNSS + estima), para buscar gasolinera",
+      "_instances": "Main_Instance",
+      "currentLocation": "rs"
+    },
+    "de.bmw.infotainment.GPSData": {
+      "_optional": "dónde está el coche (GPS), si falta la del navegador",
+      "GPSPositionCAN": "rs"
     },
     "de.bmw.infrastructure.EnvironmentalInformation": {
       "_optional": "temperatura exterior: aviso de hielo",
@@ -92,14 +101,24 @@
           "Probar la siguiente frase"
         ],
         [
-          "BTN_PHONE",
-          "Probar el aviso al iPhone"
+          "BTN_FUEL",
+          "Buscar gasolinera ahora"
         ],
         [
           "BTN_SETTINGS",
           "Ajustes"
         ]
       ]
+    }
+  ],
+  "popups": [
+    {
+      "name": "FUEL_POP",
+      "type": "popUp",
+      "widget": "LT_State_PopupSmall",
+      "label": "text3",
+      "button": "Ir",
+      "title": "Gasolinera"
     }
   ],
   "settings": [
@@ -126,10 +145,64 @@
       ]
     },
     {
+      "key": "fuelType",
+      "label": "Combustible",
+      "type": "choice",
+      "default": "ga",
+      "options": [
+        [
+          "ga",
+          "Diésel normal"
+        ],
+        [
+          "gp",
+          "Diésel premium"
+        ]
+      ]
+    },
+    {
+      "key": "tank",
+      "label": "Depósito",
+      "type": "number",
+      "unit": "L",
+      "default": 59,
+      "steps": [
+        40,
+        45,
+        50,
+        55,
+        59,
+        60,
+        65,
+        68,
+        70,
+        74,
+        80,
+        85,
+        90
+      ]
+    },
+    {
+      "key": "radiusKm",
+      "label": "Buscar a menos de",
+      "type": "number",
+      "unit": "km",
+      "default": 25,
+      "steps": [
+        10,
+        15,
+        20,
+        25,
+        30,
+        40,
+        50
+      ]
+    },
+    {
       "key": "phone",
-      "label": "Enviar la Shell al iPhone (ntfy + shell-diesel)",
+      "label": "Copia de la gasolinera al iPhone (ntfy)",
       "type": "bool",
-      "default": true
+      "default": false
     },
     {
       "key": "on_neumaticos",
@@ -335,7 +408,7 @@
     }
   ],
   "config": {
-    "shellPage": "https://46wen.github.io/shell-diesel/",
-    "_comment": "shellPage: la página que abre el aviso de combustible en el iPhone (46Wen/shell-diesel, modo ?auto=1)"
+    "l100": 6.5,
+    "_comment": "l100: consumo (L/100 km) para el coste del trayecto cuando el coche aún no da litros y autonomía"
   }
 }

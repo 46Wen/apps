@@ -116,4 +116,24 @@ function openingsOf(v) {
     return out;
 }
 
-module.exports = { oilOf, rpmOf, callOf, activeCc, ccNames, isTyreCc, kmOf, daysOf, serviceOf, voltsOf, openingsOf, walk };
+// ---- where the car is (as hexlay/idrive7-custom-apps speed_limit reads it, car-tested) ----
+//   navigation  navigation.positioning.Positioning (Main_Instance) currentLocation: { latitude, longitude } degrees,
+//               only with coordinatesValid (GNSS with the car's dead reckoning)
+//   GNSS        GPSData GPSPositionCAN: { statusGPSLatitudeCAN, statusGPSLongitudeCAN }, deg = (0.001 x raw - 2147483.648) / 3600,
+//               raw >= 4294967293 or 2147483647: none
+function navPositionOf(v) {
+    if (!v || !v.coordinatesValid) return null;
+    const lat = v.latitude, lon = v.longitude;
+    if (!isNum(lat) || !isNum(lon) || (lat === 0 && lon === 0) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { lat: lat, lon: lon };
+}
+function gnssPositionOf(v) {
+    const la = v && v.statusGPSLatitudeCAN, lo = v && v.statusGPSLongitudeCAN;
+    const bad = (x) => !isNum(x) || x >= 4294967293 || x === 2147483647;
+    if (bad(la) || bad(lo)) return null;
+    const deg = (raw) => (0.001 * raw - 2147483.648) / 3600;
+    const lat = deg(la), lon = deg(lo);
+    return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0) ? { lat: lat, lon: lon } : null;
+}
+
+module.exports = { navPositionOf, gnssPositionOf,  oilOf, rpmOf, callOf, activeCc, ccNames, isTyreCc, kmOf, daysOf, serviceOf, voltsOf, openingsOf, walk };
