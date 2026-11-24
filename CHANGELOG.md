@@ -2,7 +2,35 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 24 2026
+
+- **Cluster Themes 0.20.0:** bimmer-lab's newest Cluster Themes (their 0.19.9 of Nov 22: plug-in hybrid theme slots, separate temperature and pressure units, ADAPTIVE label, Start with the car switch, Cruise's bigger readouts, round M view scale lines, the holiday lights redone) together with this repository's own 0.19.2 to 0.19.6: the Waze map per drive mode, the theme kept ready in the background and BMW's own cluster at start until the drive mode is known. Not yet tested on a car.
+- **HUD Widgets removed:** this repository is for a car without a head-up display.
+
+## Nov 22 2026
+
+- **Cluster Themes 0.19.9, HUD Widgets 0.15.8:** M view's scale lines are now perfectly round curves (before, they bent in small corners you could see on the car). The holiday lights were redone on every theme: they never cross a theme's own lines, hang the same on both sides, and leave out the short pieces that looked broken. On M view they hang between the two dials under the M stripes, and on Vector they no longer run into the rev counter or the music panel. Not yet tested on a car.
+
 ## Nov 21 2026
+
+- **Cluster Themes 0.19.8:** Cruise's clock, range and outside temperature along the bottom are now as big as the fuel and oil figures, about twice their old height, so they read at a glance (issue #33). Not yet tested on a car.
+- **Cluster Themes 0.19.7, HUD Widgets 0.15.7:** plug-in hybrids get **In Hybrid** and **In Electric** next to Comfort, Sport and Eco Pro on the Themes tab (issue #31). Hybrid, Hybrid Eco Pro and Battery Control use the Hybrid theme, Electric uses the Electric one. Both start on "Same as the drive mode", so nothing changes until you pick one. They show once the car has sent a plug-in hybrid mode. The idea comes from FDX100's KurdBimmer Themes. Not yet tested on a car.
+- **Cluster Themes 0.19.6, HUD Widgets 0.15.6:** a **Start with the car** switch on the Settings tab, on by default. Turn it off and the app waits until you open it before it draws anything, as it did before 0.19.4. On smaller screens the Settings tab's rows sit a little closer together so all of them fit.
+- **Cluster Themes 0.19.5, HUD Widgets 0.15.5:** in Adaptive, the themes and layouts now say ADAPTIVE next to the gear instead of COMFORT (issue #29). Adaptive still uses your Comfort theme or layout.
+- **Cluster Themes 0.19.4, HUD Widgets 0.15.4: both apps start with the car** (issue #16). The car now starts them by itself when it starts, so the theme and the HUD layout come up without you opening the app first. You only need to open them to change something. Not yet tested on a car: if the theme doesn't come up by itself, or the app's page won't open after that, please say so in #16.
+- **Cluster Themes 0.19.3, HUD Widgets 0.15.3:** a safety net for installing. When the Store builds the app on your car, anything your car's software doesn't have (a signal, or one way of reading it) is now left out of that build, instead of the Store refusing the whole app as it did with 0.19.0. The app then runs without that one readout and says so in its log. Nothing changes on cars that have everything. This comes from the MGU App Kit, which alexpereap pointed to in #26. Not yet tested on a car.
+
+## Nov 20 2026
+
+- **Cluster Themes 0.19.2, HUD Widgets 0.15.2:**
+  - **Plug-in hybrids switch with the drive mode** (issue #31): Sport and Sport Plus pick your Sport theme or layout, Hybrid, Electric and Battery Control count as Comfort, and Hybrid Eco Pro as Eco Pro. Before, a plug-in hybrid's modes weren't recognised and nothing switched. Thanks to the reporter of #31 for finding the values on a 330e. Other cars switch as before.
+  - **Temperature and pressure units of their own** (issues #24, #32): two new settings under Units in Cluster Themes, Temperature (°C or °F) and Pressure (bar or psi), for mph with °C and psi as in the UK. Both start on Match speed, so nothing changes until you pick one. HUD Widgets keeps its one Units setting.
+  - **Leave BMW's bottom strip clear** (Cluster Themes, off by default): for cars where BMW still draws two black boxes over the theme, like M cars and the G22 4 Series (issues #11, #1). The theme then ends just above BMW's bottom strip, and BMW shows its own clock, range and outside temperature there. Nothing is squeezed or shrunk.
+  - The Settings tab's rows get a little shorter on smaller screens so all of them fit.
+  - Not yet tested on a car.
+- **Cluster Themes 0.19.1, HUD Widgets 0.15.1:** fixes the Store refusing to install 0.19.0 and 0.15.0 on some cars ("instance "1" is not on this unit"). The music panel now asks the car for the front screen's now playing by the name the car uses. Nothing else changes. Not yet tested on a car.
+
+## Nov 21 2026 (46Wen)
 
 - **Cluster Themes 0.19.6:** a calm start and a smooth first switch. With the theme changing with the drive mode, the app now shows BMW's own cluster at start until the car says which mode it is in (up to 60 s, then the "Theme (when not by drive mode)" setting as before), so the theme of that setting (GT3 by default) no longer flashes up at start-up. A theme kept ready in the background (0.19.4) is no longer hidden but parked: every layer drawn 1 x 1 px in the top-left corner, under the hood line where the driver sees nothing, so its shaders are compiled and its pictures sent before the first switch, which then only moves the layers back. Tried on the bench; not yet tested on a car.
 - **Cluster Themes 0.19.5, Fuel Link 0.2.2:** both start by themselves when the car starts, without opening them from the apps menu first, and start again if they stop (app.json "startType": "autostart", which the Store's install hands to the head unit's app manager). The kit's build passes "startType" on to the package as "mguAppStartType". Takes effect from the next start of the head unit after the update. Not yet tested on a car.
@@ -12,7 +40,7 @@ Newest first. Dates are when the build was pushed.
 
 - **Cluster Themes 0.19.2:** the Waze map per drive mode. With the theme changing with SPORT / COMFORT / ECO PRO and "Show Waze map inside the theme" on, the Map tab now has a switch for each mode (all on at first, so nothing changes until you turn one off). Turn Sport off, for example, and Sport shows the full theme without the map window while Waze goes back to BMW's own map view; Comfort and Eco Pro keep the map in the theme. The map follows the drive mode as you switch. Tried on the bench; not yet tested on a car.
 
-## Nov 18 2026
+## Nov 18 2026 (46Wen)
 
 - **Cluster Themes 0.19.1, HUD Widgets 0.15.1:** both install from the Store again. 0.19.0 and 0.15.0 asked for the head unit's now playing (the song in Vector) under the instance name `1`, which the head units don't have: they name it `HMI_CID` (the center screen), so the head unit's app manager refused to install the app (issue #26). Both now ask for `HMI_CID`. Cluster Themes 0.19.1 was installed and run on a car that refused 0.19.0; HUD Widgets 0.15.1 has only been tried on the bench. Whether the song shows with radio, Bluetooth, USB and CarPlay is still to be confirmed.
 
