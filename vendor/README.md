@@ -9,7 +9,7 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 | `namelsmissing/` | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | `58d26d3` | GPL-3.0 | dpf_monitor 0.2.8 |
 | `justanotherpu/` | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | `42cd224` | MIT | jap_sysmon 1.0.6 |
 | `ridetube/` | [JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) | `eb0973b` | GPL-3.0 | jap_ridetube 0.6.4 |
-| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `53e9b38` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.15 |
+| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `6ae9c16` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.15 |
 
 ## Qué se ha cambiado respecto al original
 
