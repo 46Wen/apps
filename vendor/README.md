@@ -22,6 +22,10 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 - `idrive7-apps/kit/localization/diagnostic-full.*.json` (25 MB, solo los usa el Fault Scanner) no se
   han traído: el coche descarga `kit/` en cada compilación.
 - `ridetube/kit/tools/.font-cache/` (una caché de 17 MB para hornear fuentes) no se ha traído.
+- **Prioridad baja en cada kit** (`<origen>/kit/runtime/priority.js`, nuestro, y dos líneas en su
+  `kit/runtime/mgu.js` justo después de `new OnlineApp()`): las apps corren con nice 10 y E/S en clase
+  *idle*, por debajo de CarPlay y del HMI. `scripts/vendor_sync.py` lo vuelve a aplicar tras cada
+  actualización (`kit_low_priority`).
 - Nada más: el resto es el código de sus autores tal cual.
 
 ## Código fuente de los nativos

@@ -315,6 +315,9 @@ const MAX_CONN = 4;              // connections a layout may ask for ("conn"): 3
 const PIXEL_BYTES = 16 * 1024 * 1024;   // cluster-render's pixel memory for every app's images together (CompositorLimits.pixel_bytes)
 const SHEET_AREA_FRAC = 4;       // the first sheet size limit: 1/4 of the target area (see the header)
 const TICK_MS = 50;              // 20 Hz: shift bar and gauges
+// The tick slows down when fast frames show nothing, so CarPlay and the HMI get the CPU (_tickMs):
+const PARKED_TICK_MS = 100;      // 10 Hz: standing, engine not running, no shift light (needles still; text, garland)
+const IDLE_TICK_MS = 250;        // 4 Hz: nothing of ours on the cluster (Off, BMW's own, renderer not up): data only
 const TEXT_MS = 200;             // text re-draws at most 5 times a second (what BMW's own readouts do)
 const TARGET_SIZES = { hud: [800, 480], panel: [1920, 720] };
 const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
@@ -964,7 +967,16 @@ class HudApp {
         this.log.info('connecting to cluster-render at ' + this.socketPath);
         this.started = true;
         this.clients.forEach((c) => c.connect());
-        this.tickTimer = setInterval(() => this._guard('tick', () => this._tick()), TICK_MS);
+        // a self-timed tick (_tickMs): 20 Hz while the cluster moves, slower while nothing on it would change
+        const tick = () => {
+            this.tickTimer = setTimeout(() => {
+                if (!this.tickTimer) return;
+                this._guard('tick', () => this._tick());
+                if (this.tickTimer) tick();
+            }, this._tickMs());
+        };
+        this.tickTimer = true;
+        tick();
         // Auto theme: check for sunrise / sunset once a minute; the status line too
         this.themeTimer = setInterval(() => this._guard('theme check', () => {
             if (this._themeName() !== this.themeName || this._nightDim() !== this.nightOn || this._hudHoliday() !== (this.hudHoliday || null) ||
@@ -1081,7 +1093,7 @@ class HudApp {
     }
 
     stop() {
-        clearInterval(this.tickTimer);
+        clearTimeout(this.tickTimer); this.tickTimer = null;
         clearInterval(this.themeTimer);
         clearInterval(this.statusTimer);
         clearInterval(this.dmeTimer);
@@ -2677,6 +2689,21 @@ class HudApp {
         this.mapShown = this.setting('mapUp');
         this.widgets.forEach((x) => { if (!x.sheet && x.c && x.w.holeWhen === 'mapUp') x.c.uniform(x.ref, 'u_hole', this._hole(x.w)); });
         this._status();
+    }
+
+    /**
+     * ms to the next tick. 20 Hz while our cluster is shown and the engine runs, the car moves or the shift light
+     * flashes; 10 Hz standing with the engine off (the 0-60 timer, armed whenever the car stands, then starts within
+     * 0.1 s: only an electric launch can start that way); 4 Hz while nothing of ours is drawn (the data still follows:
+     * trip, peaks, 0-60 best times, to within a quarter second).
+     */
+    _tickMs() {
+        if (!this.client.ready || this.hidden || this.activeName === 'off') return IDLE_TICK_MS;
+        const d = this.car.data();
+        if (d.demo || this.flash || (this.demo && this.demo.playing && this.demo.playing())) return TICK_MS;
+        const rpm = this._raw('rpm');
+        const still = !isNum(d.speed) || d.speed < 1;
+        return still && (!isNum(rpm) || rpm < 100) ? PARKED_TICK_MS : TICK_MS;
     }
 
     _tick() {
