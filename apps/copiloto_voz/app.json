@@ -1,8 +1,8 @@
 {
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
-  "description": "Frases grabadas cuando pasa algo en el coche: bienvenida al subir, fin del viaje, poco combustible (con la gasolinera más cercana en Waze en tu iPhone), repostaje, posible hielo y pausa tras dos horas",
-  "version": "0.1.0",
+  "description": "Su copiloto con voz: bienvenida al arrancar, fin del viaje, combustible (con la mejor Shell en Waze desde el iPhone), neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas",
+  "version": "0.2.0",
   "vendor": "custom",
   "autostart": true,
   "mguInternet": true,
@@ -17,9 +17,10 @@
       "_optional": "encendido / apagado: bienvenida y fin del viaje",
       "VehicleCondition": "s"
     },
-    "de.bmw.body.DoorsWindowsRoofMirrors": {
-      "_optional": "una puerta abierta: la bienvenida",
-      "CentralLockingSystemAndPanelStatus": "s"
+    "de.bmw.infotainment.vehicle.CDS": {
+      "_optional": "revoluciones y temperatura del aceite: motor frío / motor caliente",
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs"
     },
     "de.bmw.infotainment.KombiIF": {
       "_optional": "combustible y autonomía",
@@ -28,6 +29,34 @@
     "de.bmw.infrastructure.EnvironmentalInformation": {
       "_optional": "temperatura exterior: aviso de hielo",
       "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.connectivity.telephony.ConnectivityAggregator": {
+      "_optional": "llamada en curso: la voz espera",
+      "aggregatedCallState": "rs"
+    },
+    "de.bmw.infotainment.checkcontrol.CheckControlMaster": {
+      "_optional": "el aviso de presión de neumáticos de BMW",
+      "basicList": "rs"
+    },
+    "de.bmw.infotainment.KombiInterface_2": {
+      "_optional": "nombres de los avisos de BMW y el mantenimiento (CBS)",
+      "ccList": "rs",
+      "newCCMessage": "rs",
+      "cbsDataServiceList": "rs"
+    },
+    "de.bmw.body.DoorsWindowsRoofMirrors": {
+      "_optional": "ventanillas y techo abiertos al apagar",
+      "CentralLockingSystemAndPanelStatus": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_optional": "leer la tensión de la batería de 12 V (diagnosis de solo lectura)",
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     },
     "org.genivi.am.commandinterface.CommandControl": {
       "_optional": "el gestor de audio: conectar la voz a los altavoces (como RideTube)",
@@ -75,20 +104,8 @@
   ],
   "settings": [
     {
-      "key": "on_bienvenida",
-      "label": "Bienvenida al subir",
-      "type": "bool",
-      "default": true
-    },
-    {
-      "key": "on_fin_viaje",
-      "label": "Fin del viaje al apagar",
-      "type": "bool",
-      "default": true
-    },
-    {
       "key": "on_combustible",
-      "label": "Aviso de poco combustible",
+      "label": "1  Combustible bajo",
       "type": "bool",
       "default": true
     },
@@ -110,57 +127,67 @@
     },
     {
       "key": "phone",
-      "label": "Enviar la gasolinera al iPhone (ntfy + Waze)",
+      "label": "Enviar la Shell al iPhone (ntfy + shell-diesel)",
       "type": "bool",
       "default": true
     },
     {
-      "key": "brand",
-      "label": "Gasolinera",
-      "type": "choice",
-      "default": "Shell",
-      "options": [
-        [
-          "Shell",
-          "Shell"
-        ],
-        [
-          "Repsol",
-          "Repsol"
-        ],
-        [
-          "Cepsa",
-          "Cepsa"
-        ],
-        [
-          "BP",
-          "BP"
-        ],
-        [
-          "Galp",
-          "Galp"
-        ],
-        [
-          "gasolinera",
-          "La más cercana, de cualquier marca"
-        ]
-      ]
-    },
-    {
-      "key": "on_repostado",
-      "label": "Aviso de repostaje",
+      "key": "on_neumaticos",
+      "label": "2  Neumáticos (aviso de BMW)",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_hielo",
-      "label": "Aviso de posible hielo (3 °C o menos)",
+      "label": "3  Posible hielo (3 °C o menos)",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_motor_frio",
+      "label": "4  Motor frío (aceite < 80 °C, > 2.500 rpm)",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_bateria",
+      "label": "5  Batería baja (< 11,8 V al arrancar)",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_bienvenida",
+      "label": "6  Bienvenida al arrancar",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_mantenimiento",
+      "label": "7  Mantenimiento (2.000 km / 60 días)",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_ventanillas",
+      "label": "8  Ventanillas o techo abiertos al apagar",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_fin_viaje",
+      "label": "9  Fin del viaje",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_descanso",
-      "label": "Recordar una pausa cada 2 horas",
+      "label": "10  Pausa cada 2 horas",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "on_motor_caliente",
+      "label": "11  Motor a temperatura (80 °C)",
       "type": "bool",
       "default": true
     },
@@ -306,5 +333,9 @@
         "840": "UTC+14"
       }
     }
-  ]
+  ],
+  "config": {
+    "shellPage": "https://46wen.github.io/shell-diesel/",
+    "_comment": "shellPage: la página que abre el aviso de combustible en el iPhone (46Wen/shell-diesel, modo ?auto=1)"
+  }
 }

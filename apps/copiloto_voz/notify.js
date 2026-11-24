@@ -1,8 +1,8 @@
 'use strict';
 /**
  * notify.js - Copiloto de voz: a notification on the driver's iPhone through ntfy (https://ntfy.sh, the free ntfy app
- * from the App Store), with a link that opens Waze searching for the fuel station nearest to where the phone is.
- * Tapped with CarPlay connected, Waze opens on the car's screen.
+ * from the App Store). Tapped, it opens the shell-diesel page (pageLink), which picks the Shell and opens Waze; with
+ * CarPlay connected, Waze shows on the car's screen. (iOS lets nothing open an app without a tap.)
  *
  * The internet comes through the MGU Store's mgu-uplink (app.json "mguInternet": true). The head unit's own resolver
  * does not reach the internet, so ntfy.sh is looked up with the DNS servers of this app's uplink lease
@@ -32,9 +32,16 @@ function publicIpv4(ip) {
     return true;
 }
 
-/** The Waze link: search for `what` near the phone and drive there. */
-function wazeLink(what) {
-    return 'https://waze.com/ul?q=' + encodeURIComponent(what) + '&navigate=yes';
+/**
+ * The link to 46Wen's shell-diesel page in its car mode: it finds the best Shell around the phone (the cheapest to fill
+ * up, detour included, within the page's radius and half the range left) and opens Waze to it by itself.
+ *   <page>?auto=1&km=<range>#car=<litres>,<l100km>,<at>,<now>   (the #car= part is what Fuel Link's /go hands over)
+ */
+function pageLink(page, litres, rangeKm, now) {
+    now = now || Date.now();
+    const l100 = typeof litres === 'number' && typeof rangeKm === 'number' && rangeKm > 20 ? Math.round(litres / rangeKm * 1000) / 10 : '';
+    const car = [typeof litres === 'number' ? litres : '', l100, now, now].join(',');
+    return page.split('#')[0].split('?')[0] + '?auto=1' + (typeof rangeKm === 'number' ? '&km=' + rangeKm : '') + '#car=' + car;
 }
 
 class Notifier {
@@ -104,18 +111,18 @@ class Notifier {
         });
     }
 
-    /** The fuel station notification: tap -> Waze, to the nearest `brand`. */
-    fuel(brand, rangeKm) {
-        const url = wazeLink(brand);
+    /** The fuel notification: a tap opens the shell-diesel page, which opens Waze to the best Shell. */
+    fuel(page, litres, rangeKm) {
+        const url = pageLink(page, litres, rangeKm);
         return this.send({
-            title: 'Falta de combustible',
-            message: (typeof rangeKm === 'number' ? 'Autonomía: ' + rangeKm + ' km. ' : '') + 'Toca para ir con Waze a la ' + brand + ' más cercana.',
+            title: 'Combustible bajo',
+            message: (typeof rangeKm === 'number' ? 'Autonomía: ' + rangeKm + ' km. ' : '') + 'Toque para ir a la Shell más conveniente.',
             click: url,
-            actions: [{ action: 'view', label: 'Ir con Waze', url: url, clear: true }],
+            actions: [{ action: 'view', label: 'Ir a la Shell', url: url, clear: true }],
             tags: ['fuelpump'],
-            priority: 4,
+            priority: 5,
         });
     }
 }
 
-module.exports = { Notifier, wazeLink };
+module.exports = { Notifier, pageLink };
