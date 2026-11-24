@@ -202,6 +202,38 @@ ok(r.said.length === 0, 'welcome off in the settings');
     await sp.say('fin_viaje');
     ok(calls.length === 0 && /RideTube/.test(sp.status()), 'source in use, got ' + sp.status());
 
+    // voices.js: the chosen voice first, then the language's other voices, then voces/ itself
+    const V = require(path.join(APP, 'voices'));
+    const vroot = fs.mkdtempSync(path.join(os.tmpdir(), 'cvv-'));
+    ['es/es-ES-ElviraNeural', 'es/es-ES-AlvaroNeural', 'en/en-GB-SoniaNeural'].forEach((d) => fs.mkdirSync(path.join(vroot, d), { recursive: true }));
+    fs.writeFileSync(path.join(vroot, 'es/es-ES-AlvaroNeural/hielo.mp3'), 'x');
+    fs.writeFileSync(path.join(vroot, 'es/es-ES-ElviraNeural/fin_viaje.mp3'), 'x');
+    const vd = V.dirsFor(vroot, 'es', 'es-ES-AlvaroNeural').map((d) => path.relative(vroot, d));
+    ok(vd.join('|') === 'es/es-ES-AlvaroNeural|es/es-ES-ElviraNeural|', 'voice dirs, got ' + vd.join('|'));
+    ok(V.dirsFor(vroot, 'xx', null)[0] === path.join(vroot, 'es', 'es-ES-ElviraNeural'), 'unknown language -> Spanish, Elvira');
+    ok(V.voiceName('zh-CN-XiaoxiaoNeural') === 'Xiaoxiao', 'voice name');
+    const sp2 = new Speaker({ signals, log, dataDir: dir, dirs: () => V.dirsFor(vroot, 'es', 'es-ES-AlvaroNeural') });
+    ok(/AlvaroNeural.hielo\.mp3$/.test(sp2.file('hielo')) && /ElviraNeural.fin_viaje\.mp3$/.test(sp2.file('fin_viaje')) && !sp2.file('bateria'), 'speaker looks in the chosen voice, then the others');
+    const fr = JSON.parse(fs.readFileSync(path.join(APP, 'voces', 'frases.json'), 'utf8'));
+    ok(['es', 'zh', 'en'].every((l) => Object.keys(fr.frases).every((k) => fr.frases[k][l])), 'frases.json: every phrase in the 3 languages');
+    const appj = JSON.parse(fs.readFileSync(path.join(APP, 'app.json'), 'utf8'));
+    ok(['es', 'zh', 'en'].every((l) => appj.settings.some((x) => x.key === 'voz_' + l && x.default === V.DEFAULT[l] && x.options.length === fr.idiomas[l].voces.length)), 'app.json voice settings match frases.json');
+
+    // demo.js: a simulated trip gives the 11 notices; through the real queue they are said in the order of priority
+    const { Demo } = require(path.join(APP, 'demo'));
+    const spoken = [];
+    const dq = new Announcer({ priority: PRIORITY, keep: KEEP, inCall: () => false, speak: (ev) => { spoken.push(ev); return tick().then(() => demo.said(ev, ev === 'hielo' ? 'falta la grabación hielo' : null)); } });
+    const demo = new Demo({ add: (ev) => dq.add(ev) });
+    const given = demo.run();
+    ok(EVENTS.every((ev) => given.indexOf(ev) >= 0), 'demo gives all 11, got ' + given.join(' '));
+    for (let i = 0; i < 40 && demo.running; i++) await tick();
+    const sm = demo.summary();
+    ok(!sm.running && sm.ok === 10 && sm.failed === 1 && /hielo/.test(sm.results.hielo), 'demo results, got ' + JSON.stringify(sm));
+    ok(spoken.join(' ') === EVENTS.join(' '), 'demo said in the order of priority, got ' + spoken.join(' '));
+    const d2 = new Demo({ add: () => {} });
+    d2.run(); d2.expire(Date.now() + 6 * 60000);
+    ok(!d2.running && d2.summary().failed === 11, 'demo: never said -> failed after 5 minutes');
+
     console.log('copiloto_voz: ' + checks + ' checks, ' + fails + ' failed');
     process.exit(fails ? 1 : 0);
 })().catch((e) => { console.log('FAIL ' + (e && e.stack || e)); process.exit(1); });

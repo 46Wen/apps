@@ -596,7 +596,7 @@ def build(app_id, language='en'):
         elif f == 'voces' and os.path.isdir(os.path.join(adir, f)):
             # 46Wen: sound files the head unit's media player opens by path (Copiloto de voz): as they are, not packed
             shutil.copytree(os.path.join(adir, f), os.path.join(src, 'javascript', f),
-                            ignore=lambda d, names: [n for n in names if not n.lower().endswith(('.m4a', '.mp3', '.aac', '.wav'))])
+                            ignore=lambda d, names: [n for n in names if not os.path.isdir(os.path.join(d, n)) and not n.lower().endswith(('.m4a', '.mp3', '.aac', '.wav'))])
         elif os.path.isdir(os.path.join(adir, f)):
             # data folders go along as one compressed file, read with kit/runtime/pack.js
             # (e.g. dtc_scanner/dtc_db, the fault text database -> dtc_db.pack)

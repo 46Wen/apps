@@ -15,9 +15,15 @@
  *   10 descanso        cada 2 horas conduciendo
  *   11 motor_caliente  el aceite llega a 80 °C (en un viaje que empezó en frío), siempre el último
  *
+ * Las frases, en español, chino o inglés y con la voz elegida (Ajustes: Idioma, Voz), están en voces/<idioma>/<voz>/
+ * (voices.js; las genera scripts/generar_voces.py a partir de voces/frases.json).
+ *
  * Arranca con el coche (app.json "autostart"): todo corre en background(), con o sin la pantalla abierta. Solo lee
- * del coche (la batería, con diagnosis de solo lectura: kit/readonly-diag.js); lo único que hace es reproducir sonido. La pantalla (start): cada aviso con su icono, si está activo y cuándo sonó, y el estado
- * de la voz y el coche. Node 8 (el del coche, 8.16.2).
+ * del coche (la batería, con diagnosis de solo lectura: kit/readonly-diag.js); lo único que hace es reproducir sonido.
+ * La pantalla (start), tres páginas: Avisos (cada aviso con su icono, si está activo y cuándo sonó), Diagnóstico (cada
+ * señal del coche, la voz y el resultado de la demo, con ✓ / ✗) y Registro (las últimas líneas del registro).
+ * Demo: un viaje simulado en el que pasan los 11 avisos (demo.js), por la cola y el altavoz de verdad, solo aparcado.
+ * Node 8 (el del coche, 8.16.2).
  */
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +35,8 @@ const { Announcer } = require('./announcer');
 const { Speaker } = require('./speaker');
 const { phraseFor } = require('./phrases');
 const D = require('./decode');
+const V = require('./voices');
+const { Demo } = require('./demo');
 
 const PHRASES = ['bienvenida', 'bienvenida_manana', 'bienvenida_tarde', 'bienvenida_noche'].concat(EVENTS.filter((e) => e !== 'bienvenida'));
 const TITLES = { combustible: 'Combustible', neumaticos: 'Neumáticos', hielo: 'Posible hielo', motor_frio: 'Motor frío',
@@ -44,7 +52,29 @@ const DME = 0x12;
 mgu.run({
     async background(bg) {
         const log = bg.log, settings = bg.settings;
-        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: [path.join(__dirname, 'voces')] });
+        // the log's last lines, for the Registro page (what fails, word for word)
+        const ring = [];
+        ['info', 'warn', 'error'].forEach((level) => {
+            const orig = log[level].bind(log);
+            log[level] = function () {
+                const msg = Array.prototype.slice.call(arguments).map((x) => (x && x.stack) || String(x)).join(' ');
+                ring.push({ at: Date.now(), level: level, msg: msg });
+                if (ring.length > 300) ring.shift();
+                return orig.apply(null, arguments);
+            };
+        });
+        const lang = () => (V.LANGS.indexOf(settings.get('idioma')) >= 0 ? settings.get('idioma') : 'es');
+        const voice = () => settings.get('voz_' + lang()) || V.DEFAULT[lang()];
+        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: () => V.dirsFor(path.join(__dirname, 'voces'), lang(), voice()) });
+        // the checklist: each signal the app uses, when it last came and what it said (or the error subscribing)
+        const SIGNALS = [['estado', 'Estado del coche'], ['rpm', 'Revoluciones'], ['aceite', 'Temperatura del aceite'], ['combustible', 'Combustible y autonomía'],
+            ['exterior', 'Temperatura exterior'], ['llamadas', 'Llamadas'], ['checkcontrol', 'Avisos de BMW (Check Control)'], ['mantenimiento', 'Mantenimiento (CBS)'],
+            ['ventanillas', 'Puertas y ventanillas'], ['bateria', 'Batería (diagnosis)']];
+        const sig = {};
+        SIGNALS.forEach((x) => { sig[x[0]] = { label: x[1], at: 0, value: '', error: '' }; });
+        const mark = (k, value) => { const x = sig[k]; if (x) { x.at = Date.now(); x.value = String(value).slice(0, 60); x.error = ''; } };
+        const lastResult = {};            // event -> 'ok' | error, the last time it was said
+        let demo = null;
         const memoFile = path.join(bg.dataDir, 'memo.json');
         const listeners = [];
         const changed = () => listeners.forEach((fn) => { try { fn(); } catch (e) { /* the page */ } });
@@ -53,7 +83,15 @@ mgu.run({
         const announcer = new Announcer({
             priority: PRIORITY, keep: KEEP, log: (m) => log.info('voice: ' + m),
             inCall: () => call !== null && call > 0,
-            speak: (ev) => { changed(); return speaker.say(phraseFor(ev, settings, speaker, Date.now())).then(changed); },
+            speak: (ev) => {
+                changed();
+                return speaker.say(phraseFor(ev, settings, speaker, Date.now())).then(() => {
+                    const err = speaker.lastError && speaker.lastError.replace(/^[a-z_]+: /, '');     // without the phrase's name
+                    lastResult[ev] = err || 'ok';
+                    if (demo) demo.said(ev, err);
+                    changed();
+                });
+            },
         });
         const engine = new Engine({
             log: (m) => log.info(m),
@@ -74,8 +112,21 @@ mgu.run({
         };
         settings.onChange((key) => { if (key === 'fuelKm') engine.cfg.fuelKm = settings.get('fuelKm') || 50; });
 
-        const missing = PHRASES.filter((p) => !speaker.file(p));
-        log.info('recordings: ' + (PHRASES.length - missing.length) + ' of ' + PHRASES.length + (missing.length ? ', missing ' + missing.join(' ') : ''));
+        const recordings = () => {
+            const missing = PHRASES.filter((p) => !speaker.file(p));
+            log.info('recordings (' + lang() + ', ' + voice() + '): ' + (PHRASES.length - missing.length) + ' of ' + PHRASES.length + (missing.length ? ', missing ' + missing.join(' ') : ''));
+        };
+        recordings();
+        settings.onChange((key) => { if (key === 'idioma' || /^voz_/.test(key)) { recordings(); changed(); } });
+        demo = new Demo({ add: (ev) => announcer.add(ev), log: (m) => log.info(m) });
+        const startDemo = () => {
+            if (engine.state().cond === 10) { log.warn('demo: only parked (the car is drive-ready)'); return 'Solo con el coche parado'; }
+            if (demo.running) return 'La demo ya está en marcha';
+            log.info('demo: a simulated trip, ' + lang() + ' / ' + voice());
+            demo.run();
+            changed();
+            return null;
+        };
 
         // the 12 V battery at ignition on, before the engine starts (read-only diagnostics, the engine unit), once a cycle
         const diag = new ReadOnlyDiag(bg.signals, log);
@@ -88,67 +139,78 @@ mgu.run({
                 let v = D.voltsOf(await diag.read(DME, 0xF442, 1500));
                 if (v === null) v = D.voltsOf(await diag.physical(DME, 0x01, [0x42], 1500, (u) => u[0] === 0x41 && u[1] === 0x42));
                 log.info('battery: ' + (v === null ? 'no answer' : v.toFixed(2) + ' V'));
+                if (v === null) sig.bateria.error = 'el motor no respondió'; else mark('bateria', v.toFixed(2) + ' V');
                 engine.battery(v);
                 changed();
-            } catch (e) { log.warn('battery: ' + (e && e.message || e)); }
+            } catch (e) { log.warn('battery: ' + (e && e.message || e)); sig.bateria.error = String(e && e.message || e); }
         };
 
         // what the car says: each signal on its own, so one the car lacks leaves the others working
-        const W = (iface, handlers, opts) => bg.signals.watch(iface, '1', handlers, log, opts).then((r) => { if (r.error) log.warn(iface + ': ' + r.error); return r; });
-        await W('de.bmw.infrastructure.VehicleCondition', { VehicleCondition: (v) => {
+        const W = (iface, keys, handlers, opts) => bg.signals.watch(iface, '1', handlers, log, opts).then((r) => {
+            if (r.error) { log.warn(iface + ': ' + r.error); keys.forEach((k) => { sig[k].error = r.error; }); }
+            return r;
+        });
+        await W('de.bmw.infrastructure.VehicleCondition', ['estado'], { VehicleCondition: (v) => {
             const n = Car.conditionOf(v && v.statusConditionVehicle);
+            mark('estado', n === undefined ? JSON.stringify(v && v.statusConditionVehicle) : (COND_TEXT[n] || n));
             if (n !== undefined && n <= 5) batteryRead = false;
             if (n === 7 || n === 8) readBattery();
             engine.condition(n);
             changed();
         } });
-        await W('de.bmw.infotainment.vehicle.CDS', {
-            statusEngineSpeed2: (v) => engine.engine(D.rpmOf(v), null),
-            statusEngineTemperature: (v) => engine.engine(null, D.oilOf(v)),
+        await W('de.bmw.infotainment.vehicle.CDS', ['rpm', 'aceite'], {
+            statusEngineSpeed2: (v) => { const r = D.rpmOf(v); if (r !== null) mark('rpm', Math.round(r) + ' rpm'); engine.engine(r, null); },
+            statusEngineTemperature: (v) => { const o = D.oilOf(v); if (o !== null) mark('aceite', Math.round(o) + ' °C'); engine.engine(null, o); },
         });
-        await W('de.bmw.infotainment.KombiIF', { statusRangeTankStatus: (v) => {
+        await W('de.bmw.infotainment.KombiIF', ['combustible'], { statusRangeTankStatus: (v) => {
             const f = v && v.fluidLevelFuelTank, r = v && v.range;
+            mark('combustible', f + ' L · ' + r + ' km');
             engine.fuel(typeof f === 'number' && f >= 0 && f < 255 ? f : null, typeof r === 'number' && r >= 0 && r < 4095 ? r : null);
             saveMemo();
             changed();
         } });
-        await W('de.bmw.infrastructure.EnvironmentalInformation', { ExteriorTemperature: (v) => {
+        await W('de.bmw.infrastructure.EnvironmentalInformation', ['exterior'], { ExteriorTemperature: (v) => {
             const t = v && v.temperatureExterior;
-            if (typeof t === 'number' && t !== 255) engine.outside(t * 0.5 - 40);
+            if (typeof t === 'number' && t !== 255) { mark('exterior', (t * 0.5 - 40).toFixed(1) + ' °C'); engine.outside(t * 0.5 - 40); }
         } });
-        await W('de.bmw.infotainment.connectivity.telephony.ConnectivityAggregator', { aggregatedCallState: (v) => {
+        await W('de.bmw.infotainment.connectivity.telephony.ConnectivityAggregator', ['llamadas'], { aggregatedCallState: (v) => {
             const was = call;
             call = D.callOf(v);
+            mark('llamadas', call === null ? JSON.stringify(v) : ['sin llamada', 'sonando', 'en llamada', 'marcando', 'en espera'][call]);
             if (was > 0 && !(call > 0)) announcer.pump();       // the call ended: what waited is said now
             changed();
         } });
         // BMW's tyre pressure message (Check Control): the active ids, named by the cluster's list
         const tyreCheck = () => engine.tyreWarning(ccActive.some((id) => D.isTyreCc(ccName[id])));
-        await W('de.bmw.infotainment.checkcontrol.CheckControlMaster', { basicList: (v) => {
+        await W('de.bmw.infotainment.checkcontrol.CheckControlMaster', ['checkcontrol'], { basicList: (v) => {
             ccActive = D.activeCc(v);
+            mark('checkcontrol', ccActive.length ? ccActive.length + ' activo(s): ' + ccActive.map((id) => ccName[id] || id).join(', ') : 'ninguno activo');
             if (ccActive.length) log.info('check control active: ' + ccActive.map((id) => id + (ccName[id] ? ' ' + ccName[id] : '')).join(' | '));
             tyreCheck();
         } });
-        await W('de.bmw.infotainment.KombiInterface_2', {
+        await W('de.bmw.infotainment.KombiInterface_2', ['mantenimiento'], {
             ccList: (v) => { D.ccNames(v).forEach((p) => { ccName[p[0]] = p[1]; }); tyreCheck(); },
             newCCMessage: (v) => { D.ccNames(v).forEach((p) => { ccName[p[0]] = p[1]; }); tyreCheck(); },
             cbsDataServiceList: (v) => {
                 const items = D.serviceOf(v);
+                mark('mantenimiento', items.length + ' elemento(s)' + (items.length ? ': ' + items.map((i) => i.name + ' ' + (i.km !== null ? i.km + ' km' : '') ).join(', ') : ''));
                 log.info('service: ' + items.map((i) => i.name + ' ' + i.km + ' km ' + i.days + ' d ' + i.colour).join(' | '));
                 engine.service(items);
             },
         }, { pollMs: 10 * 60000 });
         // windows and the roof: the fields this car sends are logged once, to confirm which ones say "open"
         let doorKeys = false;
-        await W('de.bmw.body.DoorsWindowsRoofMirrors', { CentralLockingSystemAndPanelStatus: (v) => {
+        await W('de.bmw.body.DoorsWindowsRoofMirrors', ['ventanillas'], { CentralLockingSystemAndPanelStatus: (v) => {
             if (!doorKeys && v && typeof v === 'object') { doorKeys = true; log.info('doors/windows fields: ' + JSON.stringify(v).slice(0, 900)); }
+            const o = D.openingsOf(v);
+            mark('ventanillas', o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado (' + Object.keys(v || {}).length + ' campos)');
             engine.openings(D.openingsOf(v));
             changed();
         } });
         // the audio side ready before the first phrase
         speaker.init().catch(() => {});
-        setInterval(() => { engine.tick(); announcer.pump(); saveMemo(); }, 5000);
-        return { engine, speaker, announcer, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
+        setInterval(() => { engine.tick(); announcer.pump(); demo.expire(); saveMemo(); }, 5000);
+        return { engine, speaker, announcer, demo, startDemo, sig, SIGNALS, lastResult, ring, lang, voice, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
     },
 
     async start(ctx) {
@@ -194,18 +256,29 @@ mgu.run({
             return x - w - 10;
         };
 
-        const show = () => {
-            const cv = ctx.canvas(W, H), s = engine.state(), a = announcer.state();
-            cv.clear(C.bg);
-            // the M stripe and the title
+        const PAGES = ['Avisos', 'Diagnóstico', 'Registro'];
+        let page = 0;
+        const dot = (cv, x, y, state) => cv.circle(x, y, 8, state === 'ok' ? C.green : state === 'wait' ? C.faint : state === 'pending' ? C.blue : C.red);
+
+        const header = (cv, s, a, found, have) => {
             cv.fillRect(24, 22, 8, 26, C.mLight); cv.fillRect(34, 22, 8, 26, C.mDark); cv.fillRect(44, 22, 8, 26, C.mRed);
             cv.text('Copiloto de voz', 66, 46, 30, C.text, { font: 'bold', literal: true });
-            const found = speaker.found(PHRASES), have = PHRASES.filter((p) => found[p]).length;
+            // the page tabs
+            let px = 330;
+            PAGES.forEach((name, k) => {
+                const w = cv.textWidth(name, 20, { literal: true }) + 30;
+                if (k === page) cv.roundRect(px, 18, w, 34, 17, C.blue);
+                cv.text(name, px + 15, 42, 20, k === page ? C.text : C.dim, { literal: true });
+                px += w + 6;
+            });
             let x = 1576;
             x = chip(cv, x, a.call ? 'En llamada: espera' : a.speaking ? 'Hablando: ' + TITLES[a.speaking] : 'Voz: ' + (speaker.lastError ? 'error' : have + '/' + PHRASES.length + ' frases'),
                 !speaker.lastError && have === PHRASES.length && !a.call, !speaker.lastError);
+            x = chip(cv, x, V.LANG_NAME[bgs.lang()] + ' · ' + V.voiceName(bgs.voice()), have > 0, false);
             chip(cv, x, 'Coche: ' + (s.cond === null ? 'esperando' : COND_TEXT[s.cond] || s.cond), s.cond !== null, true);
+        };
 
+        const showAvisos = (cv, s, a, found) => {
             // the notices: 4 x 3 tiles, in their order of priority
             const TW = 380, TH = 118, GX = 24, GY = 70, GAP = 10;
             EVENTS.forEach((ev, i) => {
@@ -232,11 +305,74 @@ mgu.run({
             cv.text(fit(cv, 'Combustible ' + f(s.litres, ' L') + ' · ' + f(s.range, ' km'), 18, TW - 40), tx + 20, ty + 56, 18, C.text, { literal: true });
             cv.text(fit(cv, 'Aceite ' + f(s.oil, ' °C') + ' · fuera ' + f(s.outside, ' °C', 1), 18, TW - 40), tx + 20, ty + 80, 18, C.text, { literal: true });
             cv.text(fit(cv, 'Batería ' + f(s.volts, ' V', 2) + (s.open.length ? ' · abierto: ' + s.open.join(', ') : ''), 18, TW - 40), tx + 20, ty + 104, 18, C.text, { literal: true });
+        };
+
+        // the checklist: the car's signals on the left, the voice and the demo on the right
+        const showDiag = (cv, s, a, found, have) => {
+            const sig = bgs.sig, now = Date.now();
+            cv.text('Señales del coche', 30, 96, 22, C.dim, { font: 'bold', literal: true });
+            bgs.SIGNALS.forEach((x, k) => {
+                const g = sig[x[0]], y = 132 + k * 37;
+                const st = g.error ? 'bad' : g.at ? 'ok' : 'wait';
+                dot(cv, 40, y - 7, st);
+                cv.text(x[1], 60, y, 19, C.text, { literal: true });
+                const t = g.error ? 'Error: ' + g.error : g.at ? g.value + ' · ' + ago(g.at) : 'sin datos todavía';
+                cv.text(fit(cv, t, 17, 420), 380, y, 17, g.error ? C.red : g.at ? C.dim : C.faint, { literal: true });
+            });
+            const X = 830;
+            cv.text('Voz', X, 96, 22, C.dim, { font: 'bold', literal: true });
+            const missing = PHRASES.filter((p) => !found[p]);
+            const voiceRows = [
+                [have === PHRASES.length ? 'ok' : have ? 'bad' : 'bad', 'Grabaciones: ' + have + ' de ' + PHRASES.length + (missing.length ? ' · faltan ' + missing.join(', ') : '')],
+                [speaker.lastError ? 'bad' : speaker.cc ? 'ok' : 'wait', 'Audio del coche: ' + speaker.status()],
+                [a.call ? 'pending' : 'ok', a.call ? 'En llamada: la voz espera' : 'Sin llamada' + (a.waiting.length ? ' · en cola: ' + a.waiting.map((e) => TITLES[e]).join(', ') : '')],
+            ];
+            voiceRows.forEach((r, k) => { const y = 132 + k * 37; dot(cv, X + 10, y - 7, r[0]); cv.text(fit(cv, r[1], 18, 730), X + 30, y, 18, r[0] === 'bad' ? C.red : C.text, { literal: true }); });
+            const d = bgs.demo.summary();
+            cv.text('Demo' + (d.running ? ' en marcha: ' + (d.ok + d.failed) + ' de ' + d.total : Object.keys(d.results).length ? ': ' + d.ok + ' de ' + d.total + ' bien' : ': pulse «Demo» en el menú (solo aparcado)'),
+                X, 258, 22, C.dim, { font: 'bold', literal: true });
+            EVENTS.forEach((ev, k) => {
+                const col = k < 6 ? 0 : 1, row = k % 6, x = X + col * 380, y = 292 + row * 37;
+                const r = d.results[ev] !== undefined ? d.results[ev] : bgs.lastResult[ev];
+                const st = r === undefined ? 'wait' : r === 'ok' ? 'ok' : r === 'pending' ? 'pending' : 'bad';
+                dot(cv, x + 10, y - 7, st);
+                cv.text(fit(cv, TITLES[ev] + (st === 'bad' ? ': ' + r : st === 'pending' ? ': en cola' : ''), 17, 340), x + 30, y, 17, st === 'bad' ? C.red : C.text, { literal: true });
+            });
+        };
+
+        // the log's last lines, newest at the bottom
+        const showLog = (cv) => {
+            const lines = bgs.ring.slice(-17);
+            cv.text('Últimas líneas del registro (también en el archivo copiloto_voz.log)', 30, 92, 19, C.dim, { literal: true });
+            if (!lines.length) cv.text('Todavía no hay nada.', 30, 130, 20, C.faint, { literal: true });
+            lines.forEach((l, k) => {
+                const d = new Date(l.at), hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+                const y = 124 + k * 21;
+                cv.text(hh, 30, y, 16, C.faint, { literal: true });
+                cv.text(fit(cv, l.msg.replace(/\s+/g, ' '), 16, 1460), 112, y, 16, l.level === 'error' ? C.red : l.level === 'warn' ? C.amber : C.text, { literal: true });
+            });
+        };
+
+        const show = () => {
+            const cv = ctx.canvas(W, H), s = engine.state(), a = announcer.state();
+            const found = speaker.found(PHRASES), have = PHRASES.filter((p) => found[p]).length;
+            cv.clear(C.bg);
+            header(cv, s, a, found, have);
+            if (page === 0) showAvisos(cv, s, a, found);
+            else if (page === 1) showDiag(cv, s, a, found, have);
+            else showLog(cv);
             if (note) cv.text(fit(cv, note, 18, 1550), 26, 506, 18, C.amber, { literal: true });
             ctx.ui.image('MAIN_GFX', cv);
         };
         bgs.onChange(show);
         if (ctx.ui.onClick) {
+            ctx.ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; show(); });
+            ctx.ui.onClick('BTN_DEMO', () => {
+                const why = bgs.startDemo();
+                note = why || 'Demo: un viaje simulado con los 11 avisos, uno tras otro (unos dos minutos)';
+                page = 1;
+                show();
+            });
             ctx.ui.onClick('BTN_TEST', () => {
                 const p = PHRASES[testIdx++ % PHRASES.length];
                 note = 'Probando: ' + p;

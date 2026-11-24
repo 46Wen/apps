@@ -28,7 +28,8 @@ class Speaker {
     constructor(opts) {
         this.signals = opts.signals;
         this.log = opts.log;
-        this.dirs = opts.dirs;              // folders the phrases are looked for in, in order
+        this.dirs = opts.dirs;              // folders the phrases are looked for in, in order (or a function giving them:
+                                            // the language and voice chosen in the settings)
         this.dataDir = opts.dataDir;
         this.cc = null; this.mp = null;
         this.ready = null;                  // the init promise
@@ -44,9 +45,10 @@ class Speaker {
 
     /** The file for a phrase (bienvenida -> bienvenida.m4a ...), or null. */
     file(name) {
-        for (let i = 0; i < this.dirs.length; i++) {
+        const dirs = typeof this.dirs === 'function' ? this.dirs() : this.dirs;
+        for (let i = 0; i < dirs.length; i++) {
             for (let j = 0; j < EXT.length; j++) {
-                const f = path.join(this.dirs[i], name + EXT[j]);
+                const f = path.join(dirs[i], name + EXT[j]);
                 if (fs.existsSync(f)) return f;
             }
         }
@@ -152,7 +154,7 @@ class Speaker {
         const dir = path.join(this.dataDir, 'voces');
         try { fs.mkdirSync(dir); } catch (e) { /* there */ }
         try { fs.chmodSync(this.dataDir, 0o711); fs.chmodSync(dir, 0o711); } catch (e) { /* not ours to change */ }
-        const out = path.join(dir, path.basename(file));
+        const out = path.join(dir, path.basename(path.dirname(file)) + '_' + path.basename(file));   // one per voice
         try {
             if (!fs.existsSync(out) || fs.statSync(out).size !== fs.statSync(file).size) fs.writeFileSync(out, fs.readFileSync(file));
             fs.chmodSync(out, 0o644);

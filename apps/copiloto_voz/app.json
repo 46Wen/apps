@@ -1,8 +1,8 @@
 {
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
-  "description": "Su copiloto con voz: bienvenida al arrancar, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas",
-  "version": "0.4.0",
+  "description": "Su copiloto con voz, en español, chino o inglés, con voz femenina o masculina: bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas. Con demo, diagnóstico y registro.",
+  "version": "0.5.0",
   "vendor": "custom",
   "autostart": true,
   "loggingId": "OAV1",
@@ -87,6 +87,14 @@
       "title": "Copiloto de voz",
       "buttons": [
         [
+          "BTN_PAGE",
+          "Cambiar página: Avisos · Diagnóstico · Registro"
+        ],
+        [
+          "BTN_DEMO",
+          "Demo: viaje simulado con los 11 avisos"
+        ],
+        [
           "BTN_TEST",
           "Probar la siguiente frase"
         ],
@@ -98,6 +106,94 @@
     }
   ],
   "settings": [
+    {
+      "key": "idioma",
+      "label": "Idioma de la voz",
+      "type": "choice",
+      "default": "es",
+      "options": [
+        [
+          "es",
+          "Español"
+        ],
+        [
+          "zh",
+          "Chino (mandarín)"
+        ],
+        [
+          "en",
+          "Inglés (británico)"
+        ]
+      ]
+    },
+    {
+      "key": "voz_es",
+      "label": "Voz en español",
+      "type": "choice",
+      "default": "es-ES-ElviraNeural",
+      "options": [
+        [
+          "es-ES-ElviraNeural",
+          "Elvira (femenina)"
+        ],
+        [
+          "es-ES-XimenaNeural",
+          "Ximena (femenina)"
+        ],
+        [
+          "es-ES-AlvaroNeural",
+          "Álvaro (masculina)"
+        ]
+      ]
+    },
+    {
+      "key": "voz_zh",
+      "label": "Voz en chino (mandarín)",
+      "type": "choice",
+      "default": "zh-CN-XiaoxiaoNeural",
+      "options": [
+        [
+          "zh-CN-XiaoxiaoNeural",
+          "Xiaoxiao (femenina)"
+        ],
+        [
+          "zh-CN-XiaoyiNeural",
+          "Xiaoyi (femenina)"
+        ],
+        [
+          "zh-CN-YunxiNeural",
+          "Yunxi (masculina)"
+        ],
+        [
+          "zh-CN-YunjianNeural",
+          "Yunjian (masculina)"
+        ]
+      ]
+    },
+    {
+      "key": "voz_en",
+      "label": "Voz en inglés (británico)",
+      "type": "choice",
+      "default": "en-GB-SoniaNeural",
+      "options": [
+        [
+          "en-GB-SoniaNeural",
+          "Sonia (femenina)"
+        ],
+        [
+          "en-GB-LibbyNeural",
+          "Libby (femenina)"
+        ],
+        [
+          "en-GB-RyanNeural",
+          "Ryan (masculina)"
+        ],
+        [
+          "en-GB-ThomasNeural",
+          "Thomas (masculina)"
+        ]
+      ]
+    },
     {
       "key": "on_combustible",
       "label": "1  Combustible bajo",

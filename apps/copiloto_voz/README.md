@@ -28,27 +28,58 @@ Cada aviso se activa o desactiva en **Ajustes**, donde también se elige la auto
 Solo lee del coche (la batería, con diagnosis de solo lectura). Lo único que hace es reproducir sonido. No necesita
 internet ni el móvil.
 
+## Idiomas y voces
+
+Español, chino (mandarín) e inglés (británico), cada uno con voces naturales femeninas y masculinas. En el coche:
+**Ajustes → Idioma de la voz** y **Voz en …** (una por idioma). Por defecto, español con **Elvira**, la voz femenina de
+España más parecida a «Penélope» de Waze (la de Waze es de Google y no se puede sacar de Waze ni detectar).
+
+| Idioma | Femeninas | Masculinas |
+|---|---|---|
+| Español | Elvira (por defecto), Ximena | Álvaro |
+| Chino | Xiaoxiao, Xiaoyi | Yunxi, Yunjian |
+| Inglés | Sonia, Libby | Ryan, Thomas |
+
+Las frases (14, en los 3 idiomas) están en [`voces/frases.json`](voces/frases.json); las grabaciones van en
+`voces/<idioma>/<voz>/<aviso>.mp3`. Si falta una frase en la voz elegida, se usa la misma frase de otra voz del idioma.
+
+**Cambiar las frases:** con la página editora (`tools/editor_frases.html`, también publicada como artifact): una tabla
+aviso × idioma, botón ▶ para escucharla con la voz del navegador, y descargar o copiar `frases.json`. Póngalo en
+`voces/frases.json`.
+
+**Generar las voces (en el PC, con internet):**
+
+```
+py -m pip install edge-tts
+py scripts\generar_voces.py               (todas; solo rehace las frases que cambiaron)
+py scripts\generar_voces.py --idioma es   (solo español)
+```
+
+Luego commit y push, y actualizar la app desde el MGU Store. Son 154 archivos (14 frases × 11 voces), unos 2 MB.
+
 ## La pantalla
 
-Estilo BMW: un recuadro por aviso, con su icono, su número de prioridad y si está activo, en cola, hablando o cuándo
-sonó por última vez; «sin grabación» si falta su frase. Arriba, el estado del coche y de la voz (o «En llamada: espera»);
-en el último recuadro, lo que lee del coche (combustible, autonomía, aceite, temperatura exterior, batería, ventanillas
-abiertas). **Probar la siguiente frase** reproduce las frases una a una.
+Tres páginas (**Cambiar página** en el menú):
 
-## Las voces
+- **Avisos**: estilo BMW, un recuadro por aviso, con su icono, su prioridad y si está activo, en cola, hablando o
+  cuándo sonó; «sin grabación» si falta su frase. El último recuadro: lo que lee del coche.
+- **Diagnóstico** (la lista de comprobación): cada señal del coche con ✓ (verde: llega, con su último valor), gris
+  (aún no ha llegado) o rojo (error al suscribirse, con el motivo); la voz (grabaciones encontradas y cuáles faltan, el
+  audio del coche, llamada); y el resultado de cada uno de los 11 avisos (de la demo o de la última vez que sonó).
+- **Registro**: las últimas líneas del registro en la pantalla (avisos en ámbar, errores en rojo), para ver qué falla
+  exactamente sin sacar el archivo `copiloto_voz.log`.
 
-Una grabación por frase en [`voces/`](voces/FRASES.md) (allí están los 14 nombres de archivo y los textos).
+Arriba: el idioma y la voz, el estado de la voz y del coche.
 
-**Voz femenina de Apple, en el iPhone:**
+## Demo: viaje simulado
 
-1. Ajustes → Accesibilidad → Contenido leído → Voces → Español (España): descargue una voz *Mejorada* o *Premium*
-   (por ejemplo Mónica o Marisol, si aparecen). La voz de Siri no se puede guardar como archivo; estas sí.
-2. En Atajos, un atajo con: **Diccionario** (clave = nombre del archivo sin `.m4a`, valor = el texto; las 14 filas de
-   `voces/FRASES.md`) → **Repetir con cada** clave → **Obtener valor del diccionario** → **Crear audio hablado a partir
-   del texto** (en inglés *Make Spoken Audio from Text*; Español (España), la voz descargada, velocidad algo por
-   debajo de la mitad) → **Establecer nombre** (el *Elemento de repetición*) → **Guardar archivo** en iCloud Drive,
-   carpeta `BMW voces`, sin preguntar dónde.
-3. Ejecútelo, escuche los `.m4a` en Archivos y mándelos para subirlos a `voces/`. El Store los instala con la app.
+**Demo: viaje simulado con los 11 avisos** (solo con el coche parado): simula un viaje completo (batería baja,
+mantenimiento y aviso de neumáticos antes de salir; arranque; hielo y motor frío a los dos minutos; autonomía de 45 km;
+dos horas conduciendo; aceite a 85 °C; ventanilla abierta y apagado) con las mismas reglas que el coche, y pasa los 11
+avisos por la cola y el altavoz de verdad, por orden de prioridad (unos dos minutos). No toca las señales del coche.
+Se abre la página Diagnóstico: cada aviso en azul (en cola), verde (sonó) o rojo con el motivo (p. ej. «falta la
+grabación», «el coche no conectó el audio», «el reproductor no pudo con el archivo»). Lo que no suena en 5 minutos sale
+en rojo. El detalle, en la página Registro. **Probar la siguiente frase** sigue reproduciéndolas una a una.
 
 ## Cómo suena
 
@@ -61,7 +92,7 @@ pausa**; al terminar vuelve la fuente que sonaba. Si RideTube reproduce un víde
 Todo está probado fuera del coche, no en él todavía. Si algo no funciona, la pantalla y el registro
 (`copiloto_voz.log`) dicen por qué:
 
-- **El sonido** desde una app (RideTube lo hace desde un servicio): «Probar la siguiente frase».
+- **El sonido** desde una app (RideTube lo hace desde un servicio): la demo.
 - **Ventanillas y techo**: ninguna app los lee aún; el registro guarda una vez los campos que manda el coche
   (`doors/windows fields: …`) para ajustarlo.
 - **El aviso de neumáticos de BMW**: se reconoce por el nombre del mensaje de Check Control (en español, alemán o
@@ -77,4 +108,5 @@ Sin la pantalla abierta no dibuja nada. El sonido lo reproduce el reproductor de
 ## Pruebas
 
 `node tools/test_copiloto_voz.js`: los 11 avisos, la cola (prioridad, de una en una, llamadas, avisos caducados), la
-lectura de las señales, la frase según la hora y la secuencia del audio (53 comprobaciones).
+lectura de las señales, la frase según la hora, la secuencia del audio, la carpeta de cada voz, las frases en los 3
+idiomas y la demo (63 comprobaciones).
