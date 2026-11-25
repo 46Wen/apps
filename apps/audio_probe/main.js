@@ -138,7 +138,7 @@ mgu.run({
             const tx = px + 24;
             if (busy) {
                 cv.text(askedMode === 'capture' ? 'Escuchando cada entrada...' : askedMode === 'smartx' ? 'Explorando SmartXbar...' : 'Creando el informe...', tx, y0 + 44, 26, C.amber, { font: 'bold', literal: true });
-                cv.text('Unos segundos. Deje la música sonando.', tx, y0 + 78, 19, C.dim, { literal: true });
+                cv.text(askedMode === 'smartx' ? 'Hasta 30 s. Deje la música sonando.' : 'Unos segundos. Deje la música sonando.', tx, y0 + 78, 19, C.dim, { literal: true });
             } else if (ready) {
                 cv.text('Todo listo', tx, y0 + 44, 28, C.green, { font: 'bold', literal: true });
                 cv.text('Pulse "Explorar SmartXbar" con la música sonando.', tx, y0 + 78, 19, C.text, { literal: true });
@@ -254,7 +254,14 @@ mgu.run({
             const out = ['asked ' + new Date().toISOString() + ', music ' + (music.playing() ? 'playing: ' + music.title : 'not seen')];
             const line = (k, x) => out.push(k + ' ' + JSON.stringify(x).slice(0, 400));
             try {
-                if (!cc) cc = await ctx.signals.proxy(CC_IF, '1');
+                // (the first time "Service unavailable": asked before the Audio Manager's service was found. watch()
+                // follows its availability; up to 4 s for it)
+                if (!cc) {
+                    const w = await ctx.signals.watch(CC_IF, '1', { listOfMainConnections: () => {} }, log);
+                    for (let i = 0; i < 20 && w && !w.available && !w.error; i++) await new Promise((r) => setTimeout(r, 200));
+                    out.push('audio manager: ' + (w && w.error ? 'error ' + w.error : w && w.available ? 'available' : 'not available after 4 s'));
+                    cc = w && w.proxy;
+                }
                 const sinks = await ctx.signals.call(cc, 'getListMainSinks', {}, 3000).catch((e) => ({ error: String(e && e.message || e) }));
                 ((sinks && sinks.listMainSinks) || [sinks]).forEach((k) => line('sink', k));
                 const srcs = await ctx.signals.call(cc, 'getListMainSources', {}, 3000).catch((e) => ({ error: String(e && e.message || e) }));

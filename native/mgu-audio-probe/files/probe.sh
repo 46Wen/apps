@@ -13,7 +13,7 @@
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.4.0
+VERSION=0.5.0
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
@@ -207,71 +207,44 @@ strs() {                                   # printable strings of a binary, 6 ch
 smartx() {
     echo "mgu-audio-smartx $VERSION  $STAMP"
     echo "Read only: SmartXbar and the Audio Manager as they are on this unit. Nothing played, connected or changed."
+    PEEK=$(dirname "$0")/mgu-audio-shmpeek
     sec "hints"
-    n=$(ls /dev/shm 2>/dev/null | grep -v '^mgu-audio' | grep -ciE 'smartx|ias|audio|avb|xbar|pcm|ring')
-    echo "shared-memory files with an audio-like name in /dev/shm: $n"
-    for p in /proc/[0-9]*; do
-        c=$(cat "$p/comm" 2>/dev/null)
-        echo "$c" | grep -qiE "$AUDIO_RE" || continue
-        m=$(grep -oE '/dev/shm/[^ ]+' "$p/maps" 2>/dev/null | sort -u | head -n 6 | tr '\n' ' ')
-        [ -n "$m" ] && echo "${p#/proc/} $c maps: $m"
-    done
-    [ -s /dev/shm/mgu-audio-am.txt ] && echo "Audio Manager lists: below (from the app)" || echo "Audio Manager lists: none (the app did not write them)"
+    echo "Step 4: SmartXbar's ring buffers read (mapped read only, 6 looks 50 ms apart). 'changed' = what moved between"
+    echo "the looks (the counters up top, the audio below); s16 / s32 / f32 = the level of that area read three ways (dBFS)."
+    echo "The music's buffer is the one that changes and whose level moves with it (and stops when paused)."
+    echo "music: $(grep -o 'music [^,]*' /dev/shm/mgu-audio-am.txt 2>/dev/null | head -n 1)"
+    if [ -x "$PEEK" ]; then
+        k=0
+        for f in /dev/shm/smartx_*_ringbuffer /dev/shm/avb_*_ringbuffer; do
+            [ -e "$f" ] || continue
+            k=$((k + 1)); [ "$k" -gt 70 ] && { echo "(more than 70 ring buffers: the rest left out)"; break; }
+            "$PEEK" "$f" 6 50 2>&1 | head -c 600
+        done
+        [ "$k" -eq 0 ] && echo "no ring buffer in /dev/shm"
+    else echo "mgu-audio-shmpeek missing next to probe.sh"; fi
     sec "Audio Manager (from the app: sinks, sources, connections)"
     show /dev/shm/mgu-audio-am.txt 9000
+    sec "SmartXbar ports in /dev/shm (names, without _connection / _ringbuffer)"
+    ls -1 /dev/shm 2>/dev/null | grep -E '^(smartx|avb)_' | sed -e 's/_connection$//' -e 's/_ringbuffer$//' | sort -u | tr '\n' ' ' | fold -w 160
+    echo
+    echo "other /dev/shm entries: $(ls -1 /dev/shm 2>/dev/null | grep -vE '^(smartx|avb)_' | tr '\n' ' ')"
+    sec "/run/smartx"
+    ls -1 /run/smartx 2>&1 | tr '\n' ' ' | fold -w 160
+    echo
+    sec "who maps which SmartXbar buffer"
+    for p in /proc/[0-9]*; do
+        m=$(grep -oE '/dev/shm/(smartx|avb)_[^ ]+' "$p/maps" 2>/dev/null | sed -e 's|/dev/shm/||' -e 's/_connection$//' -e 's/_ringbuffer$//' | sort -u | tr '\n' ' ')
+        [ -n "$m" ] && echo "${p#/proc/} $(cat "$p/comm" 2>/dev/null): $m"
+    done
     sec "audio processes (pid, name, memory, command line)"
     for p in /proc/[0-9]*; do
         c=$(cat "$p/comm" 2>/dev/null)
         echo "$c" | grep -qiE "$AUDIO_RE" || continue
-        rss=$(awk '/^VmRSS/ {print $2 " kB"}' "$p/status" 2>/dev/null)
-        cmd=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-240)
-        echo "${p#/proc/} $c $rss: $cmd"
+        echo "${p#/proc/} $c $(awk '/^VmRSS/ {print $2 " kB"}' "$p/status" 2>/dev/null): $(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-200)"
     done
-    sec "what they map and hold (shared memory, sound devices, sockets)"
-    for p in /proc/[0-9]*; do
-        c=$(cat "$p/comm" 2>/dev/null)
-        echo "$c" | grep -qiE "$AUDIO_RE" || continue
-        shm=$(grep -oE '/dev/shm/[^ ]+|/run/[^ ]+' "$p/maps" 2>/dev/null | sort -u | head -n 10 | tr '\n' ' ')
-        fds=$(ls -l "$p/fd" 2>/dev/null | grep -oE '/dev/[^ ]+|socket:\[[0-9]+\]|/run/[^ ]+' | sed 's/socket:.*/socket/' | sort | uniq -c | awk '{print $2 "x" $1}' | tr '\n' ' ' | cut -c1-300)
-        libs=$(grep -oE '/[^ ]*(smartx|ias|xbar|avb|audio)[^ ]*\.so[^ ]*' "$p/maps" 2>/dev/null | sort -u | head -n 8 | tr '\n' ' ')
-        echo "${p#/proc/} $c"
-        [ -n "$shm" ] && echo "   maps: $shm"
-        [ -n "$fds" ] && echo "   holds: $fds"
-        [ -n "$libs" ] && echo "   libs: $libs"
-    done
-    sec "/dev/shm"
-    ls -la /dev/shm 2>&1 | head -n 80
-    sec "SmartXbar and AVB files (names only)"
-    find /usr/bin /usr/sbin /usr/lib /lib /opt /etc /usr/share -maxdepth 5 \( -iname '*smartx*' -o -iname '*xbar*' -o -iname 'libias*' \
-        -o -iname 'ias*' -o -iname '*avb*' -o -iname '*audiomanager*' -o -iname '*routingadapter*' \) 2>/dev/null | head -n 100
-    sec "the smartx ALSA plugin: its words (ports, paths, names)"
-    for f in /usr/lib/alsa-lib/libasound_module_pcm_smartx.so; do
-        [ -e "$f" ] || continue
-        echo "--- $f"
-        strs "$f" | grep -iE 'shm|/dev|/run|/tmp|\.xml|\.json|port|connect|sink|source|ias_|smartx|ring|routing|name|direction|capture|playback' | sort -u | head -n 80
-    done
-    sec "Audio Manager and SmartXbar configuration (small text files)"
-    for d in /usr/share/audiomanager /usr/lib/audiomanager /opt/audio /etc/smartx /etc/ias /etc/audiomanager /etc/audio; do
-        [ -d "$d" ] || continue
-        echo "--- $d"
-        ls -laR "$d" 2>/dev/null | head -n 60
-    done
-    k=0
-    for f in $(find /usr/share/audiomanager /etc/smartx /etc/ias /etc/audiomanager /etc/audio /opt/audio -maxdepth 4 -type f \
-               \( -name '*.xml' -o -name '*.conf' -o -name '*.json' -o -name '*.txt' -o -name '*.cfg' -o -name '*.ini' -o -name '*.yaml' \) 2>/dev/null | head -n 30); do
-        sz=$(wc -c < "$f" 2>/dev/null); [ "${sz:-0}" -gt 0 ] || continue
-        k=$((k + 1)); [ "$k" -gt 10 ] && break
-        show "$f" 3500
-    done
-    sec "systemd units for sound"
-    for u in /etc/systemd/system/multi-user.target.wants/alsaroutingadapters.service /etc/systemd/system/multi-user.target.wants/audiomanager.service \
-             $(ls /lib/systemd/system/*smartx* /lib/systemd/system/*ias* /lib/systemd/system/*avb* /lib/systemd/system/*audio* /etc/systemd/system/*smartx* 2>/dev/null | head -n 8); do
-        [ -e "$u" ] || continue
-        echo "--- $u -> $(readlink -f "$u")"
-        grep -vE '^\s*(#|$)' "$u" 2>/dev/null | head -n 30
-    done
-    sec "sockets with a sound-like name (/proc/net/unix)"
-    awk '{print $NF}' /proc/net/unix 2>/dev/null | grep -iE 'smartx|ias|audio|am_|routing|avb|xbar|pcm|sound' | sort -u | head -n 40
+    sec "SmartXbar configuration"
+    show /etc/smartx_config.txt 4000
+    show /etc/tmpfiles.d/15-run-smartx.conf 800
     echo "end"
 }
 
