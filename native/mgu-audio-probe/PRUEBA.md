@@ -1,14 +1,15 @@
 # Prueba en el coche: Audio probe
 
-## Paso 3: SmartXbar (lo siguiente que hay que hacer, unos 10 minutos)
+## Paso 4: los buffers de SmartXbar (lo siguiente, unos 10 minutos)
 
-1. Arranca el coche. En el Store (origen `46Wen/apps`, rama **pruebas**) actualiza **Audio probe**: app 0.3.0 y
-   herramienta 0.4.0. Reinicia la unidad si lo pide.
-2. Pon **música** (Bluetooth o CarPlay) y déjala sonando.
-3. Abre **Audio probe**: la herramienta y la música en verde (el USB ya no hace falta).
-4. Pulsa **Explorar SmartXbar**. Espera a "Exploración hecha".
-5. Pestaña **Informe**: haz una foto de **cada página** con *Siguiente* (ahora caben más líneas, serán menos páginas).
-6. Mándame las fotos.
+1. Arranca el coche. En el Store (origen `46Wen/apps`, rama **pruebas**) actualiza **Audio probe**: app 0.4.0 y
+   herramienta 0.5.0. Reinicia la unidad si lo pide.
+2. Pon **música** desde el **USB o Bluetooth** del coche (no CarPlay la primera vez) y déjala sonando con buen volumen.
+3. Abre **Audio probe** y pulsa **Explorar SmartXbar**. Tarda hasta 30 s. Espera a "Exploración hecha".
+4. Pestaña **Informe**: haz una foto de las páginas hasta la sección **SmartXbar ports** (las primeras, unas 6).
+5. Si puedes, repítelo con CarPlay sonando y haz fotos de las mismas páginas.
+
+## Paso 3 (hecho el 25 de noviembre): SmartXbar explorado
 
 ## Pasos 1 y 2 (ya hechos el 25 de noviembre)
 
