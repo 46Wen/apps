@@ -4,6 +4,7 @@
 # device is opened for audio, no setting is changed. What it writes: its report, in
 #   /var/opt/mgu-audio-probe/reports/  (the last 5),  /dev/shm/mgu-audio-probe.txt,
 #   a copy on every USB stick it can write to (/media/<label>/mgu-audio-probe-<time>.txt), and on stdout (the journal).
+# Step 2, the capture test (mode capture): see capture() below.
 # Each look is cut short (timeout, head -c) so a report stays small and nothing can hang the run.
 # Run as root by mgu-audio-probe.service only when the Audio probe app asks (its button, once music plays and a USB
 # stick is in: the request file /dev/shm/mgu-audio-probe.request, mgu-audio-probe.path). Its state for the app goes to
@@ -12,7 +13,7 @@
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.2.0
+VERSION=0.3.0
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
@@ -21,10 +22,17 @@ REQUEST=/dev/shm/mgu-audio-probe.request
 STATUS=/dev/shm/mgu-audio-probe.status
 NOW=$(date +%s 2>/dev/null || echo 0)
 
+# what was asked: the report (default), or the capture test (request {"mode":"capture"}; or "capture" as $1 by hand)
+MODE=report
+grep -q '"mode" *: *"capture"' "$REQUEST" 2>/dev/null && MODE=capture
+[ "$1" = "capture" ] && MODE=capture
+NAME=mgu-audio-probe
+[ "$MODE" = capture ] && NAME=mgu-audio-capture
+BIN=$(dirname "$0")/mgu-audio-capture
 # the request taken (the path unit would start this again while it is there), the app told it runs
 rm -f "$REQUEST" 2>/dev/null
 status() { echo "$1" > "$STATUS.tmp" 2>/dev/null && chmod 0644 "$STATUS.tmp" && mv -f "$STATUS.tmp" "$STATUS"; }
-status "{\"state\":\"running\",\"at\":$NOW}"
+status "{\"state\":\"running\",\"mode\":\"$MODE\",\"at\":$NOW}"
 
 T=""
 command -v timeout >/dev/null 2>&1 && T="timeout 8"
@@ -143,25 +151,59 @@ probe() {
     echo "end"
 }
 
+# The capture test (step 2): each ALSA capture device listened to for 3 s (mgu-audio-capture, read only: a device in
+# use answers busy and is left alone), and each PulseAudio .monitor source through parec when there is one. Which one
+# moves with the music is where its level can be read. Run it with the music playing, then once more paused.
+capture() {
+    echo "mgu-audio-capture test $VERSION  $STAMP"
+    echo "Each capture device listened to for 3 s. Read only: nothing played or set; a device in use is left alone."
+    sec "hints"
+    echo "rms: the level every 0.1 s in dBFS (0 = the loudest, -99 = silence)."
+    echo "The device whose numbers move with the music, and drop to -99 or near when it is paused, carries it."
+    if [ ! -x "$BIN" ]; then echo "mgu-audio-capture missing next to probe.sh"; return; fi
+    n=0
+    for f in /proc/asound/card*/pcm*c/info; do
+        [ -e "$f" ] || continue
+        n=$((n + 1)); [ "$n" -gt 12 ] && { echo "(more than 12 capture devices: the rest left out)"; break; }
+        card=${f#/proc/asound/card}; card=${card%%/*}
+        d=${f%/info}; d=${d##*/pcm}; d=${d%c}
+        id=$(grep '^id:' "$f" 2>/dev/null | cut -c5- | head -n 1)
+        nm=$(grep '^name:' "$f" 2>/dev/null | cut -c7- | head -n 1)
+        echo "card $card device $d: $id / $nm"
+        "$BIN" "$card" "$d" 3 2>&1 | head -c 1500
+    done
+    [ "$n" -eq 0 ] && echo "no ALSA capture device on this unit"
+    if command -v parec >/dev/null 2>&1; then
+        for s in /run/pulse/native /var/run/pulse/native /run/user/*/pulse/native; do
+            [ -S "$s" ] || continue
+            for src in $(env PULSE_SERVER="unix:$s" $T pactl list short sources 2>/dev/null | awk '{print $2}' | grep '\.monitor$' | head -n 4); do
+                echo "PulseAudio $src:"
+                env PULSE_SERVER="unix:$s" $T parec -d "$src" --raw --format=s16le --rate=48000 --channels=2 2>/dev/null | "$BIN" - 48000 2 3 2>&1 | head -c 1500
+            done
+        done
+    fi
+    echo "end"
+}
+
 mkdir -p "$DIR" 2>/dev/null
-probe > "$TMP" 2>&1
-cp "$TMP" "$DIR/probe-$STAMP.txt" 2>/dev/null
+if [ "$MODE" = capture ]; then capture > "$TMP" 2>&1; else probe > "$TMP" 2>&1; fi
+cp "$TMP" "$DIR/$MODE-$STAMP.txt" 2>/dev/null
 cp "$TMP" /dev/shm/mgu-audio-probe.txt 2>/dev/null && chmod 0644 /dev/shm/mgu-audio-probe.txt
 # the last 5 reports only
-ls -1t "$DIR"/probe-*.txt 2>/dev/null | tail -n +6 | while read -r f; do rm -f "$f"; done
+ls -1t "$DIR"/"$MODE"-*.txt 2>/dev/null | tail -n +6 | while read -r f; do rm -f "$f"; done
 copied=""
 for m in /media/*; do
     [ -d "$m" ] || continue
-    cp "$TMP" "$m/mgu-audio-probe-$STAMP.txt" 2>/dev/null && sync && copied="$copied $m"
+    cp "$TMP" "$m/$NAME-$STAMP.txt" 2>/dev/null && sync && copied="$copied $m"
 done
 size=$(wc -c < "$TMP" 2>/dev/null)
 usbjson=$(for m in $copied; do printf '"%s",' "$m"; done | sed 's/,$//')
-status "{\"state\":\"done\",\"at\":$(date +%s 2>/dev/null || echo 0),\"bytes\":${size:-0},\"usb\":[$usbjson],\"file\":\"mgu-audio-probe-$STAMP.txt\"}"
+status "{\"state\":\"done\",\"mode\":\"$MODE\",\"at\":$(date +%s 2>/dev/null || echo 0),\"bytes\":${size:-0},\"usb\":[$usbjson],\"file\":\"$NAME-$STAMP.txt\"}"
 # the report on stdout too: in the journal (the Store's Phone access, logs) when the service runs it, and in the
 # file when it is run by hand over SSH
 cat "$TMP"
 rm -f "$TMP"
-msg="report of $size bytes in $DIR/probe-$STAMP.txt and /dev/shm/mgu-audio-probe.txt; USB:${copied:- none writable}"
+msg="$MODE of $size bytes in $DIR/$MODE-$STAMP.txt and /dev/shm/mgu-audio-probe.txt; USB:${copied:- none writable}"
 command -v logger >/dev/null 2>&1 && logger -t mgu-audio-probe "$msg"
 echo "mgu-audio-probe: $msg"
 exit 0
