@@ -20,6 +20,7 @@ const SOURCE_ID = 1046, SINK_ID = 1024;     // the apps' media source and the ma
 const LANG = 7695972;                       // the languageCode RideTube passes to playFile
 const MAX_PHRASE_MS = 20000;                // a phrase that has not ended by then is stopped
 const TMP_DIR = '/tmp/copiloto_voz';
+const ROUTE_MS = 700;      // after the connection is up: the amplifier's ramp, so the first syllable is heard
 // each folder on the way to f: its mode and owner, to see in the log which one stops BMW's media engine
 function modes(f) {
     const out = [];
@@ -143,6 +144,7 @@ class Speaker {
                 const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
                 if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
                 connId = r.mainConnectionID;
+                await this._routed(connId);
             }
             // BMW's media engine opens the file as its own user: every folder on the way must let it through
             // (RideTube's cache is 0711 under /var/opt). Installed, then a copy in the data folder, then one in /tmp
@@ -162,7 +164,7 @@ class Speaker {
             if (/^error/.test(reason)) throw new Error('el reproductor no pudo con ' + path.basename(file) + ' (' + why.join('; ') + ')');
             this.lastSaid = { name: name, at: Date.now() };
             this.lastError = null;
-            this.log.info('speaker: said ' + name + ' (' + reason + ')');
+            this.log.info('speaker: said ' + name + ' (' + reason + (this.time && this.time.total ? ', ' + this.time.elapsed + ' of ' + this.time.total + ' ms' : '') + ', player ' + this.state + ')');
         } finally {
             if (onShared) await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
             if (connId !== null) {
@@ -175,6 +177,24 @@ class Speaker {
             }
             this.busy = false;
         }
+    }
+
+    // the connection actually on the speakers before the phrase: connect answers at once, but the Audio Manager ramps
+    // the amplifier up after; a phrase of 2 s played meanwhile is not heard. Waits for CS_CONNECTED (at most 3 s), then
+    // a little more for the ramp; the connection's fields are logged once, to see what this car sends
+    async _routed(id) {
+        const t0 = Date.now();
+        let c = null;
+        for (let i = 0; i < 15; i++) {
+            const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+            c = Array.isArray(list) ? list.filter((x) => x && x.mainConnectionID === id)[0] : null;
+            const st = c && c.connectionState;
+            if (st === 'CS_CONNECTED' || st === 2) break;
+            await sleep(200);
+        }
+        if (!this.connLogged) { this.connLogged = true; this.log.info('speaker: connection ' + JSON.stringify(c)); }
+        await sleep(ROUTE_MS);
+        this.log.info('speaker: routed in ' + (Date.now() - t0) + ' ms (' + (c ? c.connectionState : 'not listed') + ')');
     }
 
     // wait (at most 3 s) for a connection to leave the Audio Manager's list; -> true when it did
