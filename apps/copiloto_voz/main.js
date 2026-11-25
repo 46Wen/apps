@@ -7,22 +7,22 @@
  *    2 neumaticos      el aviso de presión de BMW (Check Control), una vez por viaje
  *    3 hielo           3 °C o menos fuera, conduciendo, una vez por viaje
  *    4 motor_frio      aceite por debajo de 80 °C y más de 2.500 rpm, una vez por viaje
- *    5 bateria         la batería de 12 V por debajo de 11,8 V con el motor parado, al arrancar
- *    6 bienvenida      al arrancar el motor (bienvenida_manana / _tarde / _noche, o bienvenida)
- *    7 mantenimiento   al arrancar, si faltan 2.000 km o 60 días para algo (aceite, frenos, inspección), una vez por semana
- *    8 ventanillas     al apagar, una ventanilla o el techo abierto
- *    9 fin_viaje       al apagar después de conducir
- *   10 descanso        cada 2 horas conduciendo
- *   11 motor_caliente  el aceite llega a 80 °C (en un viaje que empezó en frío), siempre el último
+ *    5 bienvenida      al arrancar el motor (bienvenida_manana / _tarde / _noche, o bienvenida)
+ *    6 mantenimiento   al arrancar, si faltan 2.000 km o 60 días para algo (aceite, frenos, inspección), una vez por semana
+ *    7 ventanillas     al apagar, una ventanilla o el techo abierto
+ *    8 fin_viaje       al apagar después de conducir
+ *    9 descanso        cada 2 horas conduciendo
+ *   10 motor_caliente  el aceite llega a 80 °C (en un viaje que empezó en frío), siempre el último
  *
- * Las frases, en español, chino o inglés y con la voz elegida (Ajustes: Idioma, Voz), están en voces/<idioma>/<voz>/
- * (voices.js; las genera scripts/generar_voces.py a partir de voces/frases.json).
+ * Las frases, en español con la voz Elvira, las instala la herramienta del Store copiloto-voz-voces en /var/opt
+ * (voices.js; las genera scripts/generar_voces.py a partir de su frases.json).
  *
  * Arranca con el coche (app.json "autostart"): todo corre en background(), con o sin la pantalla abierta. Solo lee
- * del coche (la batería, con diagnosis de solo lectura: kit/readonly-diag.js); lo único que hace es reproducir sonido.
+ * del coche; lo único que hace es reproducir sonido. background() vuelve enseguida y se suscribe a las señales
+ * después, así la pantalla se abre sin esperar al coche.
  * La pantalla (start), tres páginas: Avisos (cada aviso con su icono, si está activo y cuándo sonó), Diagnóstico (cada
  * señal del coche, la voz y el resultado de la demo, con ✓ / ✗) y Registro (las últimas líneas del registro).
- * Demo: un viaje simulado en el que pasan los 11 avisos (demo.js), por la cola y el altavoz de verdad, solo aparcado.
+ * Demo: un viaje simulado en el que pasan los 10 avisos (demo.js), por la cola y el altavoz de verdad, solo aparcado.
  * Node 8 (el del coche, 8.16.2).
  */
 const fs = require('fs');
@@ -30,7 +30,6 @@ const path = require('path');
 const mgu = require('./kit/mgu');
 const Car = require('./kit/car');
 const G = require('./kit/gauges');
-const { ReadOnlyDiag } = require('./kit/readonly-diag');
 const { Engine, EVENTS, PRIORITY, KEEP } = require('./engine');
 const { Announcer } = require('./announcer');
 const { Speaker } = require('./speaker');
@@ -38,17 +37,17 @@ const { phraseFor } = require('./phrases');
 const D = require('./decode');
 const V = require('./voices');
 const { Demo } = require('./demo');
+const { Windows } = require('./windows');
 
 const PHRASES = ['bienvenida', 'bienvenida_manana', 'bienvenida_tarde', 'bienvenida_noche'].concat(EVENTS.filter((e) => e !== 'bienvenida'));
 const TITLES = { combustible: 'Combustible', neumaticos: 'Neumáticos', hielo: 'Posible hielo', motor_frio: 'Motor frío',
-    bateria: 'Batería', bienvenida: 'Bienvenida', mantenimiento: 'Mantenimiento', ventanillas: 'Ventanillas',
+    bienvenida: 'Bienvenida', mantenimiento: 'Mantenimiento', ventanillas: 'Ventanillas',
     fin_viaje: 'Fin del viaje', descanso: 'Pausa', motor_caliente: 'Motor caliente' };
 const WHEN = { combustible: 'autonomía baja', neumaticos: 'aviso de presión BMW', hielo: '3 °C o menos', motor_frio: 'aceite < 80 °C y > 2.500 rpm',
-    bateria: '< 11,8 V al arrancar', bienvenida: 'al arrancar', mantenimiento: '2.000 km o 60 días', ventanillas: 'abiertas al apagar',
+    bienvenida: 'al arrancar', mantenimiento: '2.000 km o 60 días', ventanillas: 'abiertas al apagar',
     fin_viaje: 'al apagar', descanso: 'cada 2 horas', motor_caliente: 'aceite a 80 °C' };
 const COND_TEXT = { 1: 'aparcado', 2: 'aparcado', 3: 'aparcado', 5: 'sin contacto', 7: 'contacto', 8: 'arrancando',
     10: 'en marcha', 12: 'apagando' };
-const DME = 0x12;
 
 mgu.run({
     async background(bg) {
@@ -64,16 +63,18 @@ mgu.run({
                 return orig.apply(null, arguments);
             };
         });
-        const lang = () => (V.LANGS.indexOf(settings.get('idioma')) >= 0 ? settings.get('idioma') : 'es');
-        const voice = () => settings.get('voz_' + lang()) || V.DEFAULT[lang()];
-        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: () => V.dirsFor(path.join(__dirname, 'voces'), lang(), voice()) });
+        // one voice: Spanish, Elvira (the folders looked up once, not at every phrase or redraw)
+        const lang = () => 'es';
+        const voice = () => V.DEFAULT.es;
+        const voiceDirs = V.dirsFor(V.root(path.join(__dirname, 'voces')), 'es', V.DEFAULT.es);
+        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: voiceDirs });
         // the checklist: each signal the app uses, when it last came and what it said (or the error subscribing)
         const SIGNALS = [['estado', 'Estado del coche'], ['rpm', 'Revoluciones'], ['aceite', 'Temperatura del aceite'], ['combustible', 'Combustible y autonomía'],
             ['exterior', 'Temperatura exterior'], ['llamadas', 'Llamadas'], ['checkcontrol', 'Avisos de BMW (Check Control)'], ['mantenimiento', 'Mantenimiento (CBS)'],
-            ['ventanillas', 'Puertas y ventanillas'], ['bateria', 'Batería (diagnosis)']];
+            ['ventanillas', 'Puertas y ventanillas']];
         const sig = {};
         SIGNALS.forEach((x) => { sig[x[0]] = { label: x[1], at: 0, value: '', error: '' }; });
-        const mark = (k, value) => { const x = sig[k]; if (x) { x.at = Date.now(); x.value = String(value).slice(0, 60); x.error = ''; } };
+        const mark = (k, value) => { const x = sig[k]; if (x) { x.at = Date.now(); x.value = String(value).slice(0, 100); x.error = ''; } };
         const lastResult = {};            // event -> 'ok' | error, the last time it was said
         let demo = null;
         const memoFile = path.join(bg.dataDir, 'memo.json');
@@ -118,8 +119,126 @@ mgu.run({
             log.info('recordings (' + lang() + ', ' + voice() + '): ' + (PHRASES.length - missing.length) + ' of ' + PHRASES.length + (missing.length ? ', missing ' + missing.join(' ') : ''));
         };
         recordings();
-        settings.onChange((key) => { if (key === 'idioma' || /^voz_/.test(key)) { recordings(); changed(); } });
         demo = new Demo({ add: (ev) => announcer.add(ev), log: (m) => log.info(m) });
+        const winFile = path.join(bg.dataDir, 'ventanillas.json');
+        let winSaved = null;
+        try { winSaved = JSON.parse(fs.readFileSync(winFile, 'utf8')); } catch (e) { /* nothing learned yet */ }
+        const windows = new Windows(winSaved);
+        // the two windows (WindowsRoofMaster: statusWindowsRoofMasterDRD / PSD, each { positionWindowRegulator...,
+        // statusPositionWindowRegulator..., statusDriveWindowRegulator..., statusErrorWindowRegulator... }) merged with
+        // the doors' signal into one object, which windows.js learns from
+        let doorsLast = {};
+        const winLast = {};
+        const winView = () => Object.assign({}, doorsLast, winLast);
+        const winText = () => ['DRD', 'PSD'].map((d) => {
+            const p = winLast['W' + d + '.positionWindowRegulator' + d], st = winLast['W' + d + '.statusPositionWindowRegulator' + d];
+            return (d === 'DRD' ? 'cond.' : 'acomp.') + ' ' + (p === undefined ? '?' : p) + (st !== undefined ? ' (' + st + ')' : '');
+        }).join(' · ');
+        const winFeed = (d, v) => {
+            if (!v || typeof v !== 'object') return;
+            Object.keys(v).forEach((k) => { winLast['W' + d + '.' + k] = v[k]; });
+            if (!winLogged[d]) { winLogged[d] = true; log.info('window ' + d + ': ' + JSON.stringify(v)); }
+            windows.feed(winView());
+            const o = windows.open() || D.openingsOf(winView());
+            mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'cerrado') + ' · ' + winText() + (windows.learned() ? '' : ' (sin aprender)'));
+            engine.openings(o);
+            changed();
+        };
+        const winLogged = {};
+        log.info('windows: ' + (windows.learned() ? windows.summary() : 'not learned yet: guessed by field name'));
+        // nothing learned: where else could this car say its windows? The unit's SOME/IP catalog (5 MB, read once, only
+        // then) is searched for names about windows, and what it finds is logged with the service around it
+        const searchCatalog = () => {
+            const f = '/etc/oap/someip/someip-interfaces.json';
+            let text;
+            try { text = fs.readFileSync(f, 'utf8'); } catch (e) { log.warn('catalog: ' + e.message); return; }
+            const seen = {}, out = [];
+            const re = /"([A-Za-z0-9_.]*(?:[Ww]indow|Fenster|FENSTER|Scheibe|SCHEIBE|FensterHeber|WindowLifter|FH_|Fh[A-Z])[A-Za-z0-9_.]*)"/g;
+            let m;
+            while ((m = re.exec(text)) && out.length < 40) {
+                if (seen[m[1]]) continue;
+                seen[m[1]] = true;
+                const before = text.slice(Math.max(0, m.index - 4000), m.index);
+                const svc = (before.match(/"(de\.bmw\.[A-Za-z0-9_.]+)"/g) || []).pop() || '?';
+                out.push(m[1] + ' @ ' + svc.replace(/"/g, ''));
+            }
+            log.info('catalog: ' + text.length + ' bytes, ' + out.length + ' names about windows' + (out.length ? ': ' + out.join(' | ') : ''));
+            // the windows' fields (statusPositionWindowRegulator..., statusDriveWindowRegulator...): which struct holds
+            // them, and which attribute of which service carries that struct (the catalog walked as JSON)
+            try {
+                const db = JSON.parse(text);
+                const hits = [], holders = {};
+                const label = (o, k) => (o && typeof o === 'object' && (o.name || o.id || o.fqn)) ? String(o.name || o.id || o.fqn) : String(k);
+                const walk = (o, chain, k) => {
+                    if (!o || typeof o !== 'object' || hits.length > 40) return;
+                    const here = chain.concat([label(o, k)]);
+                    if (typeof o.name === 'string' && /WindowRegulator/.test(o.name) && !/^de\.bmw/.test(o.name)) {
+                        hits.push(here.slice(-5).join(' > '));
+                        holders[here[here.length - 3] || '?'] = 1;
+                        holders[here[here.length - 2] || '?'] = 1;
+                    }
+                    Object.keys(o).forEach((key) => walk(o[key], here, key));
+                };
+                walk(db, [], 'catalog');
+                // which attribute (of which service) has one of the windows' wrapper types: its type names it exactly
+                const wrappers = Object.keys(holders).filter((h) => /Window.*Wrapper$/.test(h));
+                const refs = [];
+                const walk2 = (o, chain, k) => {
+                    if (!o || typeof o !== 'object' || refs.length > 12) return;
+                    const here = chain.concat([label(o, k)]);
+                    Object.keys(o).forEach((key) => {
+                        const v = o[key];
+                        if (typeof v === 'string' && key !== 'name' && wrappers.some((w) => v === w || v.slice(-(w.length + 1)) === '.' + w)) {
+                            refs.push(here.slice(-4).join(' > ') + ' [' + key + '=' + v.split('.').pop() + ']');
+                        } else walk2(v, here, key);
+                    });
+                };
+                walk2(db, [], 'catalog');
+                const ids = Object.keys(db.interfaces || {}).filter((k) => /WindowsRoofMaster/.test(k));
+                log.info('WindowsRoofMaster in the catalog as: ' + (ids.join(', ') || 'none') + '; instances ' +
+                    ids.map((k) => JSON.stringify((db.instanceIDs || {})[k] || null)).join(', '));
+                log.info('windows attributes: ' + (refs.length ? refs.join(' || ') : 'none found for ' + wrappers.join(', ')));
+            } catch (e) { log.warn('catalog walk: ' + e.message); }
+            // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
+            try {
+                const own = fs.readFileSync(path.join(__dirname, '..', '..', 'someipInterfaces', 'de_bmw_body_DoorsWindowsRoofMirrors.json'), 'utf8');
+                const names = {}, re2 = /"([A-Za-z][A-Za-z0-9_]{3,})"/g;
+                let k;
+                while ((k = re2.exec(own))) if (/window|fenster|regulator|panel|status/i.test(k[1])) names[k[1]] = 1;
+                log.info('own DoorsWindowsRoofMirrors (' + own.length + ' bytes): ' + Object.keys(names).slice(0, 60).join(' '));
+            } catch (e) { log.warn('own DoorsWindowsRoofMirrors config: ' + e.message); }
+            changed();
+        };
+        // each press reads the signal afresh (a car may not send it again when only a window moves) and logs every field
+        let doorProxy = null, winProxy = null;
+        const learnWindows = async () => {
+            try {
+                if (!doorProxy) doorProxy = await bg.signals.proxy('de.bmw.body.DoorsWindowsRoofMirrors', '1').catch(() => null);
+                const v = doorProxy ? await bg.signals.get(doorProxy, 'CentralLockingSystemAndPanelStatus', 3000).catch(() => null) : null;
+                if (v && typeof v === 'object') doorsLast = v;
+                if (!winProxy) winProxy = await bg.signals.proxy('de.bmw.body.doorsandwindows.WindowsRoofMaster', '1').catch(() => null);
+                for (const d of ['DRD', 'PSD']) {
+                    const w = winProxy ? await bg.signals.get(winProxy, 'statusWindowsRoofMaster' + d, 3000).catch(() => null) : null;
+                    if (w && typeof w === 'object') Object.keys(w).forEach((k) => { winLast['W' + d + '.' + k] = w[k]; });
+                }
+                windows.feed(winView());
+                log.info('windows read: ' + winText());
+            } catch (e) { log.warn('windows read: ' + (e && e.message || e)); }
+            const first = windows.step < 0;
+            const r = windows.press();
+            if (first || (r.done && !r.save)) setTimeout(searchCatalog, 100);
+            log.info('windows learn: ' + r.msg + (windows.lastFields && windows.lastFields.length ? ' [' + windows.lastFields.map((k) => k + '=' + JSON.stringify(windows.last[k])).join(', ') + ']' : ''));
+            if (r.save) {
+                try { fs.writeFileSync(winFile, JSON.stringify(r.save)); } catch (e) { log.warn('windows: ' + e.message); }
+            }
+            if (windows.last) {
+                const o = windows.open() || D.openingsOf(windows.last);
+                mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado') + (windows.learned() ? '' : ' (sin aprender)'));
+                engine.openings(o);
+            }
+            changed();
+            return r.msg;
+        };
         const startDemo = () => {
             if (engine.state().cond === 10) { log.warn('demo: only parked (the car is drive-ready)'); return 'Solo con el coche parado'; }
             if (demo.running) return 'La demo ya está en marcha';
@@ -129,33 +248,16 @@ mgu.run({
             return null;
         };
 
-        // the 12 V battery at ignition on, before the engine starts (read-only diagnostics, the engine unit), once a cycle
-        const diag = new ReadOnlyDiag(bg.signals, log);
-        let batteryRead = false;
-        const readBattery = async () => {
-            if (batteryRead || !bg.signals.hasNative()) return;
-            batteryRead = true;
-            try {
-                if (!diag.ready) await diag.init();
-                let v = D.voltsOf(await diag.read(DME, 0xF442, 1500));
-                if (v === null) v = D.voltsOf(await diag.physical(DME, 0x01, [0x42], 1500, (u) => u[0] === 0x41 && u[1] === 0x42));
-                log.info('battery: ' + (v === null ? 'no answer' : v.toFixed(2) + ' V'));
-                if (v === null) sig.bateria.error = 'el motor no respondió'; else mark('bateria', v.toFixed(2) + ' V');
-                engine.battery(v);
-                changed();
-            } catch (e) { log.warn('battery: ' + (e && e.message || e)); sig.bateria.error = String(e && e.message || e); }
-        };
-
         // what the car says: each signal on its own, so one the car lacks leaves the others working
         const W = (iface, keys, handlers, opts) => bg.signals.watch(iface, '1', handlers, log, opts).then((r) => {
             if (r.error) { log.warn(iface + ': ' + r.error); keys.forEach((k) => { sig[k].error = r.error; }); }
             return r;
         });
+        // subscribed after background() has returned: the page opens at once, the signals come in as they are set up
+        const subscribe = async () => {
         await W('de.bmw.infrastructure.VehicleCondition', ['estado'], { VehicleCondition: (v) => {
             const n = Car.conditionOf(v && v.statusConditionVehicle);
             mark('estado', n === undefined ? JSON.stringify(v && v.statusConditionVehicle) : (COND_TEXT[n] || n));
-            if (n !== undefined && n <= 5) batteryRead = false;
-            if (n === 7 || n === 8) readBattery();
             engine.condition(n);
             changed();
         } });
@@ -199,19 +301,28 @@ mgu.run({
                 engine.service(items);
             },
         }, { pollMs: 10 * 60000 });
-        // windows and the roof: the fields this car sends are logged once, to confirm which ones say "open"
+        // windows and the roof: learned from the car (windows.js, «Aprender ventanillas»), else guessed by field name;
+        // the fields this car sends are logged once
         let doorKeys = false;
         await W('de.bmw.body.DoorsWindowsRoofMirrors', ['ventanillas'], { CentralLockingSystemAndPanelStatus: (v) => {
             if (!doorKeys && v && typeof v === 'object') { doorKeys = true; log.info('doors/windows fields: ' + JSON.stringify(v).slice(0, 900)); }
-            const o = D.openingsOf(v);
-            mark('ventanillas', o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado (' + Object.keys(v || {}).length + ' campos)');
-            engine.openings(D.openingsOf(v));
+            doorsLast = v && typeof v === 'object' ? v : {};
+            windows.feed(winView());
+            const o = windows.open() || D.openingsOf(winView());
+            mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado') + (windows.learned() ? '' : ' (sin aprender)'));
+            engine.openings(o);
             changed();
         } });
+        await W('de.bmw.body.doorsandwindows.WindowsRoofMaster', ['ventanillas'], {
+            statusWindowsRoofMasterDRD: (v) => winFeed('DRD', v),
+            statusWindowsRoofMasterPSD: (v) => winFeed('PSD', v),
+        });
         // the audio side ready before the first phrase
         speaker.init().catch(() => {});
+        };
+        setTimeout(() => { subscribe().catch((e) => log.error('subscribe', e)); }, 0);
         setInterval(() => { engine.tick(); announcer.pump(); demo.expire(); saveMemo(); }, 5000);
-        return { engine, speaker, announcer, demo, startDemo, sig, SIGNALS, lastResult, ring, lang, voice, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
+        return { engine, speaker, announcer, demo, startDemo, windows, learnWindows, sig, SIGNALS, lastResult, ring, lang, voice, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
     },
 
     async start(ctx) {
@@ -238,7 +349,6 @@ mgu.run({
             neumaticos: (cv, x, y, c) => { cv.arc(x, y, 11, 17, 0, 360, c); cv.fillRect(x - 2, y - 7, 4, 9, c); cv.circle(x, y + 6, 2, c); },
             hielo: (cv, x, y, c) => { for (let a = 0; a < 180; a += 60) { const r = a * Math.PI / 180; cv.line(x - 16 * Math.cos(r), y - 16 * Math.sin(r), x + 16 * Math.cos(r), y + 16 * Math.sin(r), 3, c); } },
             motor_frio: (cv, x, y, c) => { cv.line(x, y - 16, x, y + 6, 6, c); cv.circle(x, y + 10, 7, c); cv.line(x + 8, y - 10, x + 14, y - 10, 2, c); cv.line(x + 8, y - 3, x + 14, y - 3, 2, c); },
-            bateria: (cv, x, y, c) => { cv.strokeRoundRect(x - 17, y - 11, 34, 24, 3, 3, c); cv.fillRect(x - 12, y - 15, 6, 4, c); cv.fillRect(x + 6, y - 15, 6, 4, c); cv.line(x - 10, y + 1, x - 4, y + 1, 2, c); cv.line(x + 4, y + 1, x + 10, y + 1, 2, c); cv.line(x + 7, y - 2, x + 7, y + 4, 2, c); },
             bienvenida: (cv, x, y, c) => { cv.arc(x - 7, y, 6, 10, 0, 360, c); cv.line(x + 3, y, x + 18, y, 4, c); cv.line(x + 13, y, x + 13, y + 7, 3, c); cv.line(x + 18, y, x + 18, y + 7, 3, c); },
             mantenimiento: (cv, x, y, c) => { cv.line(x - 12, y + 12, x + 6, y - 6, 5, c); cv.arc(x + 9, y - 9, 5, 10, 200, 520, c); },
             ventanillas: (cv, x, y, c) => { cv.quad([[x - 16, y + 12], [x - 16, y - 2], [x + 2, y - 14], [x + 16, y + 12]], c); cv.quad([[x + 2, y - 14], [x + 16, y - 14], [x + 16, y + 12], [x - 16, y + 12]], c); cv.quad([[x - 11, y + 7], [x - 11, y], [x + 1, y - 9], [x + 11, y + 7]], C.tile); cv.quad([[x + 1, y - 9], [x + 11, y - 9], [x + 11, y + 7], [x - 11, y + 7]], C.tile); cv.line(x - 11, y + 2, x + 11, y + 2, 2, c); },
@@ -246,7 +356,7 @@ mgu.run({
             descanso: (cv, x, y, c) => { cv.roundRect(x - 14, y - 8, 22, 20, 4, c); cv.arc(x + 9, y + 1, 4, 8, 270, 450, c); cv.line(x - 8, y - 16, x - 8, y - 11, 2, c); cv.line(x - 2, y - 16, x - 2, y - 11, 2, c); },
             motor_caliente: (cv, x, y, c) => { cv.line(x, y - 16, x, y + 6, 6, c); cv.circle(x, y + 10, 7, c); cv.line(x - 10, y - 12, x - 6, y - 6, 2, c); cv.line(x + 10, y - 12, x + 6, y - 6, 2, c); },
         };
-        const TONE = { combustible: C.amber, neumaticos: C.amber, hielo: C.ice, motor_frio: C.ice, bateria: C.amber, bienvenida: C.light,
+        const TONE = { combustible: C.amber, neumaticos: C.amber, hielo: C.ice, motor_frio: C.ice, bienvenida: C.light,
             mantenimiento: C.light, ventanillas: C.light, fin_viaje: C.light, descanso: C.light, motor_caliente: C.red };
 
         const CY = 48;     // the chips' row, under the kit's header (its tabs: y < 38)
@@ -300,7 +410,7 @@ mgu.run({
             cv.text('El coche', tx + 20, ty + 30, 18, C.dim, { literal: true });
             cv.text(fit(cv, 'Combustible ' + f(s.litres, ' L') + ' · ' + f(s.range, ' km'), 18, TW - 40), tx + 20, ty + 56, 18, C.text, { literal: true });
             cv.text(fit(cv, 'Aceite ' + f(s.oil, ' °C') + ' · fuera ' + f(s.outside, ' °C', 1), 18, TW - 40), tx + 20, ty + 80, 18, C.text, { literal: true });
-            cv.text(fit(cv, 'Batería ' + f(s.volts, ' V', 2) + (s.open.length ? ' · abierto: ' + s.open.join(', ') : ''), 18, TW - 40), tx + 20, ty + 104, 18, C.text, { literal: true });
+            cv.text(fit(cv, s.open.length ? 'Abierto: ' + s.open.join(', ') : 'Ventanillas y techo cerrados', 18, TW - 40), tx + 20, ty + 104, 18, C.text, { literal: true });
         };
 
         // the checklist: the car's signals on the left, the voice and the demo on the right
@@ -340,7 +450,9 @@ mgu.run({
         const showLog = (cv) => {
             const LW = 1460, rows = [];
             // the last lines, newest at the bottom; a long one wraps onto the next rows (the whole path shows)
-            bgs.ring.slice(-16).forEach((l) => {
+            // the kit's own routine lines (frame rates, screen on/off) left out: they push what matters off the page
+            const NOISE = /^(display: |renderd: |entry point |state MAIN |image MAIN_GFX|click BTN_PAGE)/;
+            bgs.ring.filter((l) => !NOISE.test(l.msg)).slice(-16).forEach((l) => {
                 const d = new Date(l.at), hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
                 let msg = l.msg.replace(/\s+/g, ' '), first = true;
                 while (msg) {
@@ -371,13 +483,25 @@ mgu.run({
             if (note) cv.text(fit(cv, note, 18, 1550), 26, 506, 18, C.amber, { literal: true });
             ctx.ui.image('MAIN_GFX', cv);
         };
-        bgs.onChange(show);
+        // a burst of changes (signals, the queue) draws once; at most every 400 ms
+        let drawT = null, drawnAt = 0;
+        const redraw = () => {
+            if (drawT) return;
+            drawT = setTimeout(() => { drawT = null; drawnAt = Date.now(); show(); }, Math.max(0, 400 - (Date.now() - drawnAt)));
+        };
+        bgs.onChange(redraw);
         if (ctx.ui.onClick) {
             ctx.ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; show(); });
             if (ctx.onTab) ctx.onTab((i) => { if (i >= 0 && i < PAGES.length && i !== page) { page = i; show(); } });
+            ctx.ui.onClick('BTN_LEARN', () => {
+                note = 'Leyendo puertas y ventanillas…';
+                page = 1;
+                show();
+                Promise.resolve(bgs.learnWindows()).then((m) => { note = m; show(); });
+            });
             ctx.ui.onClick('BTN_DEMO', () => {
                 const why = bgs.startDemo();
-                note = why || 'Demo: un viaje simulado con los 11 avisos, uno tras otro (unos dos minutos)';
+                note = why || 'Demo: un viaje simulado con los 10 avisos, uno tras otro (unos dos minutos)';
                 page = 1;
                 show();
             });
@@ -388,7 +512,7 @@ mgu.run({
                 speaker.say(p).then(() => { note = speaker.lastError ? 'Error: ' + speaker.lastError : ''; show(); });
             });
         }
-        setInterval(show, 15000);
+        setInterval(redraw, 30000);
         show();
     },
 });

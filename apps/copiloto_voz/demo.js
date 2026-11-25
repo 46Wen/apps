@@ -6,10 +6,10 @@
  * call) and the real speaker. Only parked (the car not drive-ready). The result of each notice is kept for the page's
  * checklist: 'pending' | 'ok' | the error.
  *
- * The trip: battery low and a service due before the start, BMW's tyre warning on; the engine starts (welcome,
- * battery, service, tyres); two minutes on, 1 °C outside (ice) and 3,000 rpm with the oil at 40 °C (cold engine); the
+ * The trip: a service due before the start, BMW's tyre warning on; the engine starts (welcome,
+ * service, tyres); two minutes on, 1 °C outside (ice) and 3,000 rpm with the oil at 40 °C (cold engine); the
  * range down to 45 km (fuel); two hours of driving (break); the oil at 85 °C (warm engine); a window left open and the
- * switch-off (windows, end of the trip). Eleven notices. Node 8.
+ * switch-off (windows, end of the trip). Ten notices. Node 8.
  */
 const { Engine, EVENTS } = require('./engine');
 
@@ -31,7 +31,6 @@ class Demo {
         this.running = true;
         this.startedAt = Date.now();
         e.condition(5);
-        e.battery(11.5);
         e.service([{ name: 'aceite', km: 1500, days: 200, colour: 'GREEN' }]);
         e.engine(800, 20);
         e.tyreWarning(true);

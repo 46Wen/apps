@@ -13,9 +13,10 @@
  * l100km is litres over range: BMW works the range out from the recent consumption, so this is the consumption it
  * uses. The last reading is kept in the data folder, so the page gets one right after a restart, with its time.
  *
- * Light on the head unit (0.3.0): CarPlay, the HMI and BMW's own services share the same CPU and memory.
- *   - the page is drawn only while it is on screen, and at most once every 5 s; never in the background
- *   - a reading equal to the last one only refreshes its time: nothing is drawn or saved
+ * No page and no tile in the apps menu (0.4.0, app.json "hidden"): it starts with the car (autostart) and runs only in
+ * background(). Light on the head unit: CarPlay, the HMI and BMW's own services share the same CPU and memory.
+ *   - nothing is drawn, ever
+ *   - a reading equal to the last one only refreshes its time: nothing is saved
  *   - the reading is saved at most once a minute, and only when it changed
  *   - the process runs at the lowest CPU and I/O priority (app.json config.nice 19, kit/runtime/priority.js), so the
  *     car's own work (CarPlay first) always goes first
@@ -27,90 +28,19 @@ const os = require('os');
 const mgu = require('./kit/mgu');
 
 mgu.run({
-    async start(ctx) {
-        const cfg = ctx.spec.config || {};
+    async background(bg) {
+        const log = bg.log, cfg = bg.spec.config || {};
         const port = cfg.port || 8473, origin = cfg.allowOrigin || '*';
-        const memo = path.join(ctx.dataDir, 'last.json');
+        const memo = path.join(bg.dataDir, 'last.json');
         let last = { litres: null, rangeKm: null, l100km: null, at: null };
         try { last = Object.assign(last, JSON.parse(fs.readFileSync(memo, 'utf8'))); } catch (e) { /* first run */ }
 
-        // the page: full width (the kit's canvas screen, 1600 x 520), big readouts and where to reach it
-        const W = 1600, H = 520, SCREEN = 'MAIN', MIN_GAP = 5000;
-        const C = { bg: '#0b0e14', card: '#161b24', line: '#2a3140', text: '#eef1f5', dim: '#8d97a8', yellow: '#ffd500', green: '#39c27a', red: '#ff6b5b' };
-        const ago = () => {
-            if (!last.at) return '';
-            const m = Math.round((Date.now() - last.at) / 60000);
-            return m < 1 ? 'just now' : m < 120 ? m + ' min ago' : Math.round(m / 60) + ' h ago';
-        };
-        // the addresses shown on the page: worked out when the tailnet is looked for, not on every frame
-        let addrs = '';
-        const ipv4 = () => {
-            const out = [], all = os.networkInterfaces();
-            Object.keys(all).forEach((n) => (all[n] || []).forEach((a) => { if (a.family === 'IPv4' || a.family === 4) out.push(n + ' ' + a.address); }));
-            return out;
-        };
-        const tile = (cv, x, w, label, value, unit, sub) => {
-            cv.roundRect(x, 24, w, 210, 18, C.card);
-            cv.text(label, x + 28, 68, 26, C.dim, { literal: true });
-            cv.text(value, x + 28, 168, 84, C.text, { font: 'bold', literal: true });
-            if (unit) cv.text(unit, x + 28 + cv.textWidth(value, 84, { font: 'bold', literal: true }) + 14, 168, 34, C.dim, { literal: true });
-            if (sub) cv.text(sub, x + 28, 212, 24, C.dim, { literal: true });
-        };
-        let serving = false, saved = 0, savedAt = null, tailnet = null;
-        const draw = () => {
-            const cv = ctx.canvas(W, H);
-            cv.clear(C.bg);
-            const tank = cfg.tankLitres || 59;
-            tile(cv, 24, 500, 'Fuel left', last.litres != null ? String(last.litres) : '--', last.litres != null ? 'L' : '',
-                last.litres != null ? Math.round(last.litres / tank * 100) + ' % of ' + tank + ' L' : 'waiting for the car');
-            tile(cv, 548, 500, 'Range', last.rangeKm != null ? String(last.rangeKm) : '--', last.rangeKm != null ? 'km' : '', ago());
-            tile(cv, 1072, 504, 'Consumption', last.l100km != null ? last.l100km.toFixed(1) : '--', last.l100km != null ? 'L/100km' : '', 'fuel left / range');
-            // where to reach it
-            cv.roundRect(24, 258, 1552, 238, 18, C.card);
-            const ok = serving && tailnet;
-            cv.circle(60, 302, 11, ok ? C.green : serving ? C.yellow : C.red);
-            cv.text(ok ? 'On your tailnet:  http://' + tailnet + ':' + port : serving ? 'Running, but no tailnet address on this head unit' : 'Not running: port ' + port + ' could not be opened',
-                84, 312, 34, ok ? C.green : C.text, { font: 'bold', literal: true });
-            cv.text(ok ? 'Enter this address under "车辆地址" on the Shell diesel page, then tap 读取.'
-                : 'Phone and page reach it only through an address on the tailnet (100.x).', 84, 358, 24, C.dim, { literal: true });
-            cv.text('Addresses here:  ' + (addrs || 'none'), 84, 410, 22, C.dim, { literal: true });
-            cv.text('Local: http://127.0.0.1:' + port + '/fuel ' + (serving ? '(on)' : '(off)') + '    Fuel Link ' + ctx.spec.version, 84, 452, 22, C.dim, { literal: true });
-            ctx.ui.image('MAIN_GFX', cv);
-        };
-        // draw only while the page is on screen, at most once every MIN_GAP ms (later changes are folded into one frame)
-        let drawnAt = 0, pending = null;
-        const show = (now) => {
-            if (!ctx.ui.isVisible(SCREEN)) return;
-            const wait = now ? 0 : MIN_GAP - (Date.now() - drawnAt);
-            if (wait <= 0) {
-                if (pending) { clearTimeout(pending); pending = null; }
-                drawnAt = Date.now();
-                try { draw(); } catch (e) { ctx.log.warn('draw: ' + e.message); }
-            } else if (!pending) pending = setTimeout(() => { pending = null; show(); }, wait);
-        };
-        ctx.ui.onVisible((name, on) => { if (name === SCREEN && on) show(true); });
-        if (ctx.onLayout) ctx.onLayout(() => show(true));
-
+        let saved = 0, savedAt = null, tailnet = null;
         const save = () => {
             if (last.at === savedAt || Date.now() - saved < 60000) return;
             saved = Date.now(); savedAt = last.at;
-            try { fs.writeFileSync(memo, JSON.stringify(last)); } catch (e) { ctx.log.warn('cannot save ' + memo + ': ' + e.message); }
+            try { fs.writeFileSync(memo, JSON.stringify(last)); } catch (e) { log.warn('cannot save ' + memo + ': ' + e.message); }
         };
-
-        // the cluster's fuel and range: litres (255: none) and km (4095: none)
-        await ctx.signals.watch('de.bmw.infotainment.KombiIF', '1', {
-            statusRangeTankStatus: (v) => {
-                const f = v && v.fluidLevelFuelTank, r = v && v.range;
-                const litres = typeof f === 'number' && f >= 0 && f < 255 ? f : null;
-                const rangeKm = typeof r === 'number' && r >= 0 && r < 4095 ? r : null;
-                if (litres == null) return;
-                // the signal comes often while driving, mostly with the same values: then only its time is new
-                if (litres === last.litres && rangeKm === last.rangeKm) { last.at = Date.now(); return; }
-                last = { litres, rangeKm, l100km: rangeKm > 20 ? Math.round(litres / rangeKm * 1000) / 10 : null, at: Date.now() };
-                save();
-                show();
-            },
-        }, ctx.log);
 
         const handler = (req, res) => {
             const head = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Cache-Control': 'no-store' };
@@ -144,14 +74,12 @@ mgu.run({
             srv.timeout = 10000;
             srv.on('error', (e) => {
                 delete bound[host];
-                ctx.log.error('cannot listen on ' + host + ':' + port + ': ' + e.message);
-                if (host === '127.0.0.1') serving = false; else if (tailnet === host) tailnet = null;
-                show(true);
+                log.error('cannot listen on ' + host + ':' + port + ': ' + e.message);
+                if (tailnet === host) tailnet = null;
             });
             srv.listen(port, host, () => {
-                ctx.log.info('fuel at http://' + host + ':' + port + '/fuel');
-                if (host === '127.0.0.1') serving = true; else tailnet = host;
-                show(true);
+                log.info('fuel at http://' + host + ':' + port + '/fuel');
+                if (host !== '127.0.0.1') tailnet = host;
             });
         };
         const tailnetAddr = () => {
@@ -167,22 +95,27 @@ mgu.run({
         };
         listen('127.0.0.1');
         const look = () => {
-            try {
-                const list = ipv4().join('   ');
-                const changed = list !== addrs;
-                addrs = list;
-                const a = tailnetAddr();
-                if (a) listen(a);
-                if (changed) show();
-            } catch (e) { ctx.log.warn('tailnet address: ' + e.message); }
+            try { const a = tailnetAddr(); if (a) listen(a); } catch (e) { log.warn('tailnet address: ' + e.message); }
         };
         // every 30 s until the tailnet is up, then every 5 min (it may come back with a new address)
         const lookLater = () => setTimeout(() => { look(); lookLater(); }, tailnet ? 300000 : 30000);
         look();
         lookLater();
-        // the "x min ago" line: redrawn once a minute, only while the page is on screen
-        setInterval(() => show(), 60000);
-        if (ctx.ui.onClick) ctx.ui.onClick('BTN_REFRESH', () => { look(); show(true); });
-        show(true);
+
+        // the cluster's fuel and range: litres (255: none) and km (4095: none)
+        bg.signals.watch('de.bmw.infotainment.KombiIF', '1', {
+            statusRangeTankStatus: (v) => {
+                const f = v && v.fluidLevelFuelTank, r = v && v.range;
+                const litres = typeof f === 'number' && f >= 0 && f < 255 ? f : null;
+                const rangeKm = typeof r === 'number' && r >= 0 && r < 4095 ? r : null;
+                if (litres == null) return;
+                // the signal comes often while driving, mostly with the same values: then only its time is new
+                if (litres === last.litres && rangeKm === last.rangeKm) { last.at = Date.now(); return; }
+                last = { litres, rangeKm, l100km: rangeKm > 20 ? Math.round(litres / rangeKm * 1000) / 10 : null, at: Date.now() };
+                save();
+            },
+        }, log).then((r) => { if (r && r.error) log.warn('fuel signal: ' + r.error); }, (e) => log.warn('fuel signal: ' + e));
+        setInterval(save, 60000);
+        return null;
     },
 });

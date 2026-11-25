@@ -1,10 +1,11 @@
 {
   "id": "fuel_link",
   "title": "Fuel Link",
-  "description": "Shares the fuel left (litres) and the range with your own phone over your tailnet, read-only, for the Shell diesel page",
-  "version": "0.3.0",
+  "description": "Shares the fuel left (litres) and the range with your own phone over your tailnet, read-only, for the Shell diesel page. Runs in the background, with no tile in the apps menu.",
+  "version": "0.4.0",
   "vendor": "custom",
   "startType": "autostart",
+  "hidden": true,
   "loggingId": "OAF1",
   "iconGlyph": "FUL",
   "signals": {
@@ -12,19 +13,6 @@
       "statusRangeTankStatus": "rs"
     }
   },
-  "screens": [
-    {
-      "name": "MAIN",
-      "kind": "canvas",
-      "title": "Fuel Link",
-      "buttons": [
-        [
-          "BTN_REFRESH",
-          "Refresh"
-        ]
-      ]
-    }
-  ],
   "config": {
     "port": 8473,
     "allowOrigin": "https://46wen.github.io",
