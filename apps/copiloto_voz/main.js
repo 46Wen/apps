@@ -74,7 +74,7 @@ mgu.run({
             ['ventanillas', 'Puertas y ventanillas']];
         const sig = {};
         SIGNALS.forEach((x) => { sig[x[0]] = { label: x[1], at: 0, value: '', error: '' }; });
-        const mark = (k, value) => { const x = sig[k]; if (x) { x.at = Date.now(); x.value = String(value).slice(0, 60); x.error = ''; } };
+        const mark = (k, value) => { const x = sig[k]; if (x) { x.at = Date.now(); x.value = String(value).slice(0, 100); x.error = ''; } };
         const lastResult = {};            // event -> 'ok' | error, the last time it was said
         let demo = null;
         const memoFile = path.join(bg.dataDir, 'memo.json');
@@ -124,6 +124,27 @@ mgu.run({
         let winSaved = null;
         try { winSaved = JSON.parse(fs.readFileSync(winFile, 'utf8')); } catch (e) { /* nothing learned yet */ }
         const windows = new Windows(winSaved);
+        // the two windows (WindowsRoofMaster: statusWindowsRoofMasterDRD / PSD, each { positionWindowRegulator...,
+        // statusPositionWindowRegulator..., statusDriveWindowRegulator..., statusErrorWindowRegulator... }) merged with
+        // the doors' signal into one object, which windows.js learns from
+        let doorsLast = {};
+        const winLast = {};
+        const winView = () => Object.assign({}, doorsLast, winLast);
+        const winText = () => ['DRD', 'PSD'].map((d) => {
+            const p = winLast['W' + d + '.positionWindowRegulator' + d], st = winLast['W' + d + '.statusPositionWindowRegulator' + d];
+            return (d === 'DRD' ? 'cond.' : 'acomp.') + ' ' + (p === undefined ? '?' : p) + (st !== undefined ? ' (' + st + ')' : '');
+        }).join(' · ');
+        const winFeed = (d, v) => {
+            if (!v || typeof v !== 'object') return;
+            Object.keys(v).forEach((k) => { winLast['W' + d + '.' + k] = v[k]; });
+            if (!winLogged[d]) { winLogged[d] = true; log.info('window ' + d + ': ' + JSON.stringify(v)); }
+            windows.feed(winView());
+            const o = windows.open() || D.openingsOf(winView());
+            mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'cerrado') + ' · ' + winText() + (windows.learned() ? '' : ' (sin aprender)'));
+            engine.openings(o);
+            changed();
+        };
+        const winLogged = {};
         log.info('windows: ' + (windows.learned() ? windows.summary() : 'not learned yet: guessed by field name'));
         // nothing learned: where else could this car say its windows? The unit's SOME/IP catalog (5 MB, read once, only
         // then) is searched for names about windows, and what it finds is logged with the service around it
@@ -173,6 +194,8 @@ mgu.run({
                     });
                 };
                 walk2(db, [], 'catalog');
+                const ids = Object.keys(db.interfaces || {}).filter((k) => /WindowsRoofMaster/.test(k));
+                log.info('WindowsRoofMaster in the catalog as: ' + (ids.join(', ') || 'none'));
                 log.info('windows attributes: ' + (refs.length ? refs.join(' || ') : 'none found for ' + wrappers.join(', ')));
             } catch (e) { log.warn('catalog walk: ' + e.message); }
             // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
@@ -186,13 +209,19 @@ mgu.run({
             changed();
         };
         // each press reads the signal afresh (a car may not send it again when only a window moves) and logs every field
-        let doorProxy = null;
+        let doorProxy = null, winProxy = null;
         const learnWindows = async () => {
             try {
-                if (!doorProxy) doorProxy = await bg.signals.proxy('de.bmw.body.DoorsWindowsRoofMirrors', '1');
-                const v = await bg.signals.get(doorProxy, 'CentralLockingSystemAndPanelStatus', 3000);
-                if (v && typeof v === 'object') windows.feed(v);
-                log.info('windows read: ' + JSON.stringify(v));
+                if (!doorProxy) doorProxy = await bg.signals.proxy('de.bmw.body.DoorsWindowsRoofMirrors', '1').catch(() => null);
+                const v = doorProxy ? await bg.signals.get(doorProxy, 'CentralLockingSystemAndPanelStatus', 3000).catch(() => null) : null;
+                if (v && typeof v === 'object') doorsLast = v;
+                if (!winProxy) winProxy = await bg.signals.proxy('de.bmw.body.WindowsRoofMaster', '1').catch(() => null);
+                for (const d of ['DRD', 'PSD']) {
+                    const w = winProxy ? await bg.signals.get(winProxy, 'statusWindowsRoofMaster' + d, 3000).catch(() => null) : null;
+                    if (w && typeof w === 'object') Object.keys(w).forEach((k) => { winLast['W' + d + '.' + k] = w[k]; });
+                }
+                windows.feed(winView());
+                log.info('windows read: ' + winText());
             } catch (e) { log.warn('windows read: ' + (e && e.message || e)); }
             const first = windows.step < 0;
             const r = windows.press();
@@ -276,12 +305,17 @@ mgu.run({
         let doorKeys = false;
         await W('de.bmw.body.DoorsWindowsRoofMirrors', ['ventanillas'], { CentralLockingSystemAndPanelStatus: (v) => {
             if (!doorKeys && v && typeof v === 'object') { doorKeys = true; log.info('doors/windows fields: ' + JSON.stringify(v).slice(0, 900)); }
-            windows.feed(v);
-            const o = windows.open() || D.openingsOf(v);
+            doorsLast = v && typeof v === 'object' ? v : {};
+            windows.feed(winView());
+            const o = windows.open() || D.openingsOf(winView());
             mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado') + (windows.learned() ? '' : ' (sin aprender)'));
             engine.openings(o);
             changed();
         } });
+        await W('de.bmw.body.WindowsRoofMaster', ['ventanillas'], {
+            statusWindowsRoofMasterDRD: (v) => winFeed('DRD', v),
+            statusWindowsRoofMasterPSD: (v) => winFeed('PSD', v),
+        });
         // the audio side ready before the first phrase
         speaker.init().catch(() => {});
         };

@@ -48,7 +48,7 @@ class Windows {
     /** What the driver should do now (the page shows it), or null when not learning. */
     prompt() {
         if (this.step < 0) return null;
-        if (this.step === 0) return 'Aprender ventanillas: cierre todas las ventanillas y el techo, y pulse «Aprender ventanillas»';
+        if (this.step === 0) return 'Aprender ventanillas: cierre las dos ventanillas y pulse «Aprender ventanillas»';
         return 'Aprender ventanillas (' + this.step + '/' + STEPS.length + '): ' + STEPS[this.step - 1][2] +
             ' y pulse otra vez (sin cambiar nada, se salta)';
     }

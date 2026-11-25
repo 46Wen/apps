@@ -2,7 +2,7 @@
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
   "description": "Su copiloto con voz (español, voz Elvira): bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas. Con demo, diagnóstico y registro.",
-  "version": "0.7.6",
+  "version": "0.8.0",
   "vendor": "custom",
   "autostart": true,
   "requires": {
@@ -49,6 +49,11 @@
     "de.bmw.body.DoorsWindowsRoofMirrors": {
       "_optional": "ventanillas y techo abiertos al apagar",
       "CentralLockingSystemAndPanelStatus": "rs"
+    },
+    "de.bmw.body.WindowsRoofMaster": {
+      "_optional": "ventanillas: su posición y si el elevalunas se mueve",
+      "statusWindowsRoofMasterDRD": "rs",
+      "statusWindowsRoofMasterPSD": "rs"
     },
     "org.genivi.am.commandinterface.CommandControl": {
       "_optional": "el gestor de audio: conectar la voz a los altavoces (como RideTube)",
