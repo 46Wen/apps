@@ -2,7 +2,7 @@
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
   "description": "Su copiloto con voz (español, voz Elvira): bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas. Con demo, diagnóstico y registro.",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "vendor": "custom",
   "autostart": true,
   "requires": {

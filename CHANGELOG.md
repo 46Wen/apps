@@ -4,6 +4,7 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 25 2026
 
+- **Copiloto de voz 0.7.3:** still nothing learned in the car. When a learning ends with nothing, the app searches the unit's SOME/IP catalog (/etc/oap/someip/someip-interfaces.json) for names about windows and logs them with their service, to find where this car says its windows.
 - **Copiloto de voz 0.7.2:** in the car «Aprender ventanillas» learned nothing. Each press now reads DoorsWindowsRoofMirrors afresh (a car may not send it again when only a window moves) and logs every field it holds, to see where this car puts its windows. Two steps only, the owner's car has two windows and no roof.
 - **Copiloto de voz 0.7.1:** «Aprender ventanillas»: no public app reads the windows, so the app learns from the car which fields of DoorsWindowsRoofMirrors say "open": everything closed, then each window and the roof opened in turn (a press with nothing changed skips it); kept in the data folder, open while a learned field is off its closed value (flags or positions alike), the doors' switches never taken. Diagnóstico shows the windows live; the windows notice at switch-off uses what was learned (windows.js).
 - **Fuel Link 0.4.0:** no tile in the apps menu and no page any more, as the owner asked: it only serves the fuel and range to the phone's page. It starts with the car and runs in background() only; nothing is ever drawn. The kit's build takes app.json "hidden": true (no entry point, as BMW's own start widgets have none).

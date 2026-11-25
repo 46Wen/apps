@@ -125,6 +125,25 @@ mgu.run({
         try { winSaved = JSON.parse(fs.readFileSync(winFile, 'utf8')); } catch (e) { /* nothing learned yet */ }
         const windows = new Windows(winSaved);
         log.info('windows: ' + (windows.learned() ? windows.summary() : 'not learned yet: guessed by field name'));
+        // nothing learned: where else could this car say its windows? The unit's SOME/IP catalog (5 MB, read once, only
+        // then) is searched for names about windows, and what it finds is logged with the service around it
+        const searchCatalog = () => {
+            const f = '/etc/oap/someip/someip-interfaces.json';
+            let text;
+            try { text = fs.readFileSync(f, 'utf8'); } catch (e) { log.warn('catalog: ' + e.message); return; }
+            const seen = {}, out = [];
+            const re = /"([A-Za-z0-9_.]*(?:[Ww]indow|Fenster|FENSTER|Scheibe|SCHEIBE|FensterHeber|WindowLifter|FH_|Fh[A-Z])[A-Za-z0-9_.]*)"/g;
+            let m;
+            while ((m = re.exec(text)) && out.length < 40) {
+                if (seen[m[1]]) continue;
+                seen[m[1]] = true;
+                const before = text.slice(Math.max(0, m.index - 4000), m.index);
+                const svc = (before.match(/"(de\.bmw\.[A-Za-z0-9_.]+)"/g) || []).pop() || '?';
+                out.push(m[1] + ' @ ' + svc.replace(/"/g, ''));
+            }
+            log.info('catalog: ' + text.length + ' bytes, ' + out.length + ' names about windows' + (out.length ? ': ' + out.join(' | ') : ''));
+            changed();
+        };
         // each press reads the signal afresh (a car may not send it again when only a window moves) and logs every field
         let doorProxy = null;
         const learnWindows = async () => {
@@ -135,6 +154,7 @@ mgu.run({
                 log.info('windows read: ' + JSON.stringify(v));
             } catch (e) { log.warn('windows read: ' + (e && e.message || e)); }
             const r = windows.press();
+            if (r.done && !r.save) setTimeout(searchCatalog, 100);
             log.info('windows learn: ' + r.msg + (windows.lastFields && windows.lastFields.length ? ' [' + windows.lastFields.map((k) => k + '=' + JSON.stringify(windows.last[k])).join(', ') + ']' : ''));
             if (r.save) {
                 try { fs.writeFileSync(winFile, JSON.stringify(r.save)); } catch (e) { log.warn('windows: ' + e.message); }
