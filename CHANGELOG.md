@@ -2,6 +2,10 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 25 2026
+
+- **Updated from the original repositories (Nov 25):** Cluster Themes 0.20.1 (bimmer-lab's 0.19.10: the Waze map shown inside the theme again with Waze on Cluster 0.14.5+ and cluster-render 0.8.2+, now also in M view and Vector; with this repository's per-drive-mode map switches kept), Redline 2.0.51 (still without the HUD), Ambient config 2.7.26, Maps on cluster 0.6.16, cluster-render 0.8.13, Waze on Cluster 0.14.15. Not yet tested on a car.
+
 ## Nov 24 2026
 
 - **Copiloto de voz 0.5.1:** the voices: 153 recordings (14 phrases × 11 voices, Spanish, Chinese and English), made with scripts/generar_voces.py. Ryan's "good morning" did not come out; Thomas's is said in its place.
