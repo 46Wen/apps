@@ -5,7 +5,7 @@
  * rename) and listens on <dir>/ctl.sock for its newline JSON commands, logging each one. Like the real control
  * socket it has one owner: with --busy N the first N connections get the "busy" status and are closed.
  *
- *   node bench/fake-waze.js bench/.data/waze [--state showing|idle] [--target map|panel] [--busy N]
+ *   node bench/fake-waze.js bench/.data/waze [--state showing|idle] [--target map|panel] [--busy N] [--never-hosted]
  *   kill -USR1 <pid>   flips the state between showing and idle (the phone's map coming and going)
  *   then run the bench with WAZE_STATUS=<dir>/status.json WAZE_CTL=<dir>/ctl.sock
  * Hosting (waze-on-cluster 0.14.5): with BENCH_HOST_LAYERS=1 the bench writes <dir>/hosted (1 or 0) as cluster-render's
@@ -20,6 +20,8 @@ const args = process.argv.slice(2);
 const dir = path.resolve(args[0] || 'bench/.data/waze');
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i > 0 ? args[i + 1] : d; };
 let state = opt('state', 'showing'), target = opt('target', 'map'), busyLeft = Number(opt('busy', 0));
+// --never-hosted: an older Waze on Cluster that doesn't follow a host (no "hosted": 1), step 5 of the Waze trace
+const neverHosted = args.indexOf('--never-hosted') >= 0;
 const log = (s) => console.log(new Date().toISOString().slice(11, 19) + ' fake-waze: ' + s);
 
 fs.mkdirSync(dir, { recursive: true });
@@ -30,7 +32,7 @@ function hosted() { try { return fs.readFileSync(path.join(dir, 'hosted'), 'utf8
 let wasHosted = false;
 function writeStatus() {
     const s = { state, target, page: state === 'showing' ? 'Waze map, 15 frames/s' : null, reason: state === 'idle' ? 'Waiting for the phone\'s map' : null };
-    const h = hosted();
+    const h = hosted() && !neverHosted;
     if (h) s.hosted = 1;
     if (h !== wasHosted) { wasHosted = h; log(h ? 'map hosted (status "hosted": 1)' : 'map on its own slot'); }
     fs.writeFileSync(statusPath + '.tmp', JSON.stringify(s) + '\n', { mode: 0o644 });

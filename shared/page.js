@@ -25,6 +25,7 @@ const sensors = require('./sensors');
 const visible = require('./visible');
 const badges = require('./badges');
 const tz = require('./tz');
+const logring = require('./logring');
 
 const W = 1600, H = 520;
 const A = G.withAlpha;
@@ -33,7 +34,8 @@ const C = {
     blue: '#2b7fff', blueHi: '#5aa2ff', blueDeep: '#1c69d4', live: '#7fd3a0', off: '#c3cad6',
 };
 const RAIL = { x: 16, y: 54, w: 252, h: 66, gap: 8 };
-const RAIL7 = { x: 16, y: 54, w: 252, h: 58, gap: 6 };     // seven tabs or more: a little shorter, so they fit
+const RAIL7 = { x: 16, y: 54, w: 252, h: 58, gap: 6 };     // seven tabs: a little shorter, so they fit
+const RAIL8 = { x: 16, y: 54, w: 252, h: 52, gap: 4 };     // eight (Cluster Themes with the Log tab)
 const CX = 300, CR = 1584, CW = CR - CX;
 const MODES = [['inComfort', 'Comfort'], ['inSport', 'Sport'], ['inEco', 'Eco Pro']];
 // a plug-in hybrid's own (Cluster Themes; shown once the car has sent a plug-in hybrid mode, or one is set)
@@ -41,6 +43,11 @@ const PHEV_MODES = [['inHybrid', 'Hybrid'], ['inElectric', 'Electric']];
 const PHEV_KEY = { hybrid: 'inHybrid', electric: 'inElectric' };
 const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
 const MAP_MODE_KEY = { comfort: 'mapComfort', sport: 'mapSport', eco: 'mapEco' };
+// Adaptive (Cluster Themes): its own cell next to Comfort, Sport and Eco Pro; "same" follows Comfort
+const ADAPTIVE_MODE = ['inAdaptive', 'Adaptive'];
+const MAP_KEYS = ['mapComfort', 'mapSport', 'mapEco', 'mapAdaptive'];
+// the Log tab's filters (logring.js kind())
+const LOG_FILTERS = [['all', 'All'], ['waze', 'Waze map'], ['mode', 'Drive mode'], ['problems', 'Problems']];
 const TAB = {
     look: { icon: 'screen' },
     readouts: { name: 'Readouts', icon: 'lines' },
@@ -51,6 +58,7 @@ const TAB = {
     gmeter: { name: 'G-meter', icon: 'gmeter' },
     colours: { name: 'Colours', icon: 'colour' },
     settings: { name: 'Settings', icon: 'cog' },
+    log: { name: 'Log', icon: 'log' },
 };
 
 // the kit's own chrome (header, bar, Settings sheet) in BMW blue, to match the page
@@ -67,6 +75,8 @@ class Page {
         this.cat = sensors.CATS[0];      // Readouts: the sensor group shown
         this.series = null;              // Badge: the series shown (null: the picked model's)
         this.confirm = null;             // { title, lines, yes, run } while a question is open over the page
+        this.logFilter = 'all';          // Log: the filter chip
+        this.logBack = 0;                // Log: rows scrolled back from the newest (0: following the newest)
     }
 
     start() {
@@ -88,16 +98,20 @@ class Page {
         return o ? o[1] : String(v);
     }
     /** a layout's short name: "Off (BMW's own cluster)" -> "BMW's own" */
-    layoutName(v) { return v === 'off' ? "BMW's own" : v === 'same' ? 'Same' : this.optLabel('hudLayout', v); }
+    layoutName(v, key) { return v === 'off' ? "BMW's own" : v === 'same' ? (key === 'inAdaptive' ? 'Like Comfort' : 'Same') : this.optLabel('hudLayout', v); }
     /** The drive mode cells: Comfort, Sport, Eco Pro, and Hybrid / Electric on a plug-in hybrid (Cluster Themes). */
     modes() {
         const phev = this.item('inHybrid') && (this.hud.phevSeen || this.get('inHybrid') !== 'same' || this.get('inElectric') !== 'same');
-        return phev ? MODES.concat(PHEV_MODES) : MODES;
+        const base = this.item('inAdaptive') ? MODES.concat([ADAPTIVE_MODE]) : MODES;
+        return phev ? base.concat(PHEV_MODES) : base;
     }
     /** The key of the cell the car is in now: Hybrid / Electric when that has its own theme, else the drive mode's. */
     nowKey() {
         const pk = PHEV_KEY[this.hud.drivePhev];
-        return pk && this.item(pk) && this.get(pk) !== 'same' ? pk : MODE_KEY[this.hud.driveMode];
+        if (pk && this.item(pk) && this.get(pk) !== 'same') return pk;
+        // in Adaptive its own cell is the one lit and the one a tap on a theme sets (giving Adaptive a theme of its own)
+        if (this.hud.driveVariant === 'adaptive' && this.item('inAdaptive')) return 'inAdaptive';
+        return MODE_KEY[this.hud.driveMode];
     }
     valueText(k) {
         const s = this.item(k), v = this.get(k);
@@ -165,7 +179,7 @@ class Page {
         const target = cv.target;
         if (this.picker || this.confirm) cv.target = function () { return this; };
         this.rail(cv, bottom);
-        const body = { look: this.lookTab, readouts: this.readoutsTab, position: this.positionTab, map: this.mapTab, colours: this.coloursTab, badge: this.badgeTab, alerts: this.alertsTab, gmeter: this.gmeterTab, settings: this.settingsTab }[this.tab];
+        const body = { look: this.lookTab, readouts: this.readoutsTab, position: this.positionTab, map: this.mapTab, colours: this.coloursTab, badge: this.badgeTab, alerts: this.alertsTab, gmeter: this.gmeterTab, settings: this.settingsTab, log: this.logTab }[this.tab];
         if (body) body.call(this, cv, bottom);
         this.demoButton(cv);
         cv.target = target;
@@ -201,7 +215,7 @@ class Page {
 
     rail(cv, bottom) {
         cv.fillRect(RAIL.x + RAIL.w + 15, 50, 1, bottom - 56, C.line);
-        const R = this.cfg.tabs.length > 6 ? RAIL7 : RAIL, dy = (66 - R.h) / 2;
+        const R = this.cfg.tabs.length > 7 ? RAIL8 : this.cfg.tabs.length > 6 ? RAIL7 : RAIL, dy = (66 - R.h) / 2;
         this.cfg.tabs.forEach((id, i) => {
             const x = R.x, y = R.y + i * (R.h + R.gap), w = R.w, h = R.h, sel = id === this.tab;
             if (sel) {
@@ -225,7 +239,8 @@ class Page {
         }
         if (id === 'map') {
             if (!this.get('mapInTheme')) return 'Waze map · off';
-            const some = this.get('byMode') === true && this.item('mapComfort') && ['mapComfort', 'mapSport', 'mapEco'].some((k) => this.get(k) === false);
+            if (this.hud.waze && this.hud.waze.blocked && this.hud.waze.blocked()) return 'Waze map · not coming in';
+            const some = this.get('byMode') === true && this.item('mapComfort') && MAP_KEYS.some((k) => this.get(k) === false || this.get(k) === 'off');
             return some ? 'Waze map · some modes' : 'Waze map · on';
         }
         if (id === 'badge') return badges.text(this.get('badge'), this.get('badgeBMW') === true) || 'none';
@@ -233,6 +248,10 @@ class Page {
         if (id === 'gmeter') return this.optLabel('gRange', this.get('gRange')) + ' · trail ' + this.optLabel('gTrail', this.get('gTrail')).toLowerCase();
         if (id === 'colours') return this.valueText('hudTheme').replace(/ \(.*\)$/, '');
         if (id === 'settings') return (this.get('units') === 'metric' ? 'km/h' : 'mph') + ' · ' + fmtInt(this.get('redline')) + ' rpm';
+        if (id === 'log') {
+            const r = this.cfg.logRing, n = r ? r.lines.filter((l) => !l.earlier && l.level !== 'info').length : 0;
+            return !r ? 'not kept' : n ? n + ' problem' + (n > 1 ? 's' : '') + ' this run' : r.lines.length + ' lines';
+        }
         return '';
     }
 
@@ -257,6 +276,11 @@ class Page {
             // five cells on a plug-in hybrid: narrower, the one the car is in lit instead of "· now"
             const now = this.nowKey(), modes = this.modes(), cw = (rw - 12 * (modes.length - 1)) / modes.length, five = modes.length > 3;
             modes.forEach((m, i) => this.modeCell(cv, rx + i * (cw + 12), y, cw, m[1] + (m[0] === now && !five ? '  ·  now' : ''), m[0], five && m[0] === now));
+            // Adaptive on "Like Comfort": Comfort's cell lit too, so it's clear which theme shows
+            if (five && now === 'inAdaptive' && this.get('inAdaptive') === 'same') {
+                const ci = modes.findIndex((m) => m[0] === 'inComfort');
+                if (ci >= 0) cv.strokeRoundRect(rx + ci * (cw + 12), y, cw, 52, 16, 1, A(C.blueHi, 0.6));
+            }
         } else this.pickRow(cv, rx, y, rw, 'Theme', 'hudLayout', (v) => this.layoutName(v), 52);
         // the gallery, two rows: a tap shows that theme (in the drive mode the car is in, when it changes with it)
         const looks = this.looks(), cols = Math.max(5, Math.ceil(looks.length / 2)), gap = 12, gy = py + ph + 16;
@@ -278,11 +302,11 @@ class Page {
         glass(cv, x, y, w, h, !!lit);
         cv.text(name, x + 14, y + 20, 14, C.dim, { literal: true });
         // cut to the cell (a narrow one on a plug-in hybrid), leaving room for the chevron
-        let v = this.layoutName(this.get(key));
+        let v = this.layoutName(this.get(key), key);
         if (cv.textWidth) while (v.length > 3 && cv.textWidth(v, 18, { font: 'bold', literal: true }) > w - 40) v = v.slice(0, -2) + '…';
         cv.text(v, x + 14, y + 42, 18, C.blueHi, { font: 'bold', literal: true });
         chevron(cv, x + w - 18, y + h / 2, C.dim);
-        cv.target(x, y, w, h, () => { this.picker = { key, title: name, fmt: (v) => this.layoutName(v) }; this.kick(); }, 'set:' + key, 14);
+        cv.target(x, y, w, h, () => { this.picker = { key, title: name, fmt: (v) => this.layoutName(v, key) }; this.kick(); }, 'set:' + key, 14);
     }
 
     /** HUD: a card per layout with its picture and the drive modes that show it, in two rows. */
@@ -452,11 +476,24 @@ class Page {
         cv.text(text, CX + 46, y + 30, 18, info.up ? C.live : C.text, { literal: true });
         y += 54;
         // with the theme changing with the drive mode: which modes show the map (all on by default)
+        // given up on (waze.js trace): where it stopped, and a button to try again now
+        if (this.get('mapInTheme') && info.gaveUp && this.hud.waze.retry) {
+            const bw = 170, bx = CX + w + 20;
+            cv.roundRect(bx, y - 54, bw, 46, 23, C.blue);
+            cv.text('Try again', bx + bw / 2, y - 24, 18, '#ffffff', { align: 'center', font: 'bold', literal: true });
+            cv.target(bx, y - 54, bw, 46, () => { this.hud.waze.retry('Try again pressed'); this.kick(); }, 'waze:retry', 23);
+        }
         if (this.get('mapInTheme') === true && this.get('byMode') === true && this.item('mapComfort')) {
-            const now = MAP_MODE_KEY[this.hud.driveMode], cw = (w - 24) / 3;
+            const ad = !!this.item('mapAdaptive');
+            const now = this.hud.driveVariant === 'adaptive' && ad ? 'mapAdaptive' : MAP_MODE_KEY[this.hud.driveMode];
+            const cells = [['mapComfort', 'Comfort'], ['mapSport', 'Sport'], ['mapEco', 'Eco Pro']].concat(ad ? [['mapAdaptive', 'Adaptive']] : []);
+            const cw = (CW - 12 * (cells.length - 1)) / cells.length;
             label(cv, CX, y + 22, 'In each drive mode');
-            [['mapComfort', 'Comfort'], ['mapSport', 'Sport'], ['mapEco', 'Eco Pro']].forEach((m, i) =>
-                this.toggleRow(cv, CX + i * (cw + 12), y + 34, cw, m[1] + (m[0] === now ? '  ·  now' : ''), m[0]));
+            cells.forEach((m, i) => {
+                const x = CX + i * (cw + 12), name = m[1] + (m[0] === now ? '  ·  now' : '');
+                if (this.item(m[0]).type === 'bool') this.toggleRow(cv, x, y + 34, cw, name, m[0]);
+                else this.pickRow(cv, x, y + 34, cw, name, m[0], (v) => (v === 'same' ? 'Like Comfort' : v === 'on' ? 'On' : 'Off'));
+            });
             y += 34 + 64;
         }
         note(cv, CX, y + 26, [
@@ -464,7 +501,59 @@ class Page {
             'above BMW\'s own map view, so nothing shows twice. When the map goes away the theme fills back in.',
             'Needs robertnisipeanu\'s Waze on Cluster 0.14.5 or newer with cluster-render 0.8.2 or newer.',
             'Turning this off gives Waze its usual place back.',
-        ].concat(this.get('byMode') === true ? ['With the theme changing with the drive mode, each mode has its own switch (all on at first).'] : []));
+        ].concat(this.get('byMode') === true ? ['With the theme changing with the drive mode, each mode has its own switch (all on at first; Adaptive like Comfort).',
+            'If the map can\'t come in within 15 s the window stays closed and the theme stays whole; the Log tab says where it stopped.'] : []));
+    }
+
+    /* ---------- Log ---------- */
+    /**
+     * The app log's last lines (logring.js), newest at the bottom, for a photo on the car: the filter chips, Older /
+     * Newer to page back, the time in the cluster's time zone. Lines from before the app started are dimmer.
+     */
+    logTab(cv, bottom) {
+        const r = this.cfg.logRing;
+        label(cv, CX, 70, 'Log · for a photo when something goes wrong');
+        let cx = CX;
+        LOG_FILTERS.forEach((f) => { cx += chip(cv, cx, 82, f[1], this.logFilter === f[0], () => { this.logFilter = f[0]; this.logBack = 0; this.kick(); }, 'log:' + f[0]) + 8; });
+        if (!r) { note(cv, CX, 160, ['The log is not kept in this build.']); return; }
+        const all = r.lines.filter((l) => l.sep || this.logFilter === 'all' || (this.logFilter === 'problems' ? l.level !== 'info'
+            : logring.kind(l) === this.logFilter));
+        // wrapped rows, the newest last
+        const TW = CW - 104, FS = 15, LH = 19, top = 136, n = Math.max(4, Math.floor((bottom - 14 - top) / LH));
+        const rows = [];
+        const off = tz.offset(this.get('timeZone'));
+        all.forEach((l) => {
+            const d = new Date(l.at + (off || 0) * 60000), p2 = (v) => ('0' + v).slice(-2);
+            const hh = p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes()) + ':' + p2(d.getUTCSeconds());
+            let msg = l.msg.replace(/\s+/g, ' '), first = true;
+            while (msg) {
+                let k = msg.length;
+                while (k > 1 && cv.textWidth(msg.slice(0, k), FS, { literal: true }) > TW) k = Math.floor(k * 0.9);
+                rows.push({ hh: first ? hh : '', text: msg.slice(0, k), l });
+                msg = msg.slice(k); first = false;
+            }
+        });
+        const maxBack = Math.max(0, rows.length - n);
+        if (this.logBack > maxBack) this.logBack = maxBack;
+        const end = rows.length - this.logBack, shown = rows.slice(Math.max(0, end - n), end);
+        if (!shown.length) cv.text('Nothing yet.', CX, top + 20, 17, C.dim, { literal: true });
+        shown.forEach((row, i) => {
+            const y = top + 14 + i * LH, l = row.l;
+            const c = l.sep ? C.blueHi : l.level === 'error' ? '#ff6b5e' : l.level === 'warn' ? '#e0a340' : l.earlier ? C.label : C.text;
+            if (row.hh) cv.text(row.hh, CX, y, FS, l.earlier ? '#ffffff40' : C.dim, { literal: true });
+            cv.text(row.text, CX + 92, y, FS, c, { literal: true });
+        });
+        // paging, top right next to the chips
+        const bw = 120, by = 82, bh = 36, nx = CR - bw, ox = nx - bw - 10;
+        const btn = (x, text, live, run, key) => {
+            cv.roundRect(x, by, bw, bh, bh / 2, live ? '#ffffff14' : '#ffffff07');
+            cv.text(text, x + bw / 2, by + 24, 16, live ? C.text : '#ffffff40', { align: 'center', font: 'bold', literal: true });
+            if (live) cv.target(x, by, bw, bh, run, key, bh / 2);
+        };
+        btn(ox, 'Older', this.logBack < maxBack, () => { this.logBack = Math.min(maxBack, this.logBack + n - 2); this.kick(); }, 'log:older');
+        btn(nx, this.logBack ? 'Newest' : 'Newer', this.logBack > 0, () => { this.logBack = 0; this.kick(); }, 'log:newest');
+        const pos = rows.length ? (this.logBack ? 'line ' + (end - shown.length + 1) + '-' + end + ' of ' + rows.length : 'newest of ' + rows.length + ' rows') : '';
+        cv.text(pos, ox - 14, by + 24, 14, C.label, { align: 'right', literal: true });
     }
 
     /* ---------- Badge (cluster) ---------- */
@@ -715,18 +804,21 @@ class Page {
     drawPicker(cv, bottom) {
         const p = this.picker, s = this.item(p.key), opts = s.type === 'number' ? (s.steps || []).map((v) => [v, null]) : s.options || [];
         cv.fillRect(0, 36, W, bottom + 20, '#000000b0');
-        const w = 620, rh = 58, h = 76 + opts.length * rh, x = (W - w) / 2, y = Math.max(52, (bottom + 44 - h) / 2);
+        // a long list (a drive mode's 15 themes) goes in columns, so every choice is on the screen
+        const rh = 58, per = Math.max(1, Math.floor((bottom - 44 - 76) / rh)), cols = Math.ceil(opts.length / per), rows = Math.ceil(opts.length / cols);
+        const colW = cols > 1 ? Math.min(420, (W - 80) / cols) : 620, w = colW * cols;
+        const h = 76 + rows * rh, x = (W - w) / 2, y = Math.max(52, (bottom + 44 - h) / 2);
         cv.card(x, y, w, h, 18, [[0, '#18233a'], [1, '#0c111b']]);
         cv.strokeRoundRect(x, y, w, h, 18, 1, A(C.blueHi, 0.3));
         cv.text(p.title.toUpperCase(), x + 26, y + 42, 15, C.label, { font: 'bold', spacing: 2.4, literal: true });
         const v = this.get(p.key);
         opts.forEach((o, i) => {
-            const ry = y + 60 + i * rh, sel = o[0] === v;
-            if (sel) cv.roundRect(x + 12, ry, w - 24, rh - 6, 12, A(C.blue, 0.35));
+            const cx = x + Math.floor(i / rows) * colW, ry = y + 60 + (i % rows) * rh, sel = o[0] === v;
+            if (sel) cv.roundRect(cx + 12, ry, colW - 24, rh - 6, 12, A(C.blue, 0.35));
             const text = p.fmt ? p.fmt(o[0]) : o[1] !== null ? o[1] : fmtInt(o[0]) + ' rpm';
-            cv.text(text, x + 30, ry + 34, 20, sel ? '#ffffff' : C.text, { font: sel ? 'bold' : 'label', literal: true });
-            if (sel) check(cv, x + w - 50, ry + 26, '#ffffff');
-            cv.target(x + 12, ry, w - 24, rh - 6, () => {
+            cv.text(text, cx + 30, ry + 34, 20, sel ? '#ffffff' : C.text, { font: sel ? 'bold' : 'label', literal: true });
+            if (sel) check(cv, cx + colW - 50, ry + 26, '#ffffff');
+            cv.target(cx + 12, ry, colW - 24, rh - 6, () => {
                 this.picker = null;
                 if (LOOK_KEYS.indexOf(p.key) >= 0) this.chooseLayout(p.key, o[0]); else this.set(p.key, o[0]);
             }, 'pick:' + p.key + ':' + o[0], 12);
@@ -757,7 +849,7 @@ class Page {
 }
 
 /* ---------- small pieces ---------- */
-const LOOK_KEYS = ['hudLayout', 'inComfort', 'inSport', 'inEco', 'inHybrid', 'inElectric'];
+const LOOK_KEYS = ['hudLayout', 'inComfort', 'inSport', 'inEco', 'inAdaptive', 'inHybrid', 'inElectric'];
 const WARN_KEYS = ['warnOil', 'warnCoolant', 'warnBoost'];
 /** A warning limit as the page shows it, in the display units: "266 °F", "1.2 bar", "Off". */
 function warnText(k, v, us) {
@@ -836,6 +928,9 @@ function icon(cv, name, x, y, c) {
     } else if (name === 'colour') {
         cv.arc(x, y, 9.5, 12, 0, 360, c);
         cv.arc(x, y, 0, 10, 180, 360, c);
+    } else if (name === 'log') {
+        cv.strokeRoundRect(x - 11, y - 13, 22, 26, 3, lw, c);
+        [-6, -1, 4, 9].forEach((d, i) => cv.line(x - 6, y + d - 1, x + (i === 3 ? 1 : 6), y + d - 1, 1.8, c));
     } else if (name === 'lines') {
         [-8, 0, 8].forEach((d) => { cv.circle(x - 10, y + d, 2.2, c); cv.line(x - 4, y + d, x + 13, y + d, lw, c); });
     } else if (name === 'move') {

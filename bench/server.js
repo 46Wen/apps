@@ -101,11 +101,15 @@ const layers = new Map();   // key "conn:ref" -> layer
 let nextConn = 1;
 // hosting from layers (BENCH_HOST_LAYERS=1): the map's host { conn, sock, app, m, state, reason }, one at most
 const HOST_LAYERS = process.env.BENCH_HOST_LAYERS === '1';
+// BENCH_HOST_SILENT=1: takes the host but never answers it (no "hosting" / "host" events), the step 4 failure of the
+// Waze trace (shared/waze.js) that cars showed as "Moving the map into the theme" for ever (bimmer-lab/apps#34)
+const HOST_SILENT = process.env.BENCH_HOST_SILENT === '1';
 const renderSocks = new Map();   // conn -> socket, for the "host" event every client gets
 let mapHost = null;
 const HOSTED_FILE = process.env.WAZE_STATUS ? path.join(path.dirname(process.env.WAZE_STATUS), 'hosted') : null;
 function hostEval() {
     const h = mapHost;
+    if (HOST_SILENT) return;
     let state = 'waiting', reason = '';
     if (h) {
         const m = h.m;
