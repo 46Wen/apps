@@ -280,6 +280,19 @@
       "mguHmi": [
         "ID7"
       ]
+    },
+    {
+      "id": "mgu-audio-probe",
+      "kind": "tool",
+      "path": "native/mgu-audio-probe",
+      "title": "Audio probe",
+      "description": "Read-only report on how the head unit's sound is built, to see whether the music's level can be read (46Wen, for Ambient config's Music wave). Nothing is captured, played or changed; the report goes to a USB stick",
+      "optional": true,
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     }
   ]
 }

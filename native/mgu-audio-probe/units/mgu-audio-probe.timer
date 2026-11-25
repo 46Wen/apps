@@ -1,0 +1,10 @@
+# mgu-audio-probe (46Wen): the report again 3 minutes after each start of the head unit, when music is likely on.
+[Unit]
+Description=mgu-audio-probe, 3 minutes after boot
+
+[Timer]
+OnBootSec=180
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
