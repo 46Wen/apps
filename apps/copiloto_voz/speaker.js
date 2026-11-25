@@ -161,6 +161,7 @@ class Speaker {
                 if (!this.modesLogged) this.log.info('speaker: folders: ' + modes(f));
                 if (i === tries.length - 1) this.modesLogged = true;
             }
+            this._audioState('after ' + name).catch(() => {});
             if (/^error/.test(reason)) throw new Error('el reproductor no pudo con ' + path.basename(file) + ' (' + why.join('; ') + ')');
             this.lastSaid = { name: name, at: Date.now() };
             this.lastError = null;
@@ -197,6 +198,19 @@ class Speaker {
         this.log.info('speaker: routed in ' + (Date.now() - t0) + ' ms (' + (c ? c.connectionState : 'not listed') + ')');
     }
 
+    // what the Audio Manager says while a phrase plays: the connections (with their state: connected or suspended),
+    // the main sink's volume and mute, and our source; logged to find why a phrase played without sound
+    async _audioState(when) {
+        const conns = await this.signals.get(this.cc, 'listOfMainConnections').catch((e) => 'error ' + errText(e));
+        const sinks = await this.signals.call(this.cc, 'getListMainSinks', {}, 3000).catch((e) => ({ e: errText(e) }));
+        const srcs = await this.signals.call(this.cc, 'getListMainSources', {}, 3000).catch((e) => ({ e: errText(e) }));
+        const sink = ((sinks && sinks.listMainSinks) || []).filter((k) => k && k.sinkID === SINK_ID)[0];
+        const src = ((srcs && srcs.listMainSources) || []).filter((k) => k && k.sourceID === SOURCE_ID)[0];
+        this.log.info('audio ' + when + ': connections ' + JSON.stringify(conns).slice(0, 400) + ' | sink ' + SINK_ID + ' ' +
+            (sink ? JSON.stringify(sink).slice(0, 200) : JSON.stringify(sinks).slice(0, 120)) + ' | source ' + SOURCE_ID + ' ' +
+            (src ? JSON.stringify(src).slice(0, 200) : JSON.stringify(srcs).slice(0, 120)) + ' | player ' + JSON.stringify(this.state));
+    }
+
     // wait (at most 3 s) for a connection to leave the Audio Manager's list; -> true when it did
     async _gone(id) {
         for (let i = 0; i < 15; i++) {
@@ -214,6 +228,7 @@ class Speaker {
         const done = new Promise((resolve) => { this.ended = resolve; });
         const r = await this.signals.call(this.mp, 'playFile', { path: file, languageCode: LANG }, 5000);
         if (!r || r.EntError !== 'OK') { this.ended = null; return 'error playFile ' + (r && r.EntError); }
+        setTimeout(() => { this._audioState('1 s into ' + path.basename(file)).catch(() => {}); }, 1000);
         const why = await Promise.race([done, sleep(MAX_PHRASE_MS).then(() => 'time limit')]);
         this.ended = null;
         await sleep(250);     // the last syllable out of the amplifier before the source goes

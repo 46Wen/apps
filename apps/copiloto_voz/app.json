@@ -66,7 +66,9 @@
       "_instances": "1",
       "_methods": [
         "connect",
-        "disconnect"
+        "disconnect",
+        "getListMainSinks",
+        "getListMainSources"
       ],
       "listOfMainConnections": "rs"
     },

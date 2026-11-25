@@ -176,6 +176,7 @@ ok(r.said.length === 0, 'welcome off in the settings');
         on: (p, name, fn) => { handlers[name] = fn; return Promise.resolve(); },
         get: (p, field) => Promise.resolve(field === 'playerState' ? { playerState: mpState } : conns.slice()),
         call: (p, m, args) => {
+            if (/^getList/.test(m)) return Promise.resolve({});
             calls.push(m + (args && args.sourceID ? ' ' + args.sourceID : ''));
             if (m === 'connect') {
                 if (args.sourceID === 1046) conns = [{ mainConnectionID: 9, sourceID: 1046, sinkID: 1024 }];
