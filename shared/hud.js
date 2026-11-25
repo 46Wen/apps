@@ -1002,6 +1002,14 @@ class HudApp {
         this.log.info('connecting to cluster-render at ' + this.socketPath);
         this.started = true;
         this.clients.forEach((c) => c.connect());
+        // config.hideMap (M Cluster): Waze on Cluster's map hidden while this app's theme is on the cluster, rather
+        // than left on its own slot under it (cluster-render 0.8.14 "Hosting from layers", hide): the service applies
+        // it only while a layer of ours is drawn on the panel, and waze-on-cluster then makes about one picture a
+        // second instead of one a frame. Kept by the client and sent again after a reconnect; an older service
+        // (no host_hide) leaves the map where it was.
+        if (this.config.hideMap && this.target === 'panel' && this.client && this.client.host) {
+            this.client.host('panel', { target: 'map', x: 0, y: 0, w: 720, h: 480, shown: false, hide: true });
+        }
         // a self-timed tick (_tickMs): 20 Hz while the cluster moves, slower while nothing on it would change
         const tick = () => {
             this.tickTimer = setTimeout(() => {

@@ -4,6 +4,7 @@ Newest first. Dates are when the build was pushed.
 
 ## Nov 26 2026
 
+- **M Cluster 0.2.0 (lighter; Waze's map hidden under the theme):** in Sport the M theme now asks cluster-render 0.8.14 to hide Waze on Cluster's map instead of leaving it on its own slot under the theme (`config.hideMap`: a hidden host from layers, applied by the service only while the theme is drawn), so **Waze on Cluster 0.14.17 makes one map picture a second instead of one a frame while you are in Sport**; in the other modes the map is back on BMW's cluster as before. Requires cluster-render 0.8.14. 31 fonts of the other themes left out (2.4 MB of fonts instead of 8; the app 1.3 MB). `shared/cluster_render_client.js` is cluster-render 0.8.14's (it sends a host's `hide`). Cluster Themes 0.22.2: the same shared files, nothing else changes.
 - **Third-party updates, with our changes applied again:** Redline 2.0.5401 (upstream 2.0.54), Draggy 2.7.301 (2.7.3), Dyno 1.6.6, Ambient config 2.7.2704 (2.7.27, with the Music wave and the Animation pace), Maps on cluster app 0.6.17, cluster-render 0.8.14 and Waze on Cluster 0.14.17. Worth having for CarPlay: **while the map is not seen** (the cluster showing a theme without the map, as M Cluster in Sport) **Waze on Cluster now makes one map picture a second instead of one a frame**, and cluster-render can hide the map under a theme instead of putting it back on its own slot. Every patch still fits (`scripts/vendor_sync.py`: no failures); Ambient config's, Redline's and the Music wave's tests pass; the four apps build.
 
 ## Nov 25 2026
