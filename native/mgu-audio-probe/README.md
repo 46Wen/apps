@@ -17,12 +17,18 @@ Tarda un segundo o dos, con la prioridad más baja de CPU y disco.
 
 ## Cómo usarla
 
-1. Instala **Audio probe** desde el Store (origen `46Wen/apps`).
-2. Antes, mete un **USB** en el coche y pon **música** (Bluetooth, CarPlay o USB), así el informe ve el flujo
-   que suena.
-3. Se ejecuta al instalarse y otra vez **3 minutos después de cada arranque**.
-4. El informe queda en el USB como `mgu-audio-probe-<fecha>.txt`. Si el USB no admite escritura, queda en
-   `/var/opt/mgu-audio-probe/reports/` (los 5 últimos) y en `/dev/shm/mgu-audio-probe.txt`.
+Se usa con la app **Audio probe**, que se instala junto con esta herramienta. Nada se ejecuta solo: el informe
+se crea únicamente cuando se pulsa su botón.
+
+1. En el Store instala la app **Audio probe** (instala también la herramienta). **Reinicia la unidad una vez.**
+2. Mete un **USB** (FAT32 o exFAT) y pon **música** (Bluetooth, CarPlay o USB).
+3. Abre la app. Muestra tres comprobaciones: la herramienta instalada, la música sonando (con el título que la
+   unidad ve) y el USB metido.
+4. Cuando las tres están en verde, pulsa **Crear informe**. Tarda unos segundos. Si la unidad no dice qué suena
+   (puede pasar con CarPlay) y la música sí suena, pulsa **Crear informe** otra vez antes de 10 s.
+5. El informe queda en el USB como `mgu-audio-probe-<fecha>.txt`. **Ver informe** lo muestra también en la
+   pantalla, página a página (primero el resumen), por si el USB no admitió la copia: se le puede hacer una foto.
+   También queda en `/var/opt/mgu-audio-probe/reports/` (los 5 últimos).
 
 Con acceso root por SSH también se puede ejecutar a mano, sin instalar nada:
 
