@@ -29,6 +29,12 @@ se crea únicamente cuando se pulsa su botón.
 5. El informe queda en el USB como `mgu-audio-probe-<fecha>.txt`. **Ver informe** lo muestra también en la
    pantalla, página a página (primero el resumen), por si el USB no admitió la copia: se le puede hacer una foto.
    También queda en `/var/opt/mgu-audio-probe/reports/` (los 5 últimos).
+6. **Paso 2, Prueba de captura**: escucha 3 s cada entrada de captura de la unidad (sin reproducir ni cambiar nada;
+   una entrada que usa otro programa se deja en paz) y da su nivel cada 0,1 s. Hazla con la música sonando y otra vez
+   en pausa: la entrada cuyos niveles siguen a la música es la que lleva la música. Queda en el USB como
+   `mgu-audio-capture-<fecha>.txt`. El programa que escucha es `files/mgu-audio-capture` (fuente en `src/`).
+
+La lista paso a paso para ir al coche: [PRUEBA.md](PRUEBA.md).
 
 Con acceso root por SSH también se puede ejecutar a mano, sin instalar nada:
 
