@@ -58,9 +58,11 @@ code{overflow-wrap:anywhere;background:var(--bg);padding:1px 5px;border-radius:5
 <body>
 <div class="band">
   <header><div class="m"><i></i><i></i><i></i></div><h1>Copiloto de voz · Editor de frases</h1></header>
-  <p class="sub">Cambie lo que dice el coche en español, chino e inglés. El botón ▶ lee la frase con la voz de su navegador (solo para hacerse una idea: la del coche será la voz natural que elija en Ajustes). Al terminar, guarde <code>frases.json</code> y genere las voces en el PC.</p>
+  <p class="sub">Cambie lo que dice el coche y elija la voz con la que se graba. El botón ▶ lee la frase con la voz de su navegador (solo para hacerse una idea: en el coche sonará la voz natural que elija aquí). Al terminar, pulse «Copiar JSON» y péguelo en el chat con Claude.</p>
   <div class="bar">
-    <label>Voz de prueba <select id="gender"><option value="F">Femenina</option><option value="M">Masculina</option></select></label>
+    <label>Voz del coche <select id="voice"><option value="es-ES-ElviraNeural|Elvira (femenina)|F">Elvira (femenina, por defecto)</option><option value="es-ES-XimenaNeural|Ximena (femenina)|F">Ximena (femenina)</option><option value="es-ES-AlvaroNeural|Álvaro (masculina)|M">Álvaro (masculina)</option></select></label>
+    <label>Velocidad <select id="rate"><option value="-15%">Más lenta</option><option value="-10%">Algo lenta</option><option value="-5%">Normal (por defecto)</option><option value="+0%">Algo rápida</option><option value="+10%">Rápida</option></select></label>
+    <input id="gender" type="hidden" value="F">
     <span class="sp"></span>
     <button id="reset">Volver a las originales</button>
     <button id="load">Cargar frases.json</button>
@@ -70,16 +72,16 @@ code{overflow-wrap:anywhere;background:var(--bg);padding:1px 5px;border-radius:5
   </div>
   <p id="msg" role="status"></p>
   <table>
-    <thead><tr><th>Aviso</th><th>Español</th><th>中文 · Chino</th><th>English · Inglés</th></tr></thead>
+    <thead><tr><th>Aviso</th><th>Frase (español)</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
   <details>
     <summary>Después de editar: cómo llegan las frases al coche</summary>
     <ol>
-      <li>Descargue (o copie) <code>frases.json</code> y póngalo en su repositorio, en <code>apps/copiloto_voz/voces/frases.json</code>, sustituyendo el que hay.</li>
-      <li>En el PC, desde la carpeta del repositorio: <code>py -m pip install edge-tts</code> (solo la primera vez) y luego <code>py scripts\generar_voces.py</code>. Solo vuelve a grabar las frases que cambiaron.</li>
-      <li>Suba los cambios a GitHub (commit y push) y actualice Copiloto de voz desde el MGU Store.</li>
-      <li>En el coche: Ajustes → Idioma de la voz y Voz; luego «Demo: viaje simulado» y la página Diagnóstico para comprobar las 11.</li>
+      <li>Pulse <strong>Copiar JSON</strong> y péguelo en el chat con Claude (o descargue <code>frases.json</code> y mándelo).</li>
+      <li>Claude deja el generador preparado en el PC (<code>D:\MGU_Store\copiloto_voces</code>); haga doble clic en <code>GENERAR_VOCES.bat</code> y espere a «Terminado».</li>
+      <li>Claude recoge las voces, las pasa al formato del coche y las sube; usted actualiza Copiloto de voz en el Store.</li>
+      <li>En el coche: «Probar la siguiente frase» o la Demo, para escucharlas.</li>
     </ol>
     <p class="voices" id="voices"></p>
   </details>
@@ -89,15 +91,15 @@ code{overflow-wrap:anywhere;background:var(--bg);padding:1px 5px;border-radius:5
     <p><button id="apply">Usar el JSON pegado</button></p>
   </details>
 </div>
-<script id="data" type="application/json">{"_comment": "Copiloto de voz: el texto de cada aviso en cada idioma, y las voces que se generan (scripts/generar_voces.py). Se edita con la página editora o a mano; luego se ejecuta el script en el PC. Las claves de 'frases' son los nombres de archivo: no cambiarlas.", "idiomas": {"es": {"nombre": "Español", "voces": [{"id": "es-ES-ElviraNeural", "nombre": "Elvira (femenina)", "genero": "F"}, {"id": "es-ES-XimenaNeural", "nombre": "Ximena (femenina)", "genero": "F"}, {"id": "es-ES-AlvaroNeural", "nombre": "Álvaro (masculina)", "genero": "M"}]}, "zh": {"nombre": "中文 (普通话)", "voces": [{"id": "zh-CN-XiaoxiaoNeural", "nombre": "Xiaoxiao (femenina)", "genero": "F"}, {"id": "zh-CN-XiaoyiNeural", "nombre": "Xiaoyi (femenina)", "genero": "F"}, {"id": "zh-CN-YunxiNeural", "nombre": "Yunxi (masculina)", "genero": "M"}, {"id": "zh-CN-YunjianNeural", "nombre": "Yunjian (masculina)", "genero": "M"}]}, "en": {"nombre": "English (UK)", "voces": [{"id": "en-GB-SoniaNeural", "nombre": "Sonia (femenina)", "genero": "F"}, {"id": "en-GB-LibbyNeural", "nombre": "Libby (femenina)", "genero": "F"}, {"id": "en-GB-RyanNeural", "nombre": "Ryan (masculina)", "genero": "M"}, {"id": "en-GB-ThomasNeural", "nombre": "Thomas (masculina)", "genero": "M"}]}}, "velocidad": "-5%", "frases": {"combustible": {"es": "Nivel de combustible bajo.", "zh": "燃油不足，请尽快加油。", "en": "Fuel level low."}, "neumaticos": {"es": "Atención: el sistema indica presión baja en un neumático. Revíselo en cuanto pueda.", "zh": "注意：系统提示有轮胎气压过低，请尽快检查。", "en": "Attention: the system reports low pressure in a tyre. Please check it as soon as you can."}, "hielo": {"es": "Atención: la temperatura exterior es baja. Puede haber hielo en la carretera.", "zh": "注意：车外温度较低，路面可能结冰。", "en": "Attention: the outside temperature is low. There may be ice on the road."}, "motor_frio": {"es": "El motor aún está frío. Le recomiendo no superar las dos mil quinientas revoluciones.", "zh": "发动机仍然冷却，建议转速不要超过两千五百转。", "en": "The engine is still cold. I recommend staying below two thousand five hundred revs."}, "bateria": {"es": "La batería tiene poca carga. Le recomiendo revisarla.", "zh": "蓄电池电量不足，建议您检查一下。", "en": "The battery charge is low. I recommend having it checked."}, "bienvenida_manana": {"es": "Buenos días. Bienvenido a bordo. Su BMW está listo para el viaje.", "zh": "早上好，欢迎上车。您的宝马已准备就绪。", "en": "Good morning. Welcome aboard. Your BMW is ready for the journey."}, "bienvenida_tarde": {"es": "Buenas tardes. Bienvenido a bordo. Su BMW está listo para el viaje.", "zh": "下午好，欢迎上车。您的宝马已准备就绪。", "en": "Good afternoon. Welcome aboard. Your BMW is ready for the journey."}, "bienvenida_noche": {"es": "Buenas noches. Bienvenido a bordo. Su BMW está listo para el viaje.", "zh": "晚上好，欢迎上车。您的宝马已准备就绪。", "en": "Good evening. Welcome aboard. Your BMW is ready for the journey."}, "bienvenida": {"es": "Bienvenido a bordo. BMW listo para el viaje.", "zh": "欢迎上车，宝马已准备出发。", "en": "Welcome aboard. BMW ready for the journey."}, "mantenimiento": {"es": "Se acerca un mantenimiento. Puede consultarlo en el estado del vehículo.", "zh": "保养时间临近，您可以在车辆状态中查看。", "en": "A service is coming up. You can check it in the vehicle status."}, "ventanillas": {"es": "Atención: ha quedado una ventanilla o el techo abierto.", "zh": "注意：有车窗或天窗未关闭。", "en": "Attention: a window or the sunroof has been left open."}, "fin_viaje": {"es": "Fin del viaje. Hasta la próxima.", "zh": "行程结束，下次再见。", "en": "End of the journey. See you next time."}, "descanso": {"es": "Lleva dos horas conduciendo. Le recomiendo hacer una pausa.", "zh": "您已连续驾驶两个小时，建议休息一下。", "en": "You have been driving for two hours. I recommend taking a break."}, "motor_caliente": {"es": "Motor a temperatura. Ya puede exigirle.", "zh": "发动机已达到工作温度，可以尽情驾驶了。", "en": "The engine is at temperature. You can push it now."}}}</script>
+<script id="data" type="application/json">{"_comment": "Copiloto de voz: el texto de cada aviso y la voz con la que se graba (scripts/generar_voces.py). Las claves de 'frases' son los nombres de archivo: no cambiarlas.", "idiomas": {"es": {"nombre": "Español", "voces": [{"id": "es-ES-ElviraNeural", "nombre": "Elvira (femenina)", "genero": "F"}]}}, "velocidad": "-5%", "frases": {"combustible": {"es": "Nivel de combustible bajo."}, "neumaticos": {"es": "Atención: el sistema indica presión baja en un neumático. Revíselo en cuanto pueda."}, "hielo": {"es": "Atención: la temperatura exterior es baja. Puede haber hielo en la carretera."}, "motor_frio": {"es": "El motor aún está frío. Le recomiendo no superar las dos mil quinientas revoluciones."}, "bienvenida_manana": {"es": "Buenos días. Bienvenido a bordo. Su BMW está listo para el viaje."}, "bienvenida_tarde": {"es": "Buenas tardes. Bienvenido a bordo. Su BMW está listo para el viaje."}, "bienvenida_noche": {"es": "Buenas noches. Bienvenido a bordo. Su BMW está listo para el viaje."}, "bienvenida": {"es": "Bienvenido a bordo. BMW listo para el viaje."}, "mantenimiento": {"es": "Se acerca un mantenimiento. Puede consultarlo en el estado del vehículo."}, "ventanillas": {"es": "Atención: ha quedado una ventanilla o el techo abierto."}, "fin_viaje": {"es": "Fin del viaje. Hasta la próxima."}, "descanso": {"es": "Lleva dos horas conduciendo. Le recomiendo hacer una pausa."}, "motor_caliente": {"es": "Motor a temperatura. Ya puede exigirle."}}}</script>
 <script>
 {
 const ORIG = JSON.parse(document.getElementById('data').textContent);
-const LANGS = [['es', 'es-ES', 'Español'], ['zh', 'zh-CN', 'Chino'], ['en', 'en-GB', 'Inglés']];
+const LANGS = [['es', 'es-ES', 'Español']];
 const INFO = {
   combustible: ['Combustible bajo', 'Autonomía de 50 km o menos'], neumaticos: ['Neumáticos', 'Aviso de presión de BMW'],
   hielo: ['Posible hielo', '3 °C o menos fuera'], motor_frio: ['Motor frío', 'Aceite < 80 °C y > 2.500 rpm'],
-  bateria: ['Batería', '< 11,8 V al arrancar'], bienvenida_manana: ['Bienvenida · mañana', 'Al arrancar, de 6 a 13 h'],
+  bienvenida_manana: ['Bienvenida · mañana', 'Al arrancar, de 6 a 13 h'],
   bienvenida_tarde: ['Bienvenida · tarde', 'Al arrancar, de 13 a 21 h'], bienvenida_noche: ['Bienvenida · noche', 'Al arrancar, de 21 a 6 h'],
   bienvenida: ['Bienvenida (sin hora)', 'Si no hay las de mañana/tarde/noche'], mantenimiento: ['Mantenimiento', 'Faltan 2.000 km o 60 días'],
   ventanillas: ['Ventanillas', 'Abiertas al apagar'], fin_viaje: ['Fin del viaje', 'Al apagar'], descanso: ['Pausa', 'Cada 2 horas'],
@@ -105,7 +107,7 @@ const INFO = {
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 let doc = clone(ORIG);
-try { const d = JSON.parse(localStorage.getItem('copiloto_frases') || 'null'); if (d && d.frases) doc = d; } catch (e) {}
+try { const d = JSON.parse(localStorage.getItem('copiloto_frases_es1') || 'null'); if (d && d.frases) doc = d; } catch (e) {}
 const $ = (id) => document.getElementById(id);
 const msg = (t, bad) => { $('msg').textContent = t; $('msg').className = bad ? 'bad' : ''; };
 const PLAY = '<svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg>';
@@ -128,7 +130,7 @@ const mark = (t) => {
   t.parentNode.nextElementSibling.textContent = !v ? 'Vacía: no se grabará' : v !== o ? 'Cambiada · ' + v.length + ' caracteres' : v.length + ' caracteres';
 };
 const text = () => JSON.stringify(doc, null, 2) + '\n';
-const store = () => { try { localStorage.setItem('copiloto_frases', JSON.stringify(doc)); } catch (e) {} };
+const store = () => { try { localStorage.setItem('copiloto_frases_es1', JSON.stringify(doc)); } catch (e) {} };
 
 $('rows').addEventListener('input', (e) => {
   const t = e.target; if (t.tagName !== 'TEXTAREA') return;
@@ -160,7 +162,7 @@ $('rows').addEventListener('click', (e) => {
 
 const use = (d, how) => {
   if (!d || typeof d !== 'object' || !d.frases || !d.idiomas) throw new Error('no parece un frases.json del Copiloto');
-  Object.keys(ORIG.frases).forEach((k) => { d.frases[k] = Object.assign({ es: '', zh: '', en: '' }, d.frases[k] || {}); });
+  Object.keys(ORIG.frases).forEach((k) => { d.frases[k] = Object.assign({ es: '' }, d.frases[k] || {}); });
   doc = d; store(); render(); msg(how);
 };
 $('reset').addEventListener('click', () => { use(clone(ORIG), 'Frases originales restauradas.'); });
@@ -172,7 +174,7 @@ $('file').addEventListener('change', () => {
 });
 $('apply').addEventListener('click', () => { try { use(JSON.parse($('json').value), 'JSON pegado aplicado.'); } catch (e) { msg('El JSON no es válido: ' + e.message, true); } });
 $('copy').addEventListener('click', () => {
-  navigator.clipboard.writeText(text()).then(() => msg('Copiado. Péguelo en apps/copiloto_voz/voces/frases.json.'))
+  navigator.clipboard.writeText(text()).then(() => msg('Copiado. Péguelo en el chat con Claude, o en tools-prebuilt/copiloto-voz-voces/frases.json.'))
     .catch(() => { document.querySelector('details:last-of-type').open = true; $('json').select(); msg('No se pudo copiar: seleccione el texto de abajo y cópielo.', true); });
 });
 let downloads = null;
@@ -182,10 +184,24 @@ if (window.claude && window.claude.use) {
 $('save').addEventListener('click', () => {
   if (!downloads) return;
   downloads.save({ filename: 'frases.json', data: new Blob([text()], { type: 'application/json' }) })
-    .then(() => msg('frases.json guardado. Póngalo en apps/copiloto_voz/voces/.')).catch(() => msg('No se guardó. Use «Copiar JSON».', true));
+    .then(() => msg('frases.json guardado. Mándeselo a Claude o póngalo en tools-prebuilt/copiloto-voz-voces/.')).catch(() => msg('No se guardó. Use «Copiar JSON».', true));
 });
+const syncVoice = () => {
+  const v = (doc.idiomas.es.voces || [])[0] || { id: 'es-ES-ElviraNeural' };
+  const opt = Array.from($('voice').options).find((o) => o.value.split('|')[0] === v.id);
+  if (opt) $('voice').value = opt.value;
+  $('rate').value = doc.velocidad || '-5%';
+  $('gender').value = (opt ? opt.value.split('|')[2] : 'F');
+};
+$('voice').addEventListener('change', () => {
+  const p = $('voice').value.split('|');
+  doc.idiomas.es.voces = [{ id: p[0], nombre: p[1], genero: p[2] }];
+  $('gender').value = p[2]; store(); $('json').value = text();
+  msg('Voz del coche: ' + p[1] + '. El ▶ usa la voz del navegador más parecida (hombre o mujer).');
+});
+$('rate').addEventListener('change', () => { doc.velocidad = $('rate').value; store(); $('json').value = text(); });
 if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; }
-render();
+render(); syncVoice();
 }
 </script>
 </body>
