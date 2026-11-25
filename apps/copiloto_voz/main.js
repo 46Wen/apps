@@ -482,6 +482,9 @@ mgu.run({
         };
 
         const show = () => {
+            // drawn only while the page is shown (it is redrawn when it comes back): the signals change many times a
+            // second while driving, and a picture nobody sees still costs a drawing and its PNG
+            if (ctx.ui.isVisible && !ctx.ui.isVisible('MAIN')) return;
             const cv = ctx.canvas(W, H), s = engine.state(), a = announcer.state();
             const found = speaker.found(PHRASES), have = PHRASES.filter((p) => found[p]).length;
             cv.clear(C.bg);
@@ -522,6 +525,7 @@ mgu.run({
             });
         }
         setInterval(redraw, 30000);
+        if (ctx.ui.onVisible) ctx.ui.onVisible((name, on) => { if (name === 'MAIN' && on) show(); });
         show();
     },
 });
