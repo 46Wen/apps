@@ -201,11 +201,11 @@ ok(r.said.length === 0, 'welcome off in the settings');
     conns = [{ mainConnectionID: 3, sourceID: 1046, sinkID: 1024 }];
     calls.length = 0;
     await sp.say('fin_viaje');
-    ok(calls.join(',') === 'playFile' && sp.status() === 'última: fin_viaje', 'RideTube open, not playing: said on its connection, got ' + calls + ' ' + sp.status());
+    ok(calls.join(',') === 'playFile,sendButtonEvent' && sp.status() === 'última: fin_viaje', 'RideTube open, not playing: said on its connection, got ' + calls + ' ' + sp.status());
     mpState = 'PLAYER_STATE_PLAY';
     calls.length = 0;
     await sp.say('fin_viaje');
-    ok(calls.length === 0 && /RideTube está reproduciendo/.test(sp.status()), 'RideTube playing: not said, got ' + sp.status());
+    ok(calls.join(',') === 'sendButtonEvent,playFile,sendButtonEvent' && sp.status() === 'última: fin_viaje', 'RideTube playing: stopped, then said over it, got ' + calls + ' ' + sp.status());
     mpState = 'PLAYER_STATE_STOP';
 
     // voices.js: the chosen voice first, then the language's other voices, then voces/ itself

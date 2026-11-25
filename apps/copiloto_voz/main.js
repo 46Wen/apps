@@ -66,7 +66,7 @@ mgu.run({
         });
         const lang = () => (V.LANGS.indexOf(settings.get('idioma')) >= 0 ? settings.get('idioma') : 'es');
         const voice = () => settings.get('voz_' + lang()) || V.DEFAULT[lang()];
-        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: () => V.dirsFor(path.join(__dirname, 'voces'), lang(), voice()) });
+        const speaker = new Speaker({ signals: bg.signals, log, dataDir: bg.dataDir, dirs: () => V.dirsFor(V.root(path.join(__dirname, 'voces')), lang(), voice()) });
         // the checklist: each signal the app uses, when it last came and what it said (or the error subscribing)
         const SIGNALS = [['estado', 'Estado del coche'], ['rpm', 'Revoluciones'], ['aceite', 'Temperatura del aceite'], ['combustible', 'Combustible y autonomía'],
             ['exterior', 'Temperatura exterior'], ['llamadas', 'Llamadas'], ['checkcontrol', 'Avisos de BMW (Check Control)'], ['mantenimiento', 'Mantenimiento (CBS)'],

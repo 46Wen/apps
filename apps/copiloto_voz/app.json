@@ -2,9 +2,13 @@
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
   "description": "Su copiloto con voz, en español, chino o inglés, con voz femenina o masculina: bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas. Con demo, diagnóstico y registro.",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "vendor": "custom",
   "autostart": true,
+  "requires": {
+    "copiloto-voz-voces": "1.0.0"
+  },
+  "vocesFuera": true,
   "loggingId": "OAV1",
   "iconGlyph": "VOZ",
   "shared": [

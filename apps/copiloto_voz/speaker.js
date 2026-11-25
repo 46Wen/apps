@@ -114,18 +114,24 @@ class Speaker {
         if (!file) throw new Error('falta la grabación ' + name);
         await this.init();
         this.busy = true;
-        let connId = null, before = null;
+        let connId = null, before = null, onShared = false;
         try {
             const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
             const conns = Array.isArray(list) ? list : [];
-            // the apps' media source already on the speakers (RideTube open): only a video that is playing stops the
-            // phrase; RideTube paused or stopped, the phrase is said on its connection, which is left as it was
+            // the apps' media source already on the speakers (RideTube open): the phrase is said on that connection, which
+            // is left as it was. A video playing is stopped first: RideTube holds it as paused where it was (its
+            // service treats a STOP it did not ask for mid-file so), and the driver resumes it with Play
             const shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
             if (shared) {
+                onShared = true;
                 const st = await this.signals.get(this.mp, 'playerState').catch(() => this.state);
-                const playing = /PLAY/.test(String(st && typeof st === 'object' ? st.playerState : st)) && !/PAUSE|STOP/.test(String(st && typeof st === 'object' ? st.playerState : st));
-                if (playing) throw new Error('RideTube está reproduciendo: no habla encima');
-                this.log.info('speaker: the media source is already connected (RideTube open, not playing): said on it');
+                const s0 = String(st && typeof st === 'object' ? st.playerState : st);
+                if (/PLAY/.test(s0) && !/PAUSE|STOP/.test(s0)) {
+                    await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
+                    await sleep(500);
+                    this.log.info('speaker: RideTube was playing: stopped for the phrase (it stays paused)');
+                    this.interrupted = true;
+                } else this.log.info('speaker: the media source is already connected (RideTube open, not playing): said on it');
             } else {
                 before = conns.filter((c) => c && c.sinkID === SINK_ID)[0] || null;
                 const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
@@ -152,6 +158,7 @@ class Speaker {
             this.lastError = null;
             this.log.info('speaker: said ' + name + ' (' + reason + ')');
         } finally {
+            if (onShared) await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
             if (connId !== null) {
                 await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
                 const d = await this.signals.call(this.cc, 'disconnect', { mainConnectionID: connId }, 5000).catch((e) => errText(e));

@@ -280,6 +280,21 @@
       "mguHmi": [
         "ID7"
       ]
+    },
+    {
+      "id": "copiloto-voz-voces",
+      "kind": "tool",
+      "path": "apps/copiloto_voz/voces",
+      "title": "Copiloto de voz: voces",
+      "description": "Las frases grabadas de Copiloto de voz en /var/opt, donde el reproductor de BMW puede abrirlas",
+      "requires": {
+        "mgu-deploy": "0.4.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     }
   ]
 }

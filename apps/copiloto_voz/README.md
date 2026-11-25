@@ -40,6 +40,8 @@ España más parecida a «Penélope» de Waze (la de Waze es de Google y no se p
 | Chino | Xiaoxiao, Xiaoyi | Yunxi, Yunjian |
 | Inglés | Sonia, Libby | Ryan, Thomas |
 
+**Dónde se instalan:** las grabaciones son una herramienta aparte del Store, **copiloto-voz-voces**, que se instala sola con la app en `/var/opt/copiloto-voz-voces/current/`. El reproductor de BMW abre los archivos con su propio usuario y no puede leerlos dentro de la carpeta de una app (ITEM_UNPLAYABLE); en `/var/opt` sí, como el audio de RideTube. `scripts/voces_componente.py` hace su `component.json` (y lo ejecuta `generar_voces.py`).
+
 Las frases (14, en los 3 idiomas) están en [`voces/frases.json`](voces/frases.json); las grabaciones van en
 `voces/<idioma>/<voz>/<aviso>.m4a` (AAC, como RideTube: el reproductor del coche rechaza el MP3). Si falta una frase en la voz elegida, se usa la misma frase de otra voz del idioma.
 
@@ -86,7 +88,7 @@ en rojo. El detalle, en la página Registro. **Probar la siguiente frase** sigue
 
 Como RideTube (JustAnotherPU/ridetube, probado en un X5 G05): el gestor de audio de BMW conecta la fuente de medios
 de las apps a los altavoces, el reproductor de BMW reproduce la frase y se desconecta. **Mientras habla, la música se
-pausa**; al terminar vuelve la fuente que sonaba. Si RideTube reproduce un vídeo, no habla encima.
+pausa**; al terminar vuelve la fuente que sonaba. **La voz pasa por encima de todo:** radio, CarPlay o Bluetooth se cortan mientras habla y vuelven después; un vídeo de RideTube se detiene y queda en pausa donde estaba (se reanuda con Play).
 
 ## Por comprobar en el coche
 

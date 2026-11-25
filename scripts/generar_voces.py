@@ -88,6 +88,8 @@ async def generate(doc, only_lang=None, all_again=False):
             with open(memo_file, 'w', encoding='utf-8') as f:
                 json.dump(memo, f, ensure_ascii=False, indent=1)
     print('%d generadas, %d sin cambios, %d con error' % (made, skipped, len(failed)))
+    if made:
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'voces_componente.py')])
     if made and not FFMPEG:
         print('AVISO: sin ffmpeg quedan en MP3, que el coche no reproduce. Instale ffmpeg (winget install ffmpeg) y ejecute otra vez con --todo.')
     for f in failed:
