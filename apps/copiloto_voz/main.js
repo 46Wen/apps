@@ -142,6 +142,20 @@ mgu.run({
                 out.push(m[1] + ' @ ' + svc.replace(/"/g, ''));
             }
             log.info('catalog: ' + text.length + ' bytes, ' + out.length + ' names about windows' + (out.length ? ': ' + out.join(' | ') : ''));
+            // where the window regulator's status type is used: the text around its first uses (the attribute's name)
+            let at = -1, n = 0;
+            while (n < 4 && (at = text.indexOf('StatusDriveWindowRegulator', at + 1)) >= 0) {
+                n++;
+                log.info('catalog use ' + n + ': …' + text.slice(Math.max(0, at - 260), at + 60).replace(/\s+/g, ' ') + '…');
+            }
+            // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
+            try {
+                const own = fs.readFileSync(path.join(__dirname, '..', '..', 'someipInterfaces', 'de_bmw_body_DoorsWindowsRoofMirrors.json'), 'utf8');
+                const names = {}, re2 = /"([A-Za-z][A-Za-z0-9_]{3,})"/g;
+                let k;
+                while ((k = re2.exec(own))) if (/window|fenster|regulator|panel|status/i.test(k[1])) names[k[1]] = 1;
+                log.info('own DoorsWindowsRoofMirrors (' + own.length + ' bytes): ' + Object.keys(names).slice(0, 60).join(' '));
+            } catch (e) { log.warn('own DoorsWindowsRoofMirrors config: ' + e.message); }
             changed();
         };
         // each press reads the signal afresh (a car may not send it again when only a window moves) and logs every field
@@ -153,8 +167,9 @@ mgu.run({
                 if (v && typeof v === 'object') windows.feed(v);
                 log.info('windows read: ' + JSON.stringify(v));
             } catch (e) { log.warn('windows read: ' + (e && e.message || e)); }
+            const first = windows.step < 0;
             const r = windows.press();
-            if (r.done && !r.save) setTimeout(searchCatalog, 100);
+            if (first || (r.done && !r.save)) setTimeout(searchCatalog, 100);
             log.info('windows learn: ' + r.msg + (windows.lastFields && windows.lastFields.length ? ' [' + windows.lastFields.map((k) => k + '=' + JSON.stringify(windows.last[k])).join(', ') + ']' : ''));
             if (r.save) {
                 try { fs.writeFileSync(winFile, JSON.stringify(r.save)); } catch (e) { log.warn('windows: ' + e.message); }
@@ -373,7 +388,9 @@ mgu.run({
         const showLog = (cv) => {
             const LW = 1460, rows = [];
             // the last lines, newest at the bottom; a long one wraps onto the next rows (the whole path shows)
-            bgs.ring.slice(-16).forEach((l) => {
+            // the kit's own routine lines (frame rates, screen on/off) left out: they push what matters off the page
+            const NOISE = /^(display: |renderd: |entry point |state MAIN |image MAIN_GFX|click BTN_PAGE)/;
+            bgs.ring.filter((l) => !NOISE.test(l.msg)).slice(-16).forEach((l) => {
                 const d = new Date(l.at), hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
                 let msg = l.msg.replace(/\s+/g, ' '), first = true;
                 while (msg) {
