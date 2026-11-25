@@ -125,7 +125,15 @@ mgu.run({
         try { winSaved = JSON.parse(fs.readFileSync(winFile, 'utf8')); } catch (e) { /* nothing learned yet */ }
         const windows = new Windows(winSaved);
         log.info('windows: ' + (windows.learned() ? windows.summary() : 'not learned yet: guessed by field name'));
-        const learnWindows = () => {
+        // each press reads the signal afresh (a car may not send it again when only a window moves) and logs every field
+        let doorProxy = null;
+        const learnWindows = async () => {
+            try {
+                if (!doorProxy) doorProxy = await bg.signals.proxy('de.bmw.body.DoorsWindowsRoofMirrors', '1');
+                const v = await bg.signals.get(doorProxy, 'CentralLockingSystemAndPanelStatus', 3000);
+                if (v && typeof v === 'object') windows.feed(v);
+                log.info('windows read: ' + JSON.stringify(v));
+            } catch (e) { log.warn('windows read: ' + (e && e.message || e)); }
             const r = windows.press();
             log.info('windows learn: ' + r.msg + (windows.lastFields && windows.lastFields.length ? ' [' + windows.lastFields.map((k) => k + '=' + JSON.stringify(windows.last[k])).join(', ') + ']' : ''));
             if (r.save) {
@@ -387,9 +395,10 @@ mgu.run({
             ctx.ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; show(); });
             if (ctx.onTab) ctx.onTab((i) => { if (i >= 0 && i < PAGES.length && i !== page) { page = i; show(); } });
             ctx.ui.onClick('BTN_LEARN', () => {
-                note = bgs.learnWindows();
+                note = 'Leyendo puertas y ventanillas…';
                 page = 1;
                 show();
+                Promise.resolve(bgs.learnWindows()).then((m) => { note = m; show(); });
             });
             ctx.ui.onClick('BTN_DEMO', () => {
                 const why = bgs.startDemo();

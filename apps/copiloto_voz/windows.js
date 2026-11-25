@@ -5,18 +5,16 @@
  * No public app reads the windows, so the fields of DoorsWindowsRoofMirrors.CentralLockingSystemAndPanelStatus that say
  * "open" are not known. The driver teaches them (Diagnóstico, «Aprender ventanillas»):
  *   1. everything closed: press -> the signal as it is now is kept as "closed"
- *   2. for each of STEPS (driver's window, passenger's, rear left, rear right, roof): open it and press -> the fields
+ *   2. for each of STEPS (the driver's window, the passenger's): open it and press -> the fields
  *      that changed since "closed" are that opening's (a press with nothing changed skips it)
  * Learned: { fields: { <field>: { name, closed } } }, kept in the data folder. An opening is open while one of its
  * fields is not at its "closed" value (so a position in % works as well as an open / closed flag). Until something is
  * learned, the field names are guessed (decode.js openingsOf). Plain logic, no I/O. Node 8.
  */
+// the owner's car: two doors, two windows, no roof
 const STEPS = [
     ['conductor', 'ventanilla del conductor', 'Abra la ventanilla del conductor'],
     ['acompanante', 'ventanilla del acompañante', 'Abra la ventanilla del acompañante (y cierre la del conductor)'],
-    ['trasera_izq', 'ventanilla trasera izquierda', 'Abra la ventanilla trasera izquierda (y cierre las demás)'],
-    ['trasera_der', 'ventanilla trasera derecha', 'Abra la ventanilla trasera derecha (y cierre las demás)'],
-    ['techo', 'techo', 'Abra el techo (y cierre las ventanillas)'],
 ];
 // the doors' own switches change when a door opens: never taken for a window
 const IGNORE = /^statusDoorSwitch|DoorSwitch/i;

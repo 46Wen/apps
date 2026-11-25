@@ -248,12 +248,10 @@ ok(r.said.length === 0, 'welcome off in the settings');
     w.feed(Object.assign({}, wv));
     w.press(); w.press();                                              // start, everything closed
     w.feed(Object.assign({}, wv, { fhDR: 'AUF', statusDoorSwitchDRD: 1 })); w.press();   // driver's window (+ the door: ignored)
-    w.feed(Object.assign({}, wv, { fhPS: 'AUF' })); w.press();          // passenger's
-    w.press(); w.press();                                              // the rear ones: nothing changed, skipped
-    w.feed(Object.assign({}, wv, { shd: 35 })); const wr = w.press();    // the roof, as a position
-    ok(wr.done && wr.save && Object.keys(wr.save.fields).sort().join() === 'fhDR,fhPS,shd', 'windows learned: ' + JSON.stringify(wr.save && wr.save.fields));
-    w.feed(Object.assign({}, wv, { fhDR: 'AUF', shd: 10 }));
-    ok(w.open().join() === 'ventanilla del conductor,techo', 'windows open from what was learned, got ' + w.open());
+    w.feed(Object.assign({}, wv, { fhPS: 'AUF' })); const wr = w.press();   // passenger's: the last step
+    ok(wr.done && wr.save && Object.keys(wr.save.fields).sort().join() === 'fhDR,fhPS', 'windows learned: ' + JSON.stringify(wr.save && wr.save.fields));
+    w.feed(Object.assign({}, wv, { fhDR: 'AUF' }));
+    ok(w.open().join() === 'ventanilla del conductor', 'windows open from what was learned, got ' + w.open());
     const w2 = new Windows(wr.save); w2.feed(Object.assign({}, wv));
     ok(w2.learned() && w2.open().length === 0, 'windows: learned kept across starts, all closed');
 
