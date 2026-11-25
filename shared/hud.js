@@ -636,7 +636,7 @@ class HudApp {
         this.layouts.onChange(() => this._rebuild());
         ctx.settings.onChange((key) => {
             // a theme or layout picked anywhere (the page asks first, the kit's All settings list doesn't): no longer stepping aside
-            if (['hudLayout', 'inComfort', 'inSport', 'inEco', 'inAdaptive', 'inHybrid', 'inElectric', 'byMode'].indexOf(key) >= 0 && this.screen.yielded) this.screen.release();
+            if (['hudLayout', 'readyInBackground', 'inComfort', 'inSport', 'inEco', 'inAdaptive', 'inHybrid', 'inElectric', 'byMode'].indexOf(key) >= 0 && this.screen.yielded) this.screen.release();
             if (['mapInTheme', 'byMode'].concat(MAP_MODE_KEYS).indexOf(key) >= 0 && this.waze) this.waze.retry('setting ' + key + ' changed');
             if (PLACE_KEYS.indexOf(key) >= 0) this._guard('place', () => this._place());
             else if (MAP_MODE_KEYS.indexOf(key) >= 0) this._guard('map mode', () => this._mapCheck());
@@ -868,7 +868,8 @@ class HudApp {
         // now playing (the Vector layouts' music panel): the head unit's own media state, front screen only. Optional
         // (app.json): not every unit may have it, and whether CarPlay fills it is not known yet. Added last, so the
         // one-at-a-time SOME/IP setup (signals.js) reaches every vehicle signal before it, whatever this one does
-        extra[MEDIA_IF] = {
+        // (config.media false, Cluster Themes 0.22 with only the M theme: not watched at all)
+        if (this.config.media !== false) extra[MEDIA_IF] = {
             $instance: MEDIA_INSTANCE,
             playerMetadata: (v) => this._mediaFeed('meta', v),
             trackProgress: (v) => this._mediaFeed('progress', v),
@@ -2091,6 +2092,7 @@ class HudApp {
      */
     _prebuildName() {
         if (this.target !== 'panel' || this.setting('byMode') !== true) return null;
+        if (this.setting('readyInBackground') === false) return null;   // nothing of ours on the cluster outside the theme's modes
         if (this.screen.yielded || this.claimBy || this.vstate.hold()) return null;
         if (this._chosenName() !== 'off') return null;
         const themes = [];
@@ -2119,6 +2121,7 @@ class HudApp {
     /** The hold layer wanted: the cluster, the theme changing with the drive mode, some mode with a theme, nothing holding us back. */
     _standbyWanted() {
         if (this.target !== 'panel' || !this.started || this.setting('byMode') !== true) return false;
+        if (this.setting('readyInBackground') === false) return false;
         if (this.scenesApart === false || this.claimBy || this.screen.yielded) return false;   // the HUD needs the shared scene
         if (this.vstate.hold() || this.vstate.drop()) return false;                            // switching off: let go of everything
         return this._modeThemes().some((v) => v && v !== 'off');

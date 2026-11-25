@@ -1,13 +1,15 @@
 {
   "id": "cluster_themes",
   "title": "Cluster Themes",
-  "description": "Redraws the instrument cluster: GT3 race dash, M-style, M view, Vector (with a music panel), Sport, Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno (BMW-coloured readout tiles) or Ribbon (with holiday editions), with shift lights, boost, temps, tyres, a G-meter and a 0-60 timer",
-  "version": "0.21.0",
+  "description": "M Sport cluster: in SPORT and SPORT PLUS the instrument cluster changes to the M-style layout (an M8's cluster: shift lights, boost and temperatures); in every other mode BMW's own cluster stays, untouched (and Waze on Cluster's map with it).",
+  "version": "0.22.0",
   "vendor": "custom",
   "loggingId": "OAC1",
   "autostart": true,
   "iconGlyph": "CLU",
-  "requires": { "cluster-render": "0.5.1" },
+  "requires": {
+    "cluster-render": "0.5.1"
+  },
   "shared": [
     "hud.js",
     "hud_text.js",
@@ -81,12 +83,6 @@
       "controlDisplayMSystems": "rs",
       "_optional": "S or M next to the gear; controlDisplayMSystems: an M car's drive mode (issue #8)"
     },
-    "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {
-      "_instances": "HMI_CID",
-      "playerMetadata": "rs",
-      "trackProgress": "rs",
-      "_optional": "now playing (title, artist, progress) in the Vector theme's music panel"
-    },
     "de.bmw.infotainment.vehicle.TPMS": {
       "statusTyrePressure": "rs",
       "statusTyreTemperature": "rs",
@@ -118,79 +114,25 @@
       "key": "hudLayout",
       "label": "Theme (when not by drive mode)",
       "type": "choice",
-      "default": "gt3",
+      "default": "m",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
-        ],
-        [
-          "grid",
-          "Calibration grid"
-        ],
-        [
-          "mapcal",
-          "Map calibration"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "byMode",
       "label": "Change with SPORT / COMFORT / ECO PRO",
       "type": "bool",
-      "default": true
+      "default": true,
+      "reset": 2
     },
     {
       "key": "inComfort",
@@ -203,122 +145,28 @@
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "inSport",
       "label": "In Sport",
       "type": "choice",
-      "default": "gt3",
+      "default": "m",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "inEco",
@@ -331,58 +179,11 @@
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "inAdaptive",
@@ -399,58 +200,11 @@
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "inHybrid",
@@ -467,58 +221,11 @@
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "inElectric",
@@ -535,58 +242,18 @@
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
-        ],
-        [
           "m",
           "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
         ]
-      ]
+      ],
+      "reset": 2
+    },
+    {
+      "key": "readyInBackground",
+      "label": "M ready in the background",
+      "type": "bool",
+      "default": false,
+      "help": "On: the M theme stays loaded (hidden) in the other modes, so Sport switches at once, but it holds part of cluster-render's memory and the cluster's screen. Off: nothing of ours on the cluster outside Sport; the switch takes a second or two."
     },
     {
       "key": "keepStrip",
@@ -604,7 +271,8 @@
       "key": "mapInTheme",
       "label": "Show Waze map inside the theme",
       "type": "bool",
-      "default": false
+      "default": false,
+      "reset": 2
     },
     {
       "key": "mapComfort",
@@ -1022,7 +690,7 @@
       "key": "holiday",
       "label": "Holiday editions",
       "type": "choice",
-      "default": "auto",
+      "default": "off",
       "options": [
         [
           "auto",
@@ -1048,7 +716,8 @@
           "july4",
           "Fourth of July"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "warnOil",
@@ -1424,7 +1093,8 @@
           "XD3",
           "XD3"
         ]
-      ]
+      ],
+      "reset": 2
     },
     {
       "key": "badgeBMW",
@@ -1436,7 +1106,7 @@
       "key": "demo",
       "label": "Demo data",
       "type": "choice",
-      "default": "auto",
+      "default": "off",
       "options": [
         [
           "auto",
@@ -1450,7 +1120,8 @@
           "off",
           "Off"
         ]
-      ]
+      ],
+      "reset": 2
     }
   ],
   "config": {
@@ -1458,11 +1129,6 @@
     "statusName": "Cluster",
     "socketPath": "/dev/shm/cluster-render/render.sock",
     "utcOffsetMinutes": null,
-    "waze": {
-      "comment": "Show Waze map inside the theme (shared/waze.js): waze-on-cluster's status file (read every second) and its control socket (one short 'start' command, then closed). Paths from waze-on-cluster 0.9.3.",
-      "status": "/run/waze-on-cluster/status.json",
-      "control": "/dev/shm/waze-on-cluster/ctl.sock"
-    },
     "_comment": "target panel: the whole 1920x720 instrument cluster, drawn over BMW's gauges. socketPath: cluster-render's documented default. utcOffsetMinutes: as in HUD Widgets (the clock box). tankLitres: the fuel gauge's full mark (the car sends litres, not the tank size; a G01 X3 holds 65). engine: the peak crank torque (Nm) and power (kW) the {{torquePct}} and {{powerPct}} tokens count from (an M40i: 500 Nm, 285 kW / 382 hp).",
     "dme": {
       "comment": "Boost from the engine unit (DME, ecu 18) over read-only UDS 0x22, only while the sport display sends no boost and a boost readout is shown. Absolute kPa, the outside air pressure (baro) is subtracted. Candidates tried in order, the first plausible one wins. From cauliflowermossgrape's car_vitals (MIT). Intake air temperature the same way (config.dme.intake, every 2 s, only while an intake readout shows); candidates from cruzen991/Cluster's signal table (MIT), unverified on this car.",
@@ -1568,6 +1234,7 @@
     "engine": {
       "torqueNm": 500,
       "powerKw": 285
-    }
+    },
+    "media": false
   }
 }
