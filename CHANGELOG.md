@@ -2,6 +2,10 @@
 
 Newest first. Dates are when the build was pushed.
 
+## Nov 26 2026
+
+- **Third-party updates, with our changes applied again:** Redline 2.0.5401 (upstream 2.0.54), Draggy 2.7.301 (2.7.3), Dyno 1.6.6, Ambient config 2.7.2704 (2.7.27, with the Music wave and the Animation pace), Maps on cluster app 0.6.17, cluster-render 0.8.14 and Waze on Cluster 0.14.17. Worth having for CarPlay: **while the map is not seen** (the cluster showing a theme without the map, as M Cluster in Sport) **Waze on Cluster now makes one map picture a second instead of one a frame**, and cluster-render can hide the map under a theme instead of putting it back on its own slot. Every patch still fits (`scripts/vendor_sync.py`: no failures); Ambient config's, Redline's and the Music wave's tests pass; the four apps build.
+
 ## Nov 25 2026
 
 - **Audio probe app 0.6.0, tool 0.6.0 (only the last step):** as the owner asked, only what the Music wave still needs: the live level with the reason when there is none, and **Explorar SmartXbar** (the Music level section with the service, journal, files and `--once`; SmartXbar's buffers; the Audio Manager's lists; who maps which buffer), shown on the Informe tab. Gone: the general report ("Crear informe"), the capture test and its program `mgu-audio-capture`, and the USB stick check and copy (the car mounts it read only).

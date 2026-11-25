@@ -5,11 +5,11 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 
 | Carpeta | Origen | Commit | Licencia | Apps |
 |---|---|---|---|---|
-| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `874f7b8` | MIT | redline 2.0.51, draggy 2.7.2, dyno 1.6.5, ambient_config 2.7.26 (aquí 2.7.2601) |
+| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `527e9b2` | MIT | redline 2.0.51, draggy 2.7.2, dyno 1.6.6, ambient_config 2.7.26 (aquí 2.7.2601) |
 | `namelsmissing/` | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | `d552013` | GPL-3.0 | dpf_monitor 0.2.8 |
 | `justanotherpu/` | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | `42cd224` | MIT | jap_sysmon 1.0.6 |
 | `ridetube/` | [JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) | `eb0973b` | GPL-3.0 | jap_ridetube 0.6.4 |
-| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `9da968c` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.16 |
+| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `b0f8237` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.17 |
 
 ## Qué se ha cambiado respecto al original
 

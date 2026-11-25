@@ -6,8 +6,8 @@ entrada de `component.json` dice dónde está su archivo; el Store calcula los s
 
 | Carpeta | Versión | De dónde | Fuente | Licencia |
 |---|---|---|---|---|
-| `cluster-render/` | 0.8.13 | release `cluster-render@0.8.13` de robertnisipeanu/idrive-apps | `vendor/robertnisipeanu/native/cluster-render` | GPL-3.0 (cliente MPL-2.0) |
-| `waze-on-cluster/` | 0.14.15 | release `waze-on-cluster@0.14.15` de robertnisipeanu/idrive-apps | `vendor/robertnisipeanu/native/waze-on-cluster` | GPL-3.0 |
+| `cluster-render/` | 0.8.14 | release `cluster-render@0.8.14` de robertnisipeanu/idrive-apps | `vendor/robertnisipeanu/native/cluster-render` | GPL-3.0 (cliente MPL-2.0) |
+| `waze-on-cluster/` | 0.14.17 | release `waze-on-cluster@0.14.17` de robertnisipeanu/idrive-apps | `vendor/robertnisipeanu/native/waze-on-cluster` | GPL-3.0 |
 | `idrive7-renderd/` | 2.1.19 | `kit/renderd/prebuilt` de cauliflowermossgrape/idrive7-apps | `vendor/idrive7-apps/native/renderd` | MIT |
 | `mgu-inputgate/` | 1.2.1 | `kit/renderd/inputgate/tool` de cauliflowermossgrape/idrive7-apps | `vendor/idrive7-apps/native/renderd/inputgate` | MIT |
 | `jap-ridetube-d/` | 0.5.4 (46Wen: 0.5.401, on demand) | release `catalog` de JustAnotherPU/ridetube | `vendor/ridetube/native/jap-ridetube-d`, `ytdec` | GPL-3.0 |
