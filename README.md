@@ -22,6 +22,8 @@
 
 Componentes nativos que se instalan solos con las apps que los necesitan (`tools-prebuilt/`, los binarios publicados por sus autores, sin cambios): `cluster-render`, `waze-on-cluster`, `idrive7-renderd` (renderizador GPU), `mgu-inputgate` (mando del iDrive), `jap-ridetube-d` (servicio de RideTube) y `mgu-render-id7-touch` (opcional).
 
+**Audio probe** (`mgu-audio-probe`, propio, en `native/`): un informe de solo lectura sobre cómo está montado el sonido de la unidad, para saber si se puede leer el volumen de la música. [Cómo usarlo](native/mgu-audio-probe/README.md)
+
 **Node.js 22 (`jap-node22`) no está aquí:** su binario pesa 137 MB y GitHub no admite archivos de más de 100 MB. RideTube lo necesita: añade también el origen `JustAnotherPU/mgu-apps` (canal *Releases*) en el Store y se instala desde allí.
 
 ## Instalar

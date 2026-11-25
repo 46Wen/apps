@@ -1,0 +1,23 @@
+# mgu-audio-probe (46Wen): a read-only look at the head unit's sound (probe.sh), once after the install and from
+# mgu-audio-probe.timer 3 minutes after each start. It runs for a second or two and stops; nothing waits for it.
+[Unit]
+Description=mgu-audio-probe: read-only report on how the head unit's sound is built
+RequiresMountsFor=/var/opt
+
+[Service]
+Type=oneshot
+# stays active once done: the Store's health check after an install wants it active, and the timer runs it once a boot
+RemainAfterExit=yes
+# root: the other processes' open sound devices (/proc/<pid>/fd), the kernel log and the sound servers' sockets
+User=root
+ExecStart=/bin/sh /var/opt/mgu-audio-probe/current/probe.sh
+TimeoutStartSec=120
+# never ahead of the HMI or the sound
+Slice=background.slice
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=20%
+MemoryLimit=32M
+LimitCORE=1
+StandardOutput=journal
+StandardError=journal
