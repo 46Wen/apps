@@ -27,6 +27,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const mgu = require('./kit/mgu');
 const Car = require('./kit/car');
 const G = require('./kit/gauges');
@@ -90,12 +91,20 @@ mgu.run({
                 return speaker.say(phraseFor(ev, settings, speaker, Date.now())).then(() => {
                     const err = speaker.lastError && speaker.lastError.replace(/^[a-z_]+: /, '');     // without the phrase's name
                     lastResult[ev] = err || 'ok';
+                    // the car's audio not ready yet (just after the head unit started): the same notice once or twice more
+                    if (err && !/falta la grabación/.test(err) && Date.now() - appStart < 4 * 60000 && (retries[ev] || 0) < 3 && !(demo && demo.running)) {
+                        retries[ev] = (retries[ev] || 0) + 1;
+                        log.info('voice: ' + ev + ' again in 6 s (' + retries[ev] + '/3): ' + err);
+                        setTimeout(() => announcer.add(ev), 6000);
+                    } else if (!err) delete retries[ev];
                     if (demo) demo.said(ev, err);
                     changed();
                 });
             },
         });
+        const appStart = Date.now(), retries = {};
         const engine = new Engine({
+            freshStart: () => os.uptime() < 6 * 60,
             log: (m) => log.info(m),
             enabled: (ev) => settings.get('on_' + ev) !== false,
             cfg: { fuelKm: settings.get('fuelKm') || 50 },
