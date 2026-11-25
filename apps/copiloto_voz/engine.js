@@ -52,6 +52,9 @@ class Engine {
         this.enabled = opts.enabled || (() => true);       // enabled(event) -> bool (the settings)
         this.cfg = Object.assign({}, DEFAULTS, opts.cfg || {});
         this.log = opts.log || (() => {});
+        // freshStart() -> true while the head unit has only just started (main.js: os.uptime()): the app then came up
+        // after the engine was started, and the welcome is still given, late, instead of not at all
+        this.freshStart = opts.freshStart || (() => false);
         this.cond = null;
         this.trip = null;           // this trip: { start, ice, cold, warm, tyres, oilWasCold }
         this.tripEndAt = null;
@@ -102,6 +105,7 @@ class Engine {
         // the welcome when the engine starts; not when the app itself starts on the road (was unknown), not on a
         // restart right after a trip (a stall, moving the car)
         if (was !== null && !restart) this._emit('bienvenida', 'motor arrancado');
+        else if (was === null && this.freshStart()) this._emit('bienvenida', 'la app arrancó con el motor ya en marcha (unidad recién encendida)');
         this._serviceCheck();
         this._tyres();
     }

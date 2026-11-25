@@ -83,6 +83,15 @@ ok(count(r, 'motor_caliente') === 1, 'warm once, got ' + r.said);
 r = rig(); r.e.engine(800, 90); r.start(); r.e.engine(3000, 91);
 ok(count(r, 'motor_frio') + count(r, 'motor_caliente') === 0, 'a warm start: neither, got ' + r.said);
 
+// the app up after the engine started: welcome only when the head unit has just started (freshStart)
+{
+    const said = [];
+    const e1 = new Engine({ now: () => 0, say: (ev) => said.push(ev), freshStart: () => true });
+    e1.condition(10);
+    const e2 = new Engine({ now: () => 0, say: (ev) => said.push('late:' + ev), freshStart: () => false });
+    e2.condition(10);
+    ok(said.join() === 'bienvenida', 'late start: welcome only on a fresh head unit, got ' + said);
+}
 // no battery notice any more (0.7.0)
 ok(EVENTS.indexOf('bateria') < 0, 'no battery notice');
 
