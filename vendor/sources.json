@@ -26,6 +26,7 @@
       ],
       "patch": {
         "redline": "redline_no_hud",
+        "draggy": "draggy_idle_hidden",
         "ambient_config": "ambient_music"
       }
     },

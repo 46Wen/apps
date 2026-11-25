@@ -72,6 +72,13 @@ const Sheet = require('./kit/sheet');
 // 46Wen: this car has no head-up display. The HUD output, its directions probe, its call watch and the
 // HUD looks page are left out; hud.js stays only for the shift cue and the helpers the screen shares.
 const HUD = false;
+/** 46Wen: fn every ms while screen `name` is shown, nothing while it is not (the app stays up after it is left). */
+function whileShown(ui, name, fn, ms) {
+    let t = null;
+    const set = (on) => { if (on && !t) t = setInterval(fn, ms); else if (!on && t) { clearInterval(t); t = null; } };
+    ui.onVisible((n, on) => { if (n === name) set(on); });
+    try { set(ui.isVisible(name)); } catch (e) { set(true); }
+}
 
 const W = 1600, H = 520;
 // rev bar (G20 style): left to right, slanted segments; top edge shifted right by 'slant'
@@ -235,8 +242,8 @@ mgu.run({
         const shiftMap = new ShiftMap({ dataDir: ctx.dataDir, log });
         // the launch score: standing starts timed 0-100 km/h / 0-60 mph by the kit's run timer, best kept
         const launch = new LaunchScore({ dataDir: ctx.dataDir, log });
-        const launchIdle = setInterval(() => { if (!car.data().demo) launch.idle(Date.now()); }, 100);
-        if (launchIdle.unref) launchIdle.unref();
+        // 46Wen: only while the screen is shown (the app stays up after it is left: nothing of it runs then)
+        whileShown(ui, 'MAIN', () => { if (!car.data().demo) launch.idle(Date.now()); }, 100);
         shiftMap.setRedline(redline());
         const learnedShift = (gear) => {
             if (settings.get('shiftMode') === 'fixed' || !G.isNum(gear) || gear < 1) return null;

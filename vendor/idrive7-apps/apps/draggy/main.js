@@ -39,6 +39,13 @@ const Weather = require('./weather');
 const { ShiftLog } = require('./shifts');
 const Car = require('./kit/car');
 const { Diag } = require('./kit/diag');
+/** 46Wen: fn every ms while screen `name` is shown, nothing while it is not (the app stays up after it is left). */
+function whileShown(ui, name, fn, ms) {
+    let t = null;
+    const set = (on) => { if (on && !t) t = setInterval(fn, ms); else if (!on && t) { clearInterval(t); t = null; } };
+    ui.onVisible((n, on) => { if (n === name) set(on); });
+    try { set(ui.isVisible(name)); } catch (e) { set(true); }
+}
 const { DidReader } = require('./kit/dids');
 const { t: tr } = require('./kit/i18n');
 
@@ -307,11 +314,12 @@ mgu.run({
                 baroFails++; baroNext = Date.now() + 15 * 60000; log.warn('outside air pressure: ' + e);
             } finally { baroBusy = false; }
         }
-        setInterval(() => { readBaro(); }, 5000);
+        // 46Wen: only while the screen is shown (the app stays up after it is left: nothing of it runs then)
+        whileShown(ctx.ui, 'MAIN', () => { readBaro(); }, 5000);
 
         // demo feed at 20 Hz; switching source starts a clean run
 
-        setInterval(() => {
+        whileShown(ctx.ui, 'MAIN', () => {
             const d = usingDemo();
             if (d !== feedDemo) { feedDemo = d; newTimer(); log.info(d ? 'demo data on' : 'live speed'); }
             const now = Date.now();

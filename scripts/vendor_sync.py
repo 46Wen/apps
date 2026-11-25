@@ -91,6 +91,13 @@ def redline_no_hud(app_dir):
     rep("        let nav = null;\n        try {", "        let nav = null;\n        if (HUD) try {")
     rep("        hud = Hud.start(ctx, {", "        if (HUD) hud = Hud.start(ctx, {")
     rep("        const PAGES = 4;", "        const PAGES = HUD ? 4 : 3;")
+    # 46Wen: nothing of Redline's own runs while its screen is not shown (the launch timer was 10 looks a second
+    # for as long as the app stayed up, which on this unit is until the next restart)
+    rep("        const launchIdle = setInterval(() => { if (!car.data().demo) launch.idle(Date.now()); }, 100);\n"
+        "        if (launchIdle.unref) launchIdle.unref();\n",
+        "        // 46Wen: only while the screen is shown (the app stays up after it is left: nothing of it runs then)\n"
+        "        whileShown(ui, 'MAIN', () => { if (!car.data().demo) launch.idle(Date.now()); }, 100);\n")
+    rep("const HUD = false;", "const HUD = false;\n" + WHILE_SHOWN)
     open(p, 'w', encoding='utf-8', newline='\n').write(s)
     subprocess.run(['node', '--check', p], check=True)
 
@@ -103,13 +110,61 @@ def redline_no_hud(app_dir):
                   'de.bmw.infotainment.a4a.carplay.CarPlayManager',
                   'de.bmw.infotainment.sdi.aap.androidautoprojectedmanager.AndroidAutoProjectedManager']:
         a['signals'].pop(iface, None)
-    a['description'] = a['description'].split('; HUD by')[0] + ' (46Wen: without the HUD output)'
+    a['description'] = a['description'].split('; HUD by')[0] + ' (46Wen: without the HUD output; idle when not shown)'
+    mark_version(a, 1)
     keep = {'hudLead', 'hudTempUnit', 'hudTorqueUnit', 'hudPowerUnit', 'hudBoostUnit', 'hudFuelUnit', 'hudTyreUnit'}
     for st in a['settings']:
         if st['key'] == 'hud' or (st['key'].startswith('hud') and st['key'] not in keep):
             st['hidden'] = True
             if st['key'] == 'hud':
                 st['default'] = 'off'
+    open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
+
+
+# 46Wen: a timer that runs only while an app's screen is shown. OAP apps stay up after their screen is left (until
+# the head unit restarts) and an app must not exit by itself (the car takes an exit for a crash: its data wiped, a
+# second one uninstalls it), so "closed when left" is: nothing of its own runs once it is not shown.
+WHILE_SHOWN = (
+    "/** 46Wen: fn every ms while screen `name` is shown, nothing while it is not (the app stays up after it is left). */\n"
+    "function whileShown(ui, name, fn, ms) {\n"
+    "    let t = null;\n"
+    "    const set = (on) => { if (on && !t) t = setInterval(fn, ms); else if (!on && t) { clearInterval(t); t = null; } };\n"
+    "    ui.onVisible((n, on) => { if (n === name) set(on); });\n"
+    "    try { set(ui.isVisible(name)); } catch (e) { set(true); }\n"
+    "}")
+
+
+def mark_version(a, rev):
+    """x.y.z -> x.y.(z*100 + rev): newer than the original for the Store, older than the original's next one."""
+    x, y, z = [int(n) for n in a['version'].split('.')]
+    a['version'] = '%d.%d.%d' % (x, y, z * 100 + rev)
+
+
+def draggy_idle_hidden(app_dir):
+    """Draggy idle while its screen is not shown (46Wen): its 20-a-second run timer and its 5 s air pressure look
+    only while shown. Fails (PatchError) when Draggy's code moved so far that the edits no longer fit."""
+    p = os.path.join(app_dir, 'main.js')
+    s = open(p, encoding='utf-8').read()
+
+    def rep(a, b):
+        nonlocal s
+        if s.count(a) != 1:
+            raise PatchError('draggy main.js: %r found %d times, expected once' % (a[:60], s.count(a)))
+        s = s.replace(a, b)
+    rep("const { Diag } = require('./kit/diag');", "const { Diag } = require('./kit/diag');\n" + WHILE_SHOWN)
+    rep("        setInterval(() => { readBaro(); }, 5000);",
+        "        // 46Wen: only while the screen is shown (the app stays up after it is left: nothing of it runs then)\n"
+        "        whileShown(ctx.ui, 'MAIN', () => { readBaro(); }, 5000);")
+    i = s.index("        // demo feed at 20 Hz; switching source starts a clean run\n\n        setInterval(() => {")
+    j = s.index("        }, 50);\n", i)
+    body = s[i:j]
+    s = s[:i] + body.replace("        setInterval(() => {", "        whileShown(ctx.ui, 'MAIN', () => {", 1) + "        }, 50);\n" + s[j + len("        }, 50);\n"):]
+    open(p, 'w', encoding='utf-8', newline='\n').write(s)
+    subprocess.run(['node', '--check', p], check=True)
+    p = os.path.join(app_dir, 'app.json')
+    a = json.load(open(p, encoding='utf-8'))
+    a['description'] = a['description'] + ' (46Wen: idle when not shown)'
+    mark_version(a, 1)
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
@@ -201,7 +256,7 @@ def ambient_music(app_dir):
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
-PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music}
+PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music, 'draggy_idle_hidden': draggy_idle_hidden}
 
 PRIORITY_MARK = "require('./priority').lower(log, SPEC.config)"
 
