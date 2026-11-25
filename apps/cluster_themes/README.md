@@ -1,7 +1,5 @@
 # Cluster Themes
 
-> **0.22 (46Wen):** only the **M-style** theme is left, shown in Sport and Sport Plus; every other mode shows BMW's own cluster. The rest of this page describes the earlier versions with every theme.
-
 <img src="icon.png" width="72" align="left" alt="Cluster Themes icon">
 
 Redraws the whole instrument cluster in a theme of your choice. Open **Cluster Themes** from the apps menu on the center screen: its own page has the themes with pictures, the readouts, the badge, the Waze map, warnings and settings.

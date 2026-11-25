@@ -45,12 +45,10 @@ mgu.run({
         if (!hud) return;
         new Page(ctx, hud, {
             title: ctx.spec.title, what: 'cluster',
-            look: { name: 'Theme', style: 'hero', tags: { m: 'M8 style · Sport / Sport+' } },
-            // 0.22 (the owner's choice): only the M theme, in Sport and Sport+; BMW's own cluster in every other mode,
-            // with Waze on Cluster's map. No Waze map in the theme, no badge, alerts, G-meter, holidays or demo.
-            tabs: ['readouts', 'settings', 'log'],
+            look: { name: 'Themes', style: 'hero', tags: { gt3: 'race dash', m: 'M8 style', mview: 'M3 / M5 look', vector: 'music panel', sport: 'Live Cockpit', minimal: 'just the speed', track: 'tyres + temps', drag: '0-60 timer', rally: 'rev arc · G-meter', retro80s: '80s digital', cruise: 'calm · trip', dyno: 'safety tiles', ribbon: 'calm · holidays' } },
+            tabs: ['look', 'readouts', 'badge', 'map', 'alerts', 'gmeter', 'settings', 'log'],
             logRing,
-            settings: ['units', 'tempUnits', 'pressureUnits', 'clock', 'timeZone', 'tankLitres', 'redline', 'shiftBefore', 'shiftCue', 'coldGuard', 'showBoost', 'nightDim', 'readyInBackground', 'keepStrip', 'autoStart'],
+            settings: ['units', 'tempUnits', 'pressureUnits', 'clock', 'timeZone', 'tankLitres', 'redline', 'shiftBefore', 'coldGuard', 'showBoost', 'nightDim', 'cameraNotch', 'keepStrip', 'autoStart', 'holiday', 'demo'],
             // the drive mode check's candidates this app's app.json listens to (issue #8; shared/hud.js modeDiagLines)
             modeCheck: ['HMI', 'MDrive', 'Engine', 'Sport2'],
         }).start();

@@ -54,6 +54,58 @@
       }
     },
     {
+      "id": "m_cluster",
+      "kind": "app",
+      "path": "apps/m_cluster",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk",
+          "shared/hud.js",
+          "shared/hud_text.js",
+          "shared/hud_data.js",
+          "shared/hud_themes.js",
+          "shared/layouts.js",
+          "shared/shaders.js",
+          "shared/icons.js",
+          "shared/shift_score.js",
+          "shared/demo_script.js",
+          "shared/sun.js",
+          "shared/cluster_render_client.js",
+          "shared/calibration.js",
+          "shared/visible.js",
+          "shared/page.js",
+          "shared/waze.js",
+          "shared/logring.js",
+          "shared/previews.js",
+          "shared/sensors.js",
+          "shared/badges.js",
+          "shared/screen.js",
+          "shared/runs.js",
+          "shared/tz.js",
+          "shared/holidays.js",
+          "shared/vehicle_state.js",
+          "shared/shift_cue.js",
+          "shared/smart_temps.js",
+          "shared/hud_holiday.js",
+          "shared/garland.js"
+        ]
+      }
+    },
+    {
       "id": "fuel_link",
       "kind": "app",
       "path": "apps/fuel_link",
