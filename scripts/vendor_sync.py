@@ -207,8 +207,13 @@ def check(work):
     problems += ['skipped ' + s for s in v.get('skipped', [])] + v.get('errors', [])
     doc = json.load(open(os.path.join(tree, 'mgu-repo.json')))
     builds = [e for e in doc['components'] if isinstance(e.get('build'), dict)]
-    for name in sorted(os.listdir(os.path.join(tree, 'apps'))):
-        builds.append({'id': name, 'path': 'apps/' + name, 'build': dict(doc['apps']['build'], shared=['kit', 'shared', 'oap-sdk'])})
+    # our own apps are listed one by one, each with only what its build reads (build.shared), so one app's change
+    # leaves the others as they are in the Store; an "apps" pattern, if any, still builds each folder
+    if 'apps' in doc:
+        listed = set(e['id'] for e in builds)
+        for name in sorted(os.listdir(os.path.join(tree, 'apps'))):
+            if name not in listed:
+                builds.append({'id': name, 'path': 'apps/' + name, 'build': dict(doc['apps']['build'], shared=['kit', 'shared', 'oap-sdk'])})
     for e in builds:
         b = e['build']
         t = tempfile.mkdtemp(dir=work)

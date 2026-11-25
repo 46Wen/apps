@@ -57,6 +57,16 @@ class Speaker {
 
     /** The file for a phrase (bienvenida -> bienvenida.m4a ...), or null. */
     file(name) {
+        // looked up once: a found file is kept, a missing one looked for again after a minute
+        const c = this._files || (this._files = {});
+        const hit = c[name];
+        if (hit && (hit.path || Date.now() - hit.at < 60000)) return hit.path;
+        const p = this._find(name);
+        c[name] = { path: p, at: Date.now() };
+        return p;
+    }
+
+    _find(name) {
         const dirs = typeof this.dirs === 'function' ? this.dirs() : this.dirs;
         for (let i = 0; i < dirs.length; i++) {
             for (let j = 0; j < EXT.length; j++) {
@@ -83,12 +93,14 @@ class Speaker {
                 const watch = (name, fn) => this.signals.on(this.mp, name, fn, { warn: (m) => this.log.warn(m) }).catch((e) => this.log.warn('subscribe ' + name + ': ' + errText(e)));
                 await watch('playerState', (v) => {
                     this.state = typeof v === 'object' && v ? (v.playerState || JSON.stringify(v)) : v;
-                    if (this.ended && /STOP/.test(String(this.state)) && this.started) this.ended('player stopped');
+                    if (this.ended && /STOP/.test(String(this.state)) && this.started && Date.now() - this.playAt > 700) this.ended('player stopped');
                     if (/PLAY/.test(String(this.state))) this.started = true;
                 });
                 await watch('currentItemTime', (v) => {
                     this.time = v;
-                    if (this.ended && v && v.total > 0 && v.elapsed >= v.total - 150) this.ended('end of the phrase');
+                    // the end of THIS phrase: the player playing it (PLAY seen since playFile) for a moment at least; the
+                    // last item's time, still sent right after playFile, is not taken for it
+                    if (this.ended && this.started && Date.now() - this.playAt > 700 && v && v.total > 0 && v.elapsed >= v.total - 150) this.ended('end of the phrase');
                 });
                 await watch('playbackErrorEvent', (v) => {
                     const ev = v && (v.event !== undefined ? v.event : v);
@@ -225,6 +237,7 @@ class Speaker {
     // playFile and wait for its end; -> why it ended ('error ...' when it did not play)
     async _play(file) {
         this.started = false;
+        this.playAt = Date.now();
         const done = new Promise((resolve) => { this.ended = resolve; });
         const r = await this.signals.call(this.mp, 'playFile', { path: file, languageCode: LANG }, 5000);
         if (!r || r.EntError !== 'OK') { this.ended = null; return 'error playFile ' + (r && r.EntError); }

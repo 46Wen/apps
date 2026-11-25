@@ -593,8 +593,6 @@ def build(app_id, language='en'):
         elif f.endswith(('.wasm', '.wad')) or f in ('LICENSE', 'NOTICE'):
             # files the app reads as they are (doom: the game as WebAssembly, its data, its licences)
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
-        elif f == 'voces' and spec.get('vocesFuera'):
-            pass   # 46Wen: the recordings come as their own Store tool (/var/opt), not in the app
         elif f == 'voces' and os.path.isdir(os.path.join(adir, f)):
             # 46Wen: sound files the head unit's media player opens by path (Copiloto de voz): as they are, not packed
             shutil.copytree(os.path.join(adir, f), os.path.join(src, 'javascript', f),

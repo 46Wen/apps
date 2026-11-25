@@ -10,7 +10,6 @@
  *   fuel(litres, km)  KombiIF statusRangeTankStatus
  *   outside(c)        EnvironmentalInformation.ExteriorTemperature, deg C
  *   engine(rpm, oilC) CDS statusEngineSpeed2 / statusEngineTemperature
- *   battery(volts)    the 12 V battery, read with the engine off (main.js, read-only diagnostics)
  *   tyreWarning(on)   BMW's own tyre pressure Check Control message is on
  *   service(items)    [{ name, km, days, colour }] the car's service requirements (CBS)
  *   openings(list)    windows / sunroof open now (names)
@@ -18,7 +17,7 @@
  */
 
 // in order of priority: the first one is said first when two come together (announcer.js)
-const EVENTS = ['combustible', 'neumaticos', 'hielo', 'motor_frio', 'bateria', 'bienvenida', 'mantenimiento',
+const EVENTS = ['combustible', 'neumaticos', 'hielo', 'motor_frio', 'bienvenida', 'mantenimiento',
     'ventanillas', 'fin_viaje', 'descanso', 'motor_caliente'];
 const PRIORITY = {};
 EVENTS.forEach((e, i) => { PRIORITY[e] = i + 1; });
@@ -33,7 +32,6 @@ const DEFAULTS = {
     iceAfterMs: 60000,      // ... not in the first minute (the sensor warms up in a garage)
     coldOilC: 80,           // oil under this is cold: "motor_frio" over coldRpm, "motor_caliente" when it gets there
     coldRpm: 2500,
-    batteryV: 11.8,         // the 12 V battery under this with the engine off: "bateria" at the start
     serviceKm: 2000,        // a service item due within this many km or serviceDays: "mantenimiento"
     serviceDays: 60,
     serviceEveryMs: 7 * 24 * 3600000,   // ... at most once a week
@@ -66,7 +64,6 @@ class Engine {
         this.litres = null; this.range = null; this.minLitres = null;
         this.outsideC = null;
         this.rpm = null; this.oilC = null;
-        this.volts = null; this.lowBattery = false;
         this.tyres = false;
         this.items = [];            // the service items
         this.lastServiceAt = null;  // when "mantenimiento" was last said (kept across starts)
@@ -83,7 +80,7 @@ class Engine {
         if (this.history.length > 8) this.history.length = 8;
         this.lastAt[event] = at;
         this.log('event ' + event + ': ' + why);
-        this.say(event, { why: why, litres: this.litres, range: this.range, outside: this.outsideC, volts: this.volts });
+        this.say(event, { why: why, litres: this.litres, range: this.range, outside: this.outsideC });
         return true;
     }
 
@@ -94,8 +91,6 @@ class Engine {
         this.cond = n;
         if (n === DRIVING && was !== DRIVING) this._tripStart(was, t);
         if (was === DRIVING && n !== DRIVING) this._tripEnd(t);
-        // a new switch-on cycle: the battery is read again
-        if (n <= 5) this.lowBattery = false;
     }
 
     _tripStart(was, t) {
@@ -107,8 +102,6 @@ class Engine {
         // the welcome when the engine starts; not when the app itself starts on the road (was unknown), not on a
         // restart right after a trip (a stall, moving the car)
         if (was !== null && !restart) this._emit('bienvenida', 'motor arrancado');
-        if (this.lowBattery) this._emit('bateria', 'batería a ' + this.volts.toFixed(2) + ' V con el motor parado');
-        this.lowBattery = false;
         this._serviceCheck();
         this._tyres();
     }
@@ -168,14 +161,6 @@ class Engine {
             tr.warm = true;
             this._emit('motor_caliente', 'aceite a ' + Math.round(this.oilC) + ' °C');
         }
-    }
-
-    /** The 12 V battery, read with the engine off (main.js reads it at ignition on, before the start). */
-    battery(volts) {
-        if (!isNum(volts)) return;
-        this.volts = volts;
-        if (this.cond === DRIVING || (isNum(this.rpm) && this.rpm > 300)) return;   // the alternator is charging: not a rest voltage
-        this.lowBattery = volts < this.cfg.batteryV;
     }
 
     tyreWarning(on) {
@@ -238,7 +223,7 @@ class Engine {
     /** What the page shows. */
     state() {
         return { cond: this.cond, litres: this.litres, range: this.range, outside: this.outsideC, rpm: this.rpm, oil: this.oilC,
-            volts: this.volts, tyres: this.tyres, open: this.open.slice(), service: this.items.length, fuelArmed: this.fuelArmed,
+            tyres: this.tyres, open: this.open.slice(), service: this.items.length, fuelArmed: this.fuelArmed,
             driveMin: Math.round(this.driveMs / 60000), history: this.history.slice(), lastAt: Object.assign({}, this.lastAt) };
     }
 }

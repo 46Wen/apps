@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copiloto de voz: apps/copiloto_voz/voces/component.json, the Store tool "copiloto-voz-voces" that installs the
+"""Copiloto de voz: tools-prebuilt/copiloto-voz-voces/component.json, the Store tool "copiloto-voz-voces" that installs the
 recordings in /var/opt/copiloto-voz-voces/current/<idioma>/<voz>/<aviso>.m4a (root's, 0755 folders, 0644 files).
 
 BMW's media engine plays a file as its own user and answers ITEM_UNPLAYABLE for one in an app's folder; RideTube's
@@ -11,7 +11,7 @@ import json
 import os
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-VOCES = os.path.join(ROOT, 'apps', 'copiloto_voz', 'voces')
+VOCES = os.path.join(ROOT, 'tools-prebuilt', 'copiloto-voz-voces')
 OUT = os.path.join(VOCES, 'component.json')
 
 
@@ -42,7 +42,7 @@ def main():
         'kind': 'tool',
         'version': version,
         'title': 'Copiloto de voz: voces',
-        'description': 'Las frases grabadas de Copiloto de voz (español, chino e inglés, 11 voces) en /var/opt, donde el reproductor de BMW puede abrirlas',
+        'description': 'La voz de Copiloto de voz (español, Elvira) en /var/opt, donde el reproductor de BMW puede abrirla',
         'mguHmi': ['ID7', 'ID8'],
         'requires': {'mgu-deploy': '0.4.0'},
         'voicesHash': digest,

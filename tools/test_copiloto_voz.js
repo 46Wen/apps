@@ -83,11 +83,8 @@ ok(count(r, 'motor_caliente') === 1, 'warm once, got ' + r.said);
 r = rig(); r.e.engine(800, 90); r.start(); r.e.engine(3000, 91);
 ok(count(r, 'motor_frio') + count(r, 'motor_caliente') === 0, 'a warm start: neither, got ' + r.said);
 
-// battery: under 11.8 V with the engine off, said at the start; a charging voltage is not counted
-r = rig(); r.e.condition(7); r.e.battery(11.6); r.e.condition(8); r.e.condition(10);
-ok(r.said.join() === 'bienvenida,bateria', 'low battery at the start, got ' + r.said);
-r = rig(); r.e.condition(7); r.e.battery(12.4); r.e.condition(10);
-ok(count(r, 'bateria') === 0, 'a good battery: nothing');
+// no battery notice any more (0.7.0)
+ok(EVENTS.indexOf('bateria') < 0, 'no battery notice');
 
 // tyres: BMW's warning, once a trip (also when it was already on at the start)
 r = rig(); r.e.tyreWarning(true); r.start(); r.e.tyreWarning(true);
@@ -118,7 +115,7 @@ ok(r.said.length === 0, 'welcome off in the settings');
 (async () => {
     const tick = () => new Promise((res) => setImmediate(res));
     const q = { t: 0, said: [], call: false, release: null };
-    const an = new Announcer({ priority: PRIORITY, keep: KEEP, now: () => q.t, inCall: () => q.call,
+    const an = new Announcer({ gapMs: 0, priority: PRIORITY, keep: KEEP, now: () => q.t, inCall: () => q.call,
         speak: (ev) => new Promise((res) => { q.said.push(ev); q.release = res; }) });
     // two at once: the higher priority first, never together
     an.add('motor_caliente'); await tick(); an.add('bienvenida');
@@ -138,7 +135,7 @@ ok(r.said.length === 0, 'welcome off in the settings');
     q.t += KEEP_MS + 1000; q.call = false; an.pump(); await tick();
     ok(q.said.join() === 'combustible' && an.state().waiting.length === 0, 'after the call: fuel said, the stale break dropped, got ' + q.said);
     q.release(); await tick();
-    ok(EVENTS.length === 11 && PRIORITY.combustible === 1 && PRIORITY.motor_caliente === 11, 'eleven notices, fuel first, warm engine last');
+    ok(EVENTS.length === 10 && PRIORITY.combustible === 1 && PRIORITY.motor_caliente === 10, 'ten notices, fuel first, warm engine last');
 
     // ---------- what the signals mean ----------
     ok(D.oilOf({ temperatureEngineOilDrive: 128 }) === 80 && D.oilOf({ temperatureEngineOilDrive: 255 }) === null, 'oil temperature');
@@ -221,25 +218,27 @@ ok(r.said.length === 0, 'welcome off in the settings');
     ok(V.voiceName('zh-CN-XiaoxiaoNeural') === 'Xiaoxiao', 'voice name');
     const sp2 = new Speaker({ signals, log, dataDir: dir, dirs: () => V.dirsFor(vroot, 'es', 'es-ES-AlvaroNeural') });
     ok(/AlvaroNeural.hielo\.mp3$/.test(sp2.file('hielo')) && /ElviraNeural.fin_viaje\.mp3$/.test(sp2.file('fin_viaje')) && !sp2.file('bateria'), 'speaker looks in the chosen voice, then the others');
-    const fr = JSON.parse(fs.readFileSync(path.join(APP, 'voces', 'frases.json'), 'utf8'));
-    ok(['es', 'zh', 'en'].every((l) => Object.keys(fr.frases).every((k) => fr.frases[k][l])), 'frases.json: every phrase in the 3 languages');
+    const VOC = path.join(__dirname, '..', 'tools-prebuilt', 'copiloto-voz-voces');
+    const fr = JSON.parse(fs.readFileSync(path.join(VOC, 'frases.json'), 'utf8'));
+    ok(Object.keys(fr.frases).length === 13 && Object.keys(fr.frases).every((k) => fr.frases[k].es && fs.existsSync(path.join(VOC, 'es', 'es-ES-ElviraNeural', k + '.m4a'))), 'frases.json: 13 Spanish phrases, each recorded with Elvira');
+    const comp = JSON.parse(fs.readFileSync(path.join(VOC, 'component.json'), 'utf8'));
     const appj = JSON.parse(fs.readFileSync(path.join(APP, 'app.json'), 'utf8'));
-    ok(['es', 'zh', 'en'].every((l) => appj.settings.some((x) => x.key === 'voz_' + l && x.default === V.DEFAULT[l] && x.options.length === fr.idiomas[l].voces.length)), 'app.json voice settings match frases.json');
+    ok(comp.files.length === 13 && appj.requires['copiloto-voz-voces'] === comp.version && !appj.settings.some((x) => /^voz_|^idioma$|bateria/.test(x.key)), 'the voices tool: 13 files, the version the app asks for; no language, voice or battery settings')
 
-    // demo.js: a simulated trip gives the 11 notices; through the real queue they are said in the order of priority
+    // demo.js: a simulated trip gives the 10 notices; through the real queue they are said in the order of priority
     const { Demo } = require(path.join(APP, 'demo'));
     const spoken = [];
-    const dq = new Announcer({ priority: PRIORITY, keep: KEEP, inCall: () => false, speak: (ev) => { spoken.push(ev); return tick().then(() => demo.said(ev, ev === 'hielo' ? 'falta la grabación hielo' : null)); } });
+    const dq = new Announcer({ gapMs: 0, priority: PRIORITY, keep: KEEP, inCall: () => false, speak: (ev) => { spoken.push(ev); return tick().then(() => demo.said(ev, ev === 'hielo' ? 'falta la grabación hielo' : null)); } });
     const demo = new Demo({ add: (ev) => dq.add(ev) });
     const given = demo.run();
-    ok(EVENTS.every((ev) => given.indexOf(ev) >= 0), 'demo gives all 11, got ' + given.join(' '));
+    ok(EVENTS.every((ev) => given.indexOf(ev) >= 0), 'demo gives all 10, got ' + given.join(' '));
     for (let i = 0; i < 40 && demo.running; i++) await tick();
     const sm = demo.summary();
-    ok(!sm.running && sm.ok === 10 && sm.failed === 1 && /hielo/.test(sm.results.hielo), 'demo results, got ' + JSON.stringify(sm));
+    ok(!sm.running && sm.ok === 9 && sm.failed === 1 && /hielo/.test(sm.results.hielo), 'demo results, got ' + JSON.stringify(sm));
     ok(spoken.join(' ') === EVENTS.join(' '), 'demo said in the order of priority, got ' + spoken.join(' '));
     const d2 = new Demo({ add: () => {} });
     d2.run(); d2.expire(Date.now() + 6 * 60000);
-    ok(!d2.running && d2.summary().failed === 11, 'demo: never said -> failed after 5 minutes');
+    ok(!d2.running && d2.summary().failed === 10, 'demo: never said -> failed after 5 minutes');
 
     console.log('copiloto_voz: ' + checks + ' checks, ' + fails + ' failed');
     process.exit(fails ? 1 : 0);
