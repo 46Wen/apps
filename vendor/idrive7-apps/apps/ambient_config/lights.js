@@ -455,8 +455,15 @@ class Lights extends EventEmitter {
                     return;
                 }
                 let reply = null;
+                // 46Wen: the animation pace: a moving scene's next write no sooner than paceMs after the last
+                if (this.paceMs && this._wroteAt && S.moves(this.scene)) {
+                    const g = this._wroteAt + this.paceMs - this.now();
+                    if (g > 0) await new Promise((r) => setTimeout(r, g));
+                    if (this._stopped || this._holds.size) return;
+                }
                 // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s
                 try { reply = await this.diag.physical(this.bdc, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
+                this._wroteAt = this.now();
                 if (reply && reply[0] === 0x6e) {
                     this._fails = 0; this.writes++; this._times.push(this.now());
                     // (a bus given back: once more later; one not taken is not)

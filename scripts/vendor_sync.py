@@ -173,7 +173,7 @@ def ambient_music(app_dir):
     scenes.js, its button on the Animations tab, the media state as an optional signal, and the version as
     x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older than the original's next one.
     Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
-    PATCH_REV = 3
+    PATCH_REV = 4
     shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'ambient_config', 'music.js'), os.path.join(app_dir, 'music.js'))
 
     def edit(name, pairs):
@@ -240,11 +240,40 @@ def ambient_music(app_dir):
         ("cv.text(d, 284, y + 32, 20,", "cv.text(d, 284, y + 30, 20,"),
     ])
 
+    # Animation pace (46Wen, PATCH_REV 4): a moving scene's writes go back to back through the head unit's gateway
+    # (~5 a second, each ~200 ms); "Light" leaves PACE_MS between two of them, about half the writes and the gateway
+    # free half the time, so the head unit's own diagnostic traffic and the CPU get room (the default)
+    edit('lights.js', [
+        ("                // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s\n",
+         "                // 46Wen: the animation pace: a moving scene's next write no sooner than paceMs after the last\n"
+         "                if (this.paceMs && this._wroteAt && S.moves(this.scene)) {\n"
+         "                    const g = this._wroteAt + this.paceMs - this.now();\n"
+         "                    if (g > 0) await new Promise((r) => setTimeout(r, g));\n"
+         "                    if (this._stopped || this._holds.size) return;\n"
+         "                }\n"
+         "                // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s\n"),
+        ("                try { reply = await this.diag.physical(this.bdc, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }\n",
+         "                try { reply = await this.diag.physical(this.bdc, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }\n"
+         "                this._wroteAt = this.now();\n"),
+    ])
+    edit('main.js', [
+        ("    const control = new Control({ settings, lights, ambient, log });\n",
+         "    // (46Wen) the animation pace: Light (the default) about half the writes of Normal\n"
+         "    const pace = () => { lights.paceMs = settings.get('animPace') === 'normal' ? 0 : 250; };\n"
+         "    pace();\n"
+         "    settings.onChange((key) => { if (key === 'animPace') pace(); });\n"
+         "    const control = new Control({ settings, lights, ambient, log });\n"),
+    ])
+
     p = os.path.join(app_dir, 'app.json')
     a = json.load(open(p, encoding='utf-8'))
     x, y, z = (int(n) for n in a['version'].split('.'))
     a['version'] = '%d.%d.%d' % (x, y, z * 100 + PATCH_REV)
     a['description'] = a['description'] + ' (46Wen: with a Music wave)'
+    if not any(st['key'] == 'animPace' for st in a['settings']):
+        a['settings'].insert(0, {'key': 'animPace', 'label': 'Animation pace', 'type': 'choice', 'default': 'light',
+                                 'options': [['light', 'Light (about half the writes, less load on the head unit)'],
+                                             ['normal', 'Normal (as fast as the gateway takes them)']]})
     # the music's level, read from SmartXbar by the tool mgu-audio-level (installed with the app)
     a.setdefault('requires', {})['mgu-audio-level'] = '0.1.1'
     a['signals']['de.bmw.infotainment.hmi.hmimediastate.HmiMediaState'] = {

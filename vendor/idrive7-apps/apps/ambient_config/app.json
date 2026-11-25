@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode (46Wen: with a Music wave)",
-  "version": "2.7.2603",
+  "version": "2.7.2604",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -77,6 +77,22 @@
     }
   ],
   "settings": [
+    {
+      "key": "animPace",
+      "label": "Animation pace",
+      "type": "choice",
+      "default": "light",
+      "options": [
+        [
+          "light",
+          "Light (about half the writes, less load on the head unit)"
+        ],
+        [
+          "normal",
+          "Normal (as fast as the gateway takes them)"
+        ]
+      ]
+    },
     {
       "key": "carKind",
       "label": "Car type",

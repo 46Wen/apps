@@ -91,6 +91,10 @@ async function background(bg) {
     // reads are left out, as they hang it on some cars (#197, lights.js "Blind")
     const READ_FAILS = 3;
     const lights = new Lights({ diag, log, known: settings.get('lightsKnown'), writeFirst: (Number(settings.get('lightsReadFails')) || 0) >= READ_FAILS });
+    // (46Wen) the animation pace: Light (the default) about half the writes of Normal
+    const pace = () => { lights.paceMs = settings.get('animPace') === 'normal' ? 0 : 250; };
+    pace();
+    settings.onChange((key) => { if (key === 'animPace') pace(); });
     const control = new Control({ settings, lights, ambient, log });
     control.start();
     // (46Wen) the media state watched only while a Music wave is on (the driver's look or a driving mode's)
