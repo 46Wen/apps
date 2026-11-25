@@ -102,6 +102,30 @@
       }
     },
     {
+      "id": "audio_probe",
+      "kind": "app",
+      "path": "apps/audio_probe",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk"
+        ]
+      }
+    },
+    {
       "id": "redline",
       "kind": "app",
       "path": "vendor/idrive7-apps/apps/redline",
@@ -375,6 +399,19 @@
       "requires": {
         "mgu-deploy": "0.4.0"
       },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
+    },
+    {
+      "id": "mgu-audio-probe",
+      "kind": "tool",
+      "path": "native/mgu-audio-probe",
+      "title": "Audio probe",
+      "description": "Read-only report on how the head unit's sound is built, to see whether the music's level can be read (46Wen, for Ambient config's Music wave). Nothing is played or changed, and nothing runs by itself: the Audio probe app asks for it",
+      "optional": true,
       "uninstallable": true,
       "mguHmi": [
         "ID7",

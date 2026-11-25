@@ -1,0 +1,43 @@
+{
+  "id": "mgu-audio-probe",
+  "kind": "tool",
+  "version": "0.3.1",
+  "title": "Audio probe",
+  "description": "Read-only report on how the head unit's sound is built (ALSA cards and running streams, sound servers, who holds the devices), to see whether the music's level can be read. Nothing is played or changed, and nothing runs by itself: the Audio probe app asks for it with its button, once music plays and a USB stick is in. The report goes to the stick, to the app's screen and to /var/opt/mgu-audio-probe/reports. Step 2, the capture test: each capture device listened to for 3 s, to see which one carries the music.",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "files": [
+    {
+      "path": "probe.sh",
+      "mode": "0755",
+      "from": "files/probe.sh"
+    },
+    {
+      "path": "mgu-audio-capture",
+      "mode": "0755",
+      "from": "files/mgu-audio-capture"
+    }
+  ],
+  "units": [
+    {
+      "name": "mgu-audio-probe.service",
+      "from": "units/mgu-audio-probe.service"
+    },
+    {
+      "name": "mgu-audio-probe.path",
+      "from": "units/mgu-audio-probe.path"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "mgu-audio-probe.path",
+      "target": "paths.target"
+    }
+  ],
+  "recmgr": [],
+  "restart": [
+    "mgu-audio-probe.path"
+  ]
+}

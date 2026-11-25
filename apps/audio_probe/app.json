@@ -1,0 +1,45 @@
+{
+  "id": "audio_probe",
+  "title": "Audio probe",
+  "description": "Comprueba que suena música, que la unidad la ve y que hay un USB, y solo entonces, al pulsar un botón, crea el informe de solo lectura del sonido de la unidad. Paso 2: la prueba de captura escucha 3 s cada entrada de audio para ver cuál lleva la música. Lo muestra también en pantalla.",
+  "version": "0.2.1",
+  "vendor": "custom",
+  "loggingId": "OAP7",
+  "iconGlyph": "AUD",
+  "fonts": "es",
+  "requires": {
+    "mgu-audio-probe": "0.3.1"
+  },
+  "signals": {
+    "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {
+      "_instances": "HMI_CID",
+      "playerMetadata": "rs",
+      "trackProgress": "rs",
+      "_optional": "qué suena: la condición 2 (música sonando y vista por la unidad)"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Audio probe",
+      "buttons": [
+        [
+          "BTN_START",
+          "Crear informe"
+        ],
+        [
+          "BTN_CAPTURE",
+          "Prueba de captura (con música y en pausa)"
+        ],
+        [
+          "BTN_PAGE",
+          "Ver informe (página siguiente)"
+        ]
+      ]
+    }
+  ],
+  "config": {
+    "nice": 19
+  }
+}
