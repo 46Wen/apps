@@ -29,6 +29,7 @@ const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
 const Car = require('./kit/car');
+const G = require('./kit/gauges');
 const { ReadOnlyDiag } = require('./kit/readonly-diag');
 const { Engine, EVENTS, PRIORITY, KEEP } = require('./engine');
 const { Announcer } = require('./announcer');
@@ -248,11 +249,12 @@ mgu.run({
         const TONE = { combustible: C.amber, neumaticos: C.amber, hielo: C.ice, motor_frio: C.ice, bateria: C.amber, bienvenida: C.light,
             mantenimiento: C.light, ventanillas: C.light, fin_viaje: C.light, descanso: C.light, motor_caliente: C.red };
 
+        const CY = 48;     // the chips' row, under the kit's header (its tabs: y < 38)
         const chip = (cv, x, label, ok, warn) => {
             const w = cv.textWidth(label, 19, { literal: true }) + 40;
-            cv.roundRect(x - w, 18, w, 34, 17, C.tile);
-            cv.circle(x - w + 17, 35, 6, ok ? C.green : warn ? C.amber : C.red);
-            cv.text(label, x - w + 30, 42, 19, C.text, { literal: true });
+            cv.roundRect(x - w, CY, w, 32, 16, C.tile);
+            cv.circle(x - w + 17, CY + 16, 6, ok ? C.green : warn ? C.amber : C.red);
+            cv.text(label, x - w + 30, CY + 23, 19, C.text, { literal: true });
             return x - w - 10;
         };
 
@@ -261,16 +263,10 @@ mgu.run({
         const dot = (cv, x, y, state) => cv.circle(x, y, 8, state === 'ok' ? C.green : state === 'wait' ? C.faint : state === 'pending' ? C.blue : C.red);
 
         const header = (cv, s, a, found, have) => {
-            cv.fillRect(24, 22, 8, 26, C.mLight); cv.fillRect(34, 22, 8, 26, C.mDark); cv.fillRect(44, 22, 8, 26, C.mRed);
-            cv.text('Copiloto de voz', 66, 46, 30, C.text, { font: 'bold', literal: true });
-            // the page tabs
-            let px = 330;
-            PAGES.forEach((name, k) => {
-                const w = cv.textWidth(name, 20, { literal: true }) + 30;
-                if (k === page) cv.roundRect(px, 18, w, 34, 17, C.blue);
-                cv.text(name, px + 15, 42, 20, k === page ? C.text : C.dim, { literal: true });
-                px += w + 6;
-            });
+            // the kit's header: the app's name and the page tabs (on the car, in the HMI's title strip, with its Settings tab)
+            G.frame(cv, ctx.theme(), PAGES, page, []);
+            cv.fillRect(24, CY + 3, 8, 26, C.mLight); cv.fillRect(34, CY + 3, 8, 26, C.mDark); cv.fillRect(44, CY + 3, 8, 26, C.mRed);
+            cv.text('Copiloto de voz', 66, CY + 25, 24, C.text, { font: 'bold', literal: true });
             let x = 1576;
             x = chip(cv, x, a.call ? 'En llamada: espera' : a.speaking ? 'Hablando: ' + TITLES[a.speaking] : 'Voz: ' + (speaker.lastError ? 'error' : have + '/' + PHRASES.length + ' frases'),
                 !speaker.lastError && have === PHRASES.length && !a.call, !speaker.lastError);
@@ -280,7 +276,7 @@ mgu.run({
 
         const showAvisos = (cv, s, a, found) => {
             // the notices: 4 x 3 tiles, in their order of priority
-            const TW = 380, TH = 118, GX = 24, GY = 70, GAP = 10;
+            const TW = 380, TH = 116, GX = 24, GY = 92, GAP = 8;
             EVENTS.forEach((ev, i) => {
                 const col = i % 4, row = Math.floor(i / 4), tx = GX + col * (TW + GAP), ty = GY + row * (TH + GAP);
                 const on = ctx.settings.get('on_' + ev) !== false, speaking = a.speaking === ev, waiting = a.waiting.indexOf(ev) >= 0;
@@ -310,9 +306,9 @@ mgu.run({
         // the checklist: the car's signals on the left, the voice and the demo on the right
         const showDiag = (cv, s, a, found, have) => {
             const sig = bgs.sig, now = Date.now();
-            cv.text('Señales del coche', 30, 96, 22, C.dim, { font: 'bold', literal: true });
+            cv.text('Señales del coche', 30, 112, 22, C.dim, { font: 'bold', literal: true });
             bgs.SIGNALS.forEach((x, k) => {
-                const g = sig[x[0]], y = 132 + k * 37;
+                const g = sig[x[0]], y = 146 + k * 35;
                 const st = g.error ? 'bad' : g.at ? 'ok' : 'wait';
                 dot(cv, 40, y - 7, st);
                 cv.text(x[1], 60, y, 19, C.text, { literal: true });
@@ -320,19 +316,19 @@ mgu.run({
                 cv.text(fit(cv, t, 17, 420), 380, y, 17, g.error ? C.red : g.at ? C.dim : C.faint, { literal: true });
             });
             const X = 830;
-            cv.text('Voz', X, 96, 22, C.dim, { font: 'bold', literal: true });
+            cv.text('Voz', X, 112, 22, C.dim, { font: 'bold', literal: true });
             const missing = PHRASES.filter((p) => !found[p]);
             const voiceRows = [
                 [have === PHRASES.length ? 'ok' : have ? 'bad' : 'bad', 'Grabaciones: ' + have + ' de ' + PHRASES.length + (missing.length ? ' · faltan ' + missing.join(', ') : '')],
                 [speaker.lastError ? 'bad' : speaker.cc ? 'ok' : 'wait', 'Audio del coche: ' + speaker.status()],
                 [a.call ? 'pending' : 'ok', a.call ? 'En llamada: la voz espera' : 'Sin llamada' + (a.waiting.length ? ' · en cola: ' + a.waiting.map((e) => TITLES[e]).join(', ') : '')],
             ];
-            voiceRows.forEach((r, k) => { const y = 132 + k * 37; dot(cv, X + 10, y - 7, r[0]); cv.text(fit(cv, r[1], 18, 730), X + 30, y, 18, r[0] === 'bad' ? C.red : C.text, { literal: true }); });
+            voiceRows.forEach((r, k) => { const y = 146 + k * 35; dot(cv, X + 10, y - 7, r[0]); cv.text(fit(cv, r[1], 18, 730), X + 30, y, 18, r[0] === 'bad' ? C.red : C.text, { literal: true }); });
             const d = bgs.demo.summary();
             cv.text('Demo' + (d.running ? ' en marcha: ' + (d.ok + d.failed) + ' de ' + d.total : Object.keys(d.results).length ? ': ' + d.ok + ' de ' + d.total + ' bien' : ': pulse «Demo» en el menú (solo aparcado)'),
-                X, 258, 22, C.dim, { font: 'bold', literal: true });
+                X, 272, 22, C.dim, { font: 'bold', literal: true });
             EVENTS.forEach((ev, k) => {
-                const col = k < 6 ? 0 : 1, row = k % 6, x = X + col * 380, y = 292 + row * 37;
+                const col = k < 6 ? 0 : 1, row = k % 6, x = X + col * 380, y = 304 + row * 33;
                 const r = d.results[ev] !== undefined ? d.results[ev] : bgs.lastResult[ev];
                 const st = r === undefined ? 'wait' : r === 'ok' ? 'ok' : r === 'pending' ? 'pending' : 'bad';
                 dot(cv, x + 10, y - 7, st);
@@ -342,12 +338,12 @@ mgu.run({
 
         // the log's last lines, newest at the bottom
         const showLog = (cv) => {
-            const lines = bgs.ring.slice(-17);
-            cv.text('Últimas líneas del registro (también en el archivo copiloto_voz.log)', 30, 92, 19, C.dim, { literal: true });
-            if (!lines.length) cv.text('Todavía no hay nada.', 30, 130, 20, C.faint, { literal: true });
+            const lines = bgs.ring.slice(-16);
+            cv.text('Últimas líneas del registro (también en el archivo copiloto_voz.log)', 30, 112, 19, C.dim, { literal: true });
+            if (!lines.length) cv.text('Todavía no hay nada.', 30, 146, 20, C.faint, { literal: true });
             lines.forEach((l, k) => {
                 const d = new Date(l.at), hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
-                const y = 124 + k * 21;
+                const y = 142 + k * 21;
                 cv.text(hh, 30, y, 16, C.faint, { literal: true });
                 cv.text(fit(cv, l.msg.replace(/\s+/g, ' '), 16, 1460), 112, y, 16, l.level === 'error' ? C.red : l.level === 'warn' ? C.amber : C.text, { literal: true });
             });
@@ -367,6 +363,7 @@ mgu.run({
         bgs.onChange(show);
         if (ctx.ui.onClick) {
             ctx.ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; show(); });
+            if (ctx.onTab) ctx.onTab((i) => { if (i >= 0 && i < PAGES.length && i !== page) { page = i; show(); } });
             ctx.ui.onClick('BTN_DEMO', () => {
                 const why = bgs.startDemo();
                 note = why || 'Demo: un viaje simulado con los 11 avisos, uno tras otro (unos dos minutos)';

@@ -41,7 +41,7 @@ España más parecida a «Penélope» de Waze (la de Waze es de Google y no se p
 | Inglés | Sonia, Libby | Ryan, Thomas |
 
 Las frases (14, en los 3 idiomas) están en [`voces/frases.json`](voces/frases.json); las grabaciones van en
-`voces/<idioma>/<voz>/<aviso>.mp3`. Si falta una frase en la voz elegida, se usa la misma frase de otra voz del idioma.
+`voces/<idioma>/<voz>/<aviso>.m4a` (AAC, como RideTube: el reproductor del coche rechaza el MP3). Si falta una frase en la voz elegida, se usa la misma frase de otra voz del idioma.
 
 **Cambiar las frases:** con la página editora (`tools/editor_frases.html`, también publicada como artifact): una tabla
 aviso × idioma, botón ▶ para escucharla con la voz del navegador, y descargar o copiar `frases.json`. Póngalo en
@@ -51,11 +51,12 @@ aviso × idioma, botón ▶ para escucharla con la voz del navegador, y descarga
 
 ```
 py -m pip install edge-tts
+winget install ffmpeg                      (para pasar las voces a M4A)
 py scripts\generar_voces.py               (todas; solo rehace las frases que cambiaron)
 py scripts\generar_voces.py --idioma es   (solo español)
 ```
 
-Luego commit y push, y actualizar la app desde el MGU Store. Son 154 archivos (14 frases × 11 voces), unos 2 MB.
+Luego commit y push, y actualizar la app desde el MGU Store. Son 154 archivos (14 frases × 11 voces), unos 11 MB.
 
 ## La pantalla
 

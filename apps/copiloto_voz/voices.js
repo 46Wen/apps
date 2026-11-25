@@ -1,7 +1,7 @@
 'use strict';
 /**
  * voices.js - Copiloto de voz: where the recordings of the chosen language and voice are. scripts/generar_voces.py
- * leaves them as voces/<idioma>/<voz>/<aviso>.mp3 (voces/frases.json says which languages and voices); the settings
+ * leaves them as voces/<idioma>/<voz>/<aviso>.m4a (voces/frases.json says which languages and voices); the settings
  * "idioma" (es, zh, en) and "voz_<idioma>" pick one. Looked for in that voice's folder, then any other voice of the
  * same language (one missing phrase is still said), then voces/ itself (recordings put there by hand). Node 8.
  */

@@ -108,21 +108,31 @@ class Speaker {
         try {
             const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
             const conns = Array.isArray(list) ? list : [];
-            // RideTube (the same source) is playing: never talk over a video
-            if (conns.some((c) => c && c.sourceID === SOURCE_ID)) throw new Error('RideTube está sonando: no habla encima');
-            before = conns.filter((c) => c && c.sinkID === SINK_ID)[0] || null;
-            const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
-            if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
-            connId = r.mainConnectionID;
+            // the apps' media source already on the speakers (RideTube open): only a video that is playing stops the
+            // phrase; RideTube paused or stopped, the phrase is said on its connection, which is left as it was
+            const shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
+            if (shared) {
+                const st = await this.signals.get(this.mp, 'playerState').catch(() => this.state);
+                const playing = /PLAY/.test(String(st && typeof st === 'object' ? st.playerState : st)) && !/PAUSE|STOP/.test(String(st && typeof st === 'object' ? st.playerState : st));
+                if (playing) throw new Error('RideTube está reproduciendo: no habla encima');
+                this.log.info('speaker: the media source is already connected (RideTube open, not playing): said on it');
+            } else {
+                before = conns.filter((c) => c && c.sinkID === SINK_ID)[0] || null;
+                const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
+                if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
+                connId = r.mainConnectionID;
+            }
             const tries = this.useCopy ? ['copy'] : ['installed', 'copy'];
             let reason = null;
+            const why = [];
             for (let i = 0; i < tries.length; i++) {
                 const f = tries[i] === 'copy' ? this._copy(file) : file;
                 reason = await this._play(f);
                 if (!/^error/.test(reason)) { if (tries[i] === 'copy') this.useCopy = true; break; }
-                this.log.warn('speaker: ' + path.basename(f) + ' (' + tries[i] + '): ' + reason);
+                why.push((tries[i] === 'copy' ? 'copia' : 'instalado') + ': ' + reason.replace(/^error /, ''));
+                this.log.warn('speaker: ' + f + ' (' + tries[i] + '): ' + reason);
             }
-            if (/^error/.test(reason)) throw new Error('el reproductor no pudo con el archivo (' + reason + ')');
+            if (/^error/.test(reason)) throw new Error('el reproductor no pudo con ' + path.basename(file) + ' (' + why.join('; ') + ')');
             this.lastSaid = { name: name, at: Date.now() };
             this.lastError = null;
             this.log.info('speaker: said ' + name + ' (' + reason + ')');
