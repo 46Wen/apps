@@ -142,12 +142,38 @@ mgu.run({
                 out.push(m[1] + ' @ ' + svc.replace(/"/g, ''));
             }
             log.info('catalog: ' + text.length + ' bytes, ' + out.length + ' names about windows' + (out.length ? ': ' + out.join(' | ') : ''));
-            // where the window regulator's status type is used: the text around its first uses (the attribute's name)
-            let at = -1, n = 0;
-            while (n < 4 && (at = text.indexOf('StatusDriveWindowRegulator', at + 1)) >= 0) {
-                n++;
-                log.info('catalog use ' + n + ': …' + text.slice(Math.max(0, at - 260), at + 60).replace(/\s+/g, ' ') + '…');
-            }
+            // the windows' fields (statusPositionWindowRegulator..., statusDriveWindowRegulator...): which struct holds
+            // them, and which attribute of which service carries that struct (the catalog walked as JSON)
+            try {
+                const db = JSON.parse(text);
+                const hits = [], holders = {};
+                const label = (o, k) => (o && typeof o === 'object' && (o.name || o.id || o.fqn)) ? String(o.name || o.id || o.fqn) : String(k);
+                const walk = (o, chain, k) => {
+                    if (!o || typeof o !== 'object' || hits.length > 40) return;
+                    const here = chain.concat([label(o, k)]);
+                    if (typeof o.name === 'string' && /WindowRegulator/.test(o.name) && !/^de\.bmw/.test(o.name)) {
+                        hits.push(here.slice(-5).join(' > '));
+                        holders[here[here.length - 3] || '?'] = 1;
+                        holders[here[here.length - 2] || '?'] = 1;
+                    }
+                    Object.keys(o).forEach((key) => walk(o[key], here, key));
+                };
+                walk(db, [], 'catalog');
+                log.info('windows fields: ' + hits.slice(0, 8).join(' || '));
+                // who refers to the holders (the attribute): any object whose values mention one of them
+                const refs = [];
+                const walk2 = (o, chain, k) => {
+                    if (!o || typeof o !== 'object' || refs.length > 12) return;
+                    const here = chain.concat([label(o, k)]);
+                    Object.keys(o).forEach((key) => {
+                        const v = o[key];
+                        if (typeof v === 'string' && key !== 'name' && Object.keys(holders).some((h) => h.length > 6 && h !== 'members' && v.indexOf(h) >= 0)) refs.push(here.slice(-4).join(' > ') + ' [' + key + '=' + v + ']');
+                        else walk2(v, here, key);
+                    });
+                };
+                walk2(db, [], 'catalog');
+                log.info('windows holders: ' + Object.keys(holders).join(', ') + ' | used by: ' + refs.slice(0, 8).join(' || '));
+            } catch (e) { log.warn('catalog walk: ' + e.message); }
             // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
             try {
                 const own = fs.readFileSync(path.join(__dirname, '..', '..', 'someipInterfaces', 'de_bmw_body_DoorsWindowsRoofMirrors.json'), 'utf8');
