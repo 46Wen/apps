@@ -1,4 +1,16 @@
-# Prueba en el coche: Audio probe (unos 15 minutos)
+# Prueba en el coche: Audio probe
+
+## Paso 3: SmartXbar (lo siguiente que hay que hacer, unos 10 minutos)
+
+1. Arranca el coche. En el Store (origen `46Wen/apps`, rama **pruebas**) actualiza **Audio probe**: app 0.3.0 y
+   herramienta 0.4.0. Reinicia la unidad si lo pide.
+2. Pon **música** (Bluetooth o CarPlay) y déjala sonando.
+3. Abre **Audio probe**: la herramienta y la música en verde (el USB ya no hace falta).
+4. Pulsa **Explorar SmartXbar**. Espera a "Exploración hecha".
+5. Pestaña **Informe**: haz una foto de **cada página** con *Siguiente* (ahora caben más líneas, serán menos páginas).
+6. Mándame las fotos.
+
+## Pasos 1 y 2 (ya hechos el 25 de noviembre)
 
 Objetivo: saber si la música se puede leer desde Linux (paso 1, el informe) y en qué entrada (paso 2, la captura),
 en una sola visita.

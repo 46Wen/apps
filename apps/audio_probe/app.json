@@ -1,14 +1,14 @@
 {
   "id": "audio_probe",
   "title": "Audio probe",
-  "description": "Comprueba que suena música, que la unidad la ve y que hay un USB, y solo entonces, al pulsar un botón, crea el informe de solo lectura del sonido de la unidad. Paso 2: la prueba de captura escucha 3 s cada entrada de audio para ver cuál lleva la música. Lo muestra también en pantalla.",
-  "version": "0.2.1",
+  "description": "Comprueba que la herramienta está y que suena música, y solo entonces, al pulsar un botón, crea un informe de solo lectura del sonido de la unidad: general, de SmartXbar y el Audio Manager, o la prueba de captura. Lo muestra en pantalla, página a página.",
+  "version": "0.3.0",
   "vendor": "custom",
   "loggingId": "OAP7",
   "iconGlyph": "AUD",
   "fonts": "es",
   "requires": {
-    "mgu-audio-probe": "0.3.1"
+    "mgu-audio-probe": "0.4.0"
   },
   "signals": {
     "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {
@@ -16,6 +16,15 @@
       "playerMetadata": "rs",
       "trackProgress": "rs",
       "_optional": "qué suena: la condición 2 (música sonando y vista por la unidad)"
+    },
+    "org.genivi.am.commandinterface.CommandControl": {
+      "_optional": "el gestor de audio: sus listas de salidas, fuentes y conexiones (solo lectura), para la exploración de SmartXbar",
+      "_instances": "1",
+      "_methods": [
+        "getListMainSinks",
+        "getListMainSources"
+      ],
+      "listOfMainConnections": "rs"
     }
   },
   "screens": [
@@ -25,12 +34,16 @@
       "title": "Audio probe",
       "buttons": [
         [
+          "BTN_SMARTX",
+          "Explorar SmartXbar"
+        ],
+        [
           "BTN_START",
           "Crear informe"
         ],
         [
           "BTN_CAPTURE",
-          "Prueba de captura (con música y en pausa)"
+          "Prueba de captura"
         ],
         [
           "BTN_PAGE",
