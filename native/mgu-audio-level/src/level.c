@@ -15,6 +15,8 @@
  *
  * Only while someone wants it: /dev/shm/mgu-audio-level.want touched in the last 15 s (music.js touches it while a
  * Music wave is on, the Audio probe app while it is shown). Otherwise one look at that file a second and nothing else.
+ * Also, once a second, /dev/shm/mgu-audio-level.status {"v","pid","uid","wanted","wantAge","ports","live","src","err","at"}:
+ * Audio probe shows from it why there is no level. --once prints what it sees, for a check by hand.
  * Build: gcc -static -O2 -o mgu-audio-level level.c -lm
  */
 #include <dirent.h>
@@ -35,6 +37,8 @@
 #define SHM "/dev/shm"
 #define OUT SHM "/mgu-audio-level.json"
 #define WANT SHM "/mgu-audio-level.want"
+#define STATUS SHM "/mgu-audio-level.status"
+#define VERSION "0.1.1"
 #define HEAD 240
 #define TAIL 4436
 #define BLOCK 6144                 /* 1536 frames x 4 bytes, one channel */
@@ -124,9 +128,47 @@ static double block_rms(const unsigned char *b) {
     return sqrt(s / FRAMES);
 }
 
+/* The want file is touched by the apps, each under a uid of its own (OAP): the first one to make it owns it, and in
+ * /dev/shm (sticky, 0644 by their umask) no other app could touch it again: Audio probe's touches failed silently
+ * when Ambient config had made it, and the other way round. So it is kept here as everybody's: made 0666 at the start,
+ * and given back 0666 whenever an app made it again. Its time is what counts. */
+static int want_age = -1;          /* seconds since the last touch, -1: no file */
 static int wanted(void) {
     struct stat st;
-    return stat(WANT, &st) == 0 && time(NULL) - st.st_mtime <= WANT_S;
+    if (stat(WANT, &st)) { want_age = -1; return 0; }
+    if ((st.st_mode & 0777) != 0666) chmod(WANT, 0666);
+    want_age = (int)(time(NULL) - st.st_mtime);
+    return want_age <= WANT_S;
+}
+static void make_want(void) {
+    int fd = open(WANT, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
+    if (fd >= 0) { fchmod(fd, 0666); close(fd); }
+    else fprintf(stderr, "mgu-audio-level: cannot make %s: %s\n", WANT, strerror(errno));
+}
+
+/* whole-file writes, replaced at once (a reader never sees half a file) */
+static int put(const char *path, const char *buf, int n) {
+    char tmp[128];
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    unlink(tmp);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (fd < 0) return -1;
+    int ok = write(fd, buf, (size_t)n) == n;
+    fchmod(fd, 0644); close(fd);
+    if (!ok || rename(tmp, path)) { unlink(tmp); return -1; }
+    return 0;
+}
+
+/* The heartbeat, once a second, idle or not: what Audio probe shows when there is no level ("the tool runs, nobody
+ * asks", "no buffers"...). */
+static char last_err[160];
+static void heartbeat(int w, const char *src, int live) {
+    char buf[400];
+    int n = snprintf(buf, sizeof buf, "{\"v\":\"%s\",\"pid\":%d,\"uid\":%d,\"wanted\":%s,\"wantAge\":%d,\"ports\":%d,"
+        "\"live\":%d,\"src\":\"%s\",\"err\":\"%s\",\"at\":%lld}\n", VERSION, (int)getpid(), (int)getuid(),
+        w ? "true" : "false", want_age, nports, live, src, last_err, wall_ms());
+    static int warned;
+    if (put(STATUS, buf, n) && !warned++) fprintf(stderr, "mgu-audio-level: cannot write %s: %s\n", STATUS, strerror(errno));
 }
 
 static void publish(double rms, const char *src) {
@@ -136,23 +178,73 @@ static void publish(double rms, const char *src) {
     if (level < 0) level = 0;
     if (level > 1) level = 1;
     int n = snprintf(buf, sizeof buf, "{\"level\":%.3f,\"db\":%.1f,\"src\":\"%s\",\"at\":%lld}\n", level, db, src, wall_ms());
-    int fd = open(OUT ".tmp", O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
-    if (fd < 0) return;
-    if (write(fd, buf, (size_t)n) == n) { fchmod(fd, 0644); close(fd); rename(OUT ".tmp", OUT); }
-    else close(fd);
+    if (put(OUT, buf, n)) {
+        snprintf(last_err, sizeof last_err, "cannot write %s: %s", OUT, strerror(errno));
+        static int warned;
+        if (!warned++) fprintf(stderr, "mgu-audio-level: %s\n", last_err);
+    } else last_err[0] = 0;
+}
+
+/* --once (Audio probe's "Music level" check, by hand over SSH): ten looks 50 ms apart, every buffer it maps printed
+ * with its channels, how many of them moved and their level. Nothing is written. */
+static int diagnose(void) {
+    int i, c, k;
+    int moved[MAXPORTS][MAXCH];
+    double peak[MAXPORTS];
+    memset(moved, 0, sizeof moved); memset(peak, 0, sizeof peak);
+    scan();
+    printf("mgu-audio-level %s --once: %d buffers mapped (uid %d)\n", VERSION, nports, (int)getuid());
+    for (k = 0; k < 10; k++) {
+        struct timespec ts = { 0, TICK_MS * 1000000L };
+        nanosleep(&ts, NULL);
+        for (i = 0; i < nports; i++) for (c = 0; c < ports[i].nch; c++) {
+            const unsigned char *b = ports[i].map + HEAD + (size_t)c * BLOCK;
+            uint32_t f = fingerprint(b);
+            if (f != ports[i].sig[c]) { moved[i][c]++; double r = block_rms(b); if (r > peak[i]) peak[i] = r; }
+            ports[i].sig[c] = f;
+        }
+    }
+    for (i = 0; i < nports; i++) {
+        int any = 0;
+        char mv[3 * MAXCH + 1] = "";
+        for (c = 0; c < ports[i].nch; c++) { any |= moved[i][c]; snprintf(mv + strlen(mv), sizeof mv - strlen(mv), "%d%s", moved[i][c], c + 1 < ports[i].nch ? "," : ""); }
+        if (!any) continue;
+        printf("  %-44s %s %dch moved/10 [%s] %.1f dB\n", ports[i].name, ports[i].amp ? "avb" : "sx ", ports[i].nch, mv,
+               peak[i] > 1e-7 ? 20 * log10(peak[i]) : -140.0);
+    }
+    int quiet = 0;
+    for (i = 0; i < nports; i++) { int any = 0; for (c = 0; c < ports[i].nch; c++) any |= moved[i][c]; quiet += !any; }
+    printf("  (%d more mapped, not moving)\n", quiet);
+    unmap_all();
+    return 0;
 }
 
 int main(int argc, char **argv) {
-    long long last_scan = 0;
-    int once = argc > 1 && !strcmp(argv[1], "--once");     /* one look, printed: for tests */
+    long long last_scan = 0, last_beat = 0;
+    if (argc > 1 && !strcmp(argv[1], "--once")) return diagnose();
     signal(SIGTERM, on_term); signal(SIGINT, on_term);
+    umask(0);
+    int was = -1;
+    fprintf(stderr, "mgu-audio-level %s: started as uid %d, waiting for %s\n", VERSION, (int)getuid(), WANT);
+    if (wanted() == 0 && want_age < 0) make_want();
     while (!stop) {
-        if (!once && !wanted()) { if (nports) unmap_all(); sleep(1); last_scan = 0; continue; }
+        int w = wanted();
         long long t = now_ms();
-        if (!last_scan || t - last_scan > RESCAN_MS) { scan(); last_scan = t; }
+        if (w != was) { fprintf(stderr, "mgu-audio-level: %s\n", w ? "asked for the level: reading" : "nobody asks: idle"); was = w; }
+        if (!w) {
+            if (nports) unmap_all();
+            last_scan = 0;
+            heartbeat(0, "none", 0);
+            sleep(1);
+            continue;
+        }
+        if (!last_scan || t - last_scan > RESCAN_MS) {
+            int before = nports; scan(); last_scan = t;
+            if (nports != before) fprintf(stderr, "mgu-audio-level: %d SmartXbar buffers mapped\n", nports);
+        }
         double best = 0, best_amp = 0;
         const char *src = "none", *src_amp = "none";
-        int i, c;
+        int i, c, nlive = 0;
         for (i = 0; i < nports; i++) {
             struct port *p = &ports[i];
             double lv = 0;
@@ -164,16 +256,18 @@ int main(int argc, char **argv) {
                 p->sig[c] = f;
             }
             if (!live) continue;
-            if (p->amp) { if (lv > best_amp) { best_amp = lv; src_amp = p->name; } }
-            else if (lv > best) { best = lv; src = p->name; }
+            nlive++;
+            if (p->amp) { if (lv >= best_amp) { best_amp = lv; src_amp = p->name; } }
+            else if (lv >= best) { best = lv; src = p->name; }
         }
         /* a player's own port when one plays, else what goes to the amplifier */
-        if (strcmp(src, "none")) publish(best, src); else publish(best_amp, src_amp);
-        if (once && once++ < 3) { struct timespec w = { 0, TICK_MS * 1000000L }; nanosleep(&w, NULL); continue; }
-        if (once) { FILE *f = fopen(OUT, "r"); char l[256]; if (f && fgets(l, sizeof l, f)) fputs(l, stdout); if (f) fclose(f); break; }
+        const char *from = strcmp(src, "none") ? src : src_amp;
+        publish(strcmp(src, "none") ? best : best_amp, from);
+        if (t - last_beat >= 1000) { last_beat = t; heartbeat(1, from, nlive); }
         struct timespec ts = { 0, TICK_MS * 1000000L };
         nanosleep(&ts, NULL);
     }
+    unlink(STATUS);
     unmap_all();
     return 0;
 }

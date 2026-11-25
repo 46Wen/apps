@@ -4,10 +4,9 @@
 Description=mgu-audio-level: the music's level from SmartXbar's buffers (read only), for the Music wave
 
 [Service]
-# no root: a user of its own in the two groups SmartXbar's and AVB's buffers belong to, read only
-DynamicUser=yes
-User=mgu-audio-level
-SupplementaryGroups=mgu_alsa mgu_avbs
+# root, as Audio probe's tool: the first try ran as a dynamic user in mgu_alsa / mgu_avbs and never wrote a level in
+# the car (0.1.0). It only maps SmartXbar's buffers read only and writes its own two files in /dev/shm.
+User=root
 NoNewPrivileges=yes
 ExecStart=/var/opt/mgu-audio-level/current/mgu-audio-level
 Restart=on-failure

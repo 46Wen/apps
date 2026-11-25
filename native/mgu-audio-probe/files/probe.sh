@@ -13,7 +13,7 @@
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.5.0
+VERSION=0.5.1
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
@@ -204,6 +204,25 @@ strs() {                                   # printable strings of a binary, 6 ch
     if busybox strings "$1" >/dev/null 2>&1; then busybox strings "$1" 2>/dev/null
     else tr -c '[:print:]' '\n' < "$1" 2>/dev/null | grep -E '.{6,}'; fi
 }
+# Step 5, why the Music level tool gives no level: its service, its last lines in the journal, its files in /dev/shm
+# (owner and mode: an app's uid owning the want file kept the others from touching it), and what it sees (--once:
+# ten looks, nothing written). First in the SmartXbar report, so it is on the first page photographed.
+level() {
+    L=/var/opt/mgu-audio-level/current/mgu-audio-level
+    sec "Music level (mgu-audio-level)"
+    [ -x "$L" ] && echo "installed: $L" || echo "NOT installed ($L missing)"
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "active: $(systemctl is-active mgu-audio-level.service 2>&1)  enabled: $(systemctl is-enabled mgu-audio-level.service 2>&1)"
+        systemctl show mgu-audio-level.service -p ExecMainStatus -p ExecMainPID -p NRestarts -p User -p Result 2>&1 | tr '\n' ' '; echo
+    fi
+    command -v journalctl >/dev/null 2>&1 && $T journalctl -u mgu-audio-level.service -n 14 --no-pager -o cat 2>&1 | cut -c 1-160
+    ls -ln /dev/shm/mgu-audio-level* 2>&1
+    echo "now $(date +%s 2>/dev/null)"
+    show /dev/shm/mgu-audio-level.status 400
+    show /dev/shm/mgu-audio-level.json 200
+    [ -x "$L" ] && $T "$L" --once 2>&1 | head -n 40
+}
+
 smartx() {
     echo "mgu-audio-smartx $VERSION  $STAMP"
     echo "Read only: SmartXbar and the Audio Manager as they are on this unit. Nothing played, connected or changed."
@@ -213,6 +232,8 @@ smartx() {
     echo "the looks (the counters up top, the audio below); s16 / s32 / f32 = the level of that area read three ways (dBFS)."
     echo "The music's buffer is the one that changes and whose level moves with it (and stops when paused)."
     echo "music: $(grep -o 'music [^,]*' /dev/shm/mgu-audio-am.txt 2>/dev/null | head -n 1)"
+    level
+    sec "SmartXbar's buffers"
     if [ -x "$PEEK" ]; then
         k=0
         for f in /dev/shm/smartx_*_ringbuffer /dev/shm/avb_*_ringbuffer; do
@@ -225,11 +246,11 @@ smartx() {
     sec "Audio Manager (from the app: sinks, sources, connections)"
     show /dev/shm/mgu-audio-am.txt 9000
     sec "SmartXbar ports in /dev/shm (names, without _connection / _ringbuffer)"
-    ls -1 /dev/shm 2>/dev/null | grep -E '^(smartx|avb)_' | sed -e 's/_connection$//' -e 's/_ringbuffer$//' | sort -u | tr '\n' ' ' | fold -w 160
+    ls -1 /dev/shm 2>/dev/null | grep -E '^(smartx|avb)_' | sed -e 's/_connection$//' -e 's/_ringbuffer$//' | sort -u | xargs -n 6 echo
     echo
     echo "other /dev/shm entries: $(ls -1 /dev/shm 2>/dev/null | grep -vE '^(smartx|avb)_' | tr '\n' ' ')"
     sec "/run/smartx"
-    ls -1 /run/smartx 2>&1 | tr '\n' ' ' | fold -w 160
+    ls -1 /run/smartx 2>&1 | xargs -n 6 echo
     echo
     sec "who maps which SmartXbar buffer"
     for p in /proc/[0-9]*; do

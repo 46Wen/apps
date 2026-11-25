@@ -1,14 +1,19 @@
 # Prueba en el coche: Audio probe
 
-## Paso 5: el volumen real (lo siguiente, unos 10 minutos)
+## Paso 5, segundo intento: el volumen real (unos 10 minutos)
 
-1. Arranca el coche. En el Store (rama **pruebas**) actualiza **Ambient config** (2.7.2602) y **Audio probe** (0.5.0):
-   instalan también la herramienta **Music level**. Reinicia la unidad si lo pide.
+La primera vez salía "esperando" todo el rato: el archivo con el que las apps piden el volumen era de la primera app
+que lo creaba, y la otra no podía tocarlo. Arreglado en Music level 0.1.1.
+
+1. Arranca el coche. En el Store (rama **pruebas**) actualiza **Music level** (0.1.1), **Audio probe** (app 0.5.1 y
+   herramienta 0.5.1) y **Ambient config** (2.7.2603). **Reinicia la unidad** después, aunque no lo pida.
 2. Pon música por **Bluetooth o USB**.
-3. Abre **Audio probe**: abajo, **Nivel de la música en vivo** debe moverse con la música (y quedarse en "nada suena"
-   en pausa). Haz un vídeo corto o una foto.
-4. Prueba también con **CarPlay** y con la **radio**: dime qué pone a la derecha de la barra (el nombre del puerto).
-5. **Ambient config → Animations → Music wave** con la música sonando: la ola debe ir más rápida y brillante cuanto
+3. Abre **Audio probe**: abajo, **Nivel de la música en vivo** debe moverse con la música. Si no, ahora dice por qué
+   (por ejemplo "la herramienta no está en marcha" o "no encuentra los buffers"): haz una foto de esa línea.
+4. Pulsa **Explorar SmartXbar** y, en **Informe**, fotografía la primera página y la siguiente (sección
+   **Music level**: estado del servicio, sus últimos mensajes y qué buffers se mueven).
+5. Cierra Audio probe y pon **CarPlay**: dime si sigue yendo lento.
+6. **Ambient config → Animations → Music wave** con la música sonando: la ola debe ir más rápida y brillante cuanto
    más alto suena, y casi parada en los silencios.
 
 ## Paso 4 (hecho el 25 de noviembre): los buffers de SmartXbar

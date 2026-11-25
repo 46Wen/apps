@@ -18,7 +18,18 @@ la música no pasa por ALSA sino por **SmartXbar**, y cada reproductor escribe e
 - En reposo: mira un archivo una vez por segundo.
 - Solo trabaja (20 veces por segundo, unos pocos KB leídos de memoria) mientras alguien toca
   `/dev/shm/mgu-audio-level.want`: la Music wave mientras está puesta y la app Audio probe mientras se ve. Límite del servicio: 5 % de CPU, 16 MB.
-- Sin root: usuario propio en los grupos `mgu_alsa` y `mgu_avbs`, solo lectura.
+- Corre como root (como la herramienta de Audio probe): la 0.1.0, con un usuario dinámico, nunca dio un nivel en el
+  coche. Solo mapea los buffers en lectura y escribe sus tres archivos en `/dev/shm`.
+
+## Por qué no daba nivel (0.1.0) y qué cambió en 0.1.1
+
+- **El archivo `.want` era de la primera app que lo creaba.** Cada app OAP corre con su propio uid y `/dev/shm`
+  tiene el bit *sticky*: si Ambient config lo creaba (0644), Audio probe ya no podía tocarlo, y al revés. El error se
+  callaba y la herramienta seguía en reposo. Ahora la herramienta lo crea y lo mantiene en 0666.
+- **Latido:** `/dev/shm/mgu-audio-level.status` una vez por segundo (`wanted`, `wantAge`, `ports`, `live`, `src`, `err`).
+  Audio probe dice con él qué pasa en vez de «esperando».
+- `mgu-audio-level --once`: diez miradas, imprime cada buffer que se mueve con sus canales y su nivel; no escribe nada.
+  Sale en el informe «Explorar SmartXbar» (sección «Music level»), junto con el estado del servicio y su journal.
 
 ## Compilar
 
