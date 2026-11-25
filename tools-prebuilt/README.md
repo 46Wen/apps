@@ -10,7 +10,7 @@ entrada de `component.json` dice dónde está su archivo; el Store calcula los s
 | `waze-on-cluster/` | 0.14.15 | release `waze-on-cluster@0.14.15` de robertnisipeanu/idrive-apps | `vendor/robertnisipeanu/native/waze-on-cluster` | GPL-3.0 |
 | `idrive7-renderd/` | 2.1.19 | `kit/renderd/prebuilt` de cauliflowermossgrape/idrive7-apps | `vendor/idrive7-apps/native/renderd` | MIT |
 | `mgu-inputgate/` | 1.2.1 | `kit/renderd/inputgate/tool` de cauliflowermossgrape/idrive7-apps | `vendor/idrive7-apps/native/renderd/inputgate` | MIT |
-| `jap-ridetube-d/` | 0.5.4 | release `catalog` de JustAnotherPU/ridetube | `vendor/ridetube/native/jap-ridetube-d`, `ytdec` | GPL-3.0 |
+| `jap-ridetube-d/` | 0.5.4 (46Wen: 0.5.401, on demand) | release `catalog` de JustAnotherPU/ridetube | `vendor/ridetube/native/jap-ridetube-d`, `ytdec` | GPL-3.0 |
 | `mgu-render-id7-touch/` | 1.4.0 | release `catalog` de JustAnotherPU/ridetube | `vendor/ridetube/native/mgu-render-id7-touch` | GPL-3.0 |
 
 Cada artefacto se comprobó contra el sha256 del `catalog.json` de su autor antes de desempaquetarlo.

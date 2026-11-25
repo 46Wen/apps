@@ -148,7 +148,8 @@ class Model {
     }
     active() { return ACTIVE.indexOf(this.state) >= 0; }
     /** the service answers this (hello's caps: health, related, hist, ytdlp, remote, proxy, stream) */
-    can(cap) { return this.caps.indexOf(cap) >= 0; }
+    // 46Wen: no downloads and no phone remote (not used on this car): their pages and buttons stay hidden
+    can(cap) { return cap !== 'download' && cap !== 'remote' && this.caps.indexOf(cap) >= 0; }
     _changed() { this.rev++; }
 
     /** a new display language (the Language setting): hello again with it (the service keeps a connection's last

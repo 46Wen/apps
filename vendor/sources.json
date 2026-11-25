@@ -73,7 +73,10 @@
       },
       "drop": [
         "kit/tools/.font-cache"
-      ]
+      ],
+      "patch": {
+        "jap_ridetube": "ridetube_on_demand"
+      }
     },
     {
       "dir": "robertnisipeanu",

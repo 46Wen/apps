@@ -1820,6 +1820,12 @@ Daemon.prototype.start = async function () {
     this.ytdlpNext = Date.now() + this.opts.ytdlpFirstMs;
     this.timers.push(setInterval(() => this.guard(() => this.ytdlpTick()), this.opts.tickMs));
     this.timers.push(setInterval(() => this.guard(() => this.downloadTick()), this.opts.tickMs));
+    // 46Wen: no app connected and nothing playing for 3 minutes: stop (the app starts it again when opened)
+    this.usedLast = Date.now();
+    this.timers.push(setInterval(() => this.guard(() => {
+        if (this.client || this.state === 'playing' || this.state === 'preparing') { this.usedLast = Date.now(); return; }
+        if (Date.now() - this.usedLast > 180000) { this.log('no app and nothing playing for 3 min: stopping'); process.kill(process.pid, 'SIGTERM'); }
+    }), 10000));
     this.keepWarm();
     this.prune();
     // The SOME/IP services may come up after us at boot: retry until the leftover check ran (logged when the reason changes)
@@ -2022,6 +2028,8 @@ Daemon.prototype.onLine = function (line) {
     case 'resume': return this.resume();
     case 'seek': return this.seek(m.ms);
     case 'stop': return this.stop('idle');
+    // 46Wen: the app's "¿Sigues aquí?" answered No (or not): the daemon's own clean stop, started again by the app
+    case 'quit': this.log('quit: asked by the app'); setTimeout(() => process.kill(process.pid, 'SIGTERM'), 200); return undefined;
     case 'video': return this.setVideo(!!m.on);
     case 'fill': return this.setFill(!!m.on);
     case 'quality': return this.requality(m.quality);
@@ -2346,6 +2354,7 @@ Daemon.prototype.stopDownload = function () {
 // autoEveryMs while signed in and on Wi-Fi (the uplink's wlan*: never on phone data, never with no lease). Their markers
 // carry auto: true; one goes once watched, or when newer videos push it out, or when the setting goes down
 Daemon.prototype.autoMax = function () {
+    if (process.env.MGU_YT_AUTODL !== 'on') return 0;   // 46Wen: auto-downloads off
     if (this.autoN === undefined) { const s = readJson(path.join(this.opts.stateDir, 'autodl.json')); this.autoN = s && s.max > 0 && s.max <= 10 ? Math.floor(s.max) : 0; }
     return this.autoN;
 };

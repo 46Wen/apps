@@ -1,0 +1,11 @@
+# 46Wen: RideTube's service only while RideTube is used: the app writes the want file when it is opened,
+# the service removes it when it stops ("¿Sigues aquí?" answered No, or no app for 3 minutes).
+[Unit]
+Description=jap-ridetube-d on demand: started when the RideTube app is opened
+
+[Path]
+PathExists=/dev/shm/jap-ridetube-d.want
+Unit=jap-ridetube-d.service
+
+[Install]
+WantedBy=multi-user.target

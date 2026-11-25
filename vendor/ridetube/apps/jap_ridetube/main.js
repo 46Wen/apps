@@ -1683,12 +1683,15 @@ mgu.run({
                     // where the kit runs the screen the rail has the pages: the header shows just the name
                     if (cv.own) G.frame(cv, ctx.theme(), [], -1); else G.frame(cv, ctx.theme(), TABS.map((m) => NAMES[m]), TABS.indexOf(mode));
                 }
+                onDemand.draw(cv, { mode, focus: focusKey, MID, W, H, C });
                 drawVolume(cv);
                 last = cv;
                 keepFocus(cv);
             }
             return ui.image('VIEW_GFX', last);
         }
+        // 46Wen: the service only while RideTube is used (ondemand.js)
+        const onDemand = require('./ondemand')({ ui, model, ctl, log });
         ctx.loop('VIEW', 10, render);
         // the Language setting changed (or, on Auto, the car's language): the new catalog, hello again with its lang and
         // region (feeds, search and related come in it), the page shown asks again, every text drawn or sent again

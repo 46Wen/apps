@@ -256,7 +256,113 @@ def ambient_music(app_dir):
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
-PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music, 'draggy_idle_hidden': draggy_idle_hidden}
+def ridetube_on_demand(app_dir):
+    """RideTube only while it is used (46Wen): ondemand.js from vendor/patches/jap_ridetube (the service started
+    when the app is opened, "¿Sigues aquí?" after a minute without playing, stopped on No or no answer), and the
+    downloads, auto-downloads and phone remote hidden (the owner uses none). yt-dlp's own updates stay. Goes with
+    the tool patch ridetube_d_on_demand. Fails (PatchError) when RideTube's code moved too far."""
+    shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'jap_ridetube', 'ondemand.js'), os.path.join(app_dir, 'ondemand.js'))
+
+    def edit(name, pairs):
+        p = os.path.join(app_dir, name)
+        s = open(p, encoding='utf-8').read()
+        for a, b in pairs:
+            if s.count(a) != 1:
+                raise PatchError('jap_ridetube %s: %r found %d times, expected once' % (name, a[:60], s.count(a)))
+            s = s.replace(a, b)
+        open(p, 'w', encoding='utf-8', newline='\n').write(s)
+        subprocess.run(['node', '--check', p], check=True)
+
+    edit('main.js', [
+        ("        ctx.loop('VIEW', 10, render);",
+         "        // 46Wen: the service only while RideTube is used (ondemand.js)\n"
+         "        const onDemand = require('./ondemand')({ ui, model, ctl, log });\n"
+         "        ctx.loop('VIEW', 10, render);"),
+        ("                drawVolume(cv);\n                last = cv;",
+         "                onDemand.draw(cv, { mode, focus: focusKey, MID, W, H, C });\n                drawVolume(cv);\n                last = cv;"),
+    ])
+    edit('yt.js', [
+        ("    can(cap) { return this.caps.indexOf(cap) >= 0; }",
+         "    // 46Wen: no downloads and no phone remote (not used on this car): their pages and buttons stay hidden\n"
+         "    can(cap) { return cap !== 'download' && cap !== 'remote' && this.caps.indexOf(cap) >= 0; }"),
+    ])
+    p = os.path.join(app_dir, 'app.json')
+    a = json.load(open(p, encoding='utf-8'))
+    for st in a.get('settings', []):
+        if st['key'] == 'auto_download':
+            st['hidden'] = True
+            st['default'] = 0
+    a['description'] = a['description'] + ' (46Wen: its service only while used; no downloads or phone remote)'
+    # the tool as patched here (tools-prebuilt): its 'quit' and its path unit
+    tc = json.load(open(os.path.join(ROOT, 'tools-prebuilt', 'jap-ridetube-d', 'component.json'), encoding='utf-8'))
+    a.setdefault('requires', {})['jap-ridetube-d'] = tc['version']
+    mark_version(a, 1)
+    open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
+
+
+RIDETUBE_D_REV = 1
+
+
+def ridetube_d_on_demand(tool_dir):
+    """RideTube's service only while RideTube is used (46Wen): not started with the car but by the path unit
+    jap-ridetube-d.path when the app writes /dev/shm/jap-ridetube-d.want; a 'quit' command (the app's "No" or no
+    answer) and, as a safety net, 3 minutes with no app connected and nothing playing end it (SIGTERM to itself: the
+    daemon's own clean stop); ExecStopPost removes the want file. Auto-downloads off. Fails (PatchError) when the
+    daemon's code moved too far."""
+    p = os.path.join(tool_dir, 'files', 'ytd.js')
+    s = open(p, encoding='utf-8').read()
+
+    def rep(a, b):
+        nonlocal s
+        if s.count(a) != 1:
+            raise PatchError('jap-ridetube-d ytd.js: %r found %d times, expected once' % (a[:60], s.count(a)))
+        s = s.replace(a, b)
+    rep("    case 'stop': return this.stop('idle');",
+        "    case 'stop': return this.stop('idle');\n"
+        "    // 46Wen: the app's \"¿Sigues aquí?\" answered No (or not): the daemon's own clean stop, started again by the app\n"
+        "    case 'quit': this.log('quit: asked by the app'); setTimeout(() => process.kill(process.pid, 'SIGTERM'), 200); return undefined;")
+    rep("    this.timers.push(setInterval(() => this.guard(() => this.downloadTick()), this.opts.tickMs));",
+        "    this.timers.push(setInterval(() => this.guard(() => this.downloadTick()), this.opts.tickMs));\n"
+        "    // 46Wen: no app connected and nothing playing for 3 minutes: stop (the app starts it again when opened)\n"
+        "    this.usedLast = Date.now();\n"
+        "    this.timers.push(setInterval(() => this.guard(() => {\n"
+        "        if (this.client || this.state === 'playing' || this.state === 'preparing') { this.usedLast = Date.now(); return; }\n"
+        "        if (Date.now() - this.usedLast > 180000) { this.log('no app and nothing playing for 3 min: stopping'); process.kill(process.pid, 'SIGTERM'); }\n"
+        "    }), 10000));")
+    rep("Daemon.prototype.autoMax = function () {\n",
+        "Daemon.prototype.autoMax = function () {\n    if (process.env.MGU_YT_AUTODL !== 'on') return 0;   // 46Wen: auto-downloads off\n")
+    open(p, 'w', encoding='utf-8', newline='\n').write(s)
+    subprocess.run(['node', '--check', p], check=True)
+
+    u = os.path.join(tool_dir, 'units', 'jap-ridetube-d.service')
+    s = open(u, encoding='utf-8').read()
+    rep("ExecStopPost=-/bin/sh -c 'umount /run/jap-ridetube-media 2>/dev/null; rmdir /run/jap-ridetube-media 2>/dev/null; true'",
+        "ExecStopPost=-/bin/sh -c 'umount /run/jap-ridetube-media 2>/dev/null; rmdir /run/jap-ridetube-media 2>/dev/null; true'\n"
+        "# 46Wen: started by jap-ridetube-d.path while RideTube is used; the want file goes with it\n"
+        "ExecStopPost=-/bin/rm -f /dev/shm/jap-ridetube-d.want")
+    open(u, 'w', encoding='utf-8', newline='\n').write(s)
+    open(os.path.join(tool_dir, 'units', 'jap-ridetube-d.path'), 'w', encoding='utf-8', newline='\n').write(
+        "# 46Wen: RideTube's service only while RideTube is used: the app writes the want file when it is opened,\n"
+        "# the service removes it when it stops (\"¿Sigues aquí?\" answered No, or no app for 3 minutes).\n"
+        "[Unit]\nDescription=jap-ridetube-d on demand: started when the RideTube app is opened\n\n"
+        "[Path]\nPathExists=/dev/shm/jap-ridetube-d.want\nUnit=jap-ridetube-d.service\n\n"
+        "[Install]\nWantedBy=multi-user.target\n")
+    p = os.path.join(tool_dir, 'component.json')
+    c = json.load(open(p, encoding='utf-8'))
+    if not any(x['name'] == 'jap-ridetube-d.path' for x in c['units']):
+        c['units'].append({'name': 'jap-ridetube-d.path', 'from': 'units/jap-ridetube-d.path'})
+    c['enable'] = [{'unit': 'jap-ridetube-d.path', 'target': 'multi-user.target'}]
+    c['restart'] = ['jap-ridetube-d.path']
+    c['description'] = c.get('description', '') + ' (46Wen: started only while the RideTube app is used)'
+    x, y, z = [int(n) for n in c['version'].split('.')]
+    c['version'] = '%d.%d.%d' % (x, y, z * 100 + RIDETUBE_D_REV)
+    open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(c, indent=2, ensure_ascii=False) + '\n')
+
+
+TOOL_PATCHES = {'jap-ridetube-d': ridetube_d_on_demand}
+
+
+PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music, 'draggy_idle_hidden': draggy_idle_hidden, 'ridetube_on_demand': ridetube_on_demand}
 
 PRIORITY_MARK = "require('./priority').lower(log, SPEC.config)"
 
@@ -464,6 +570,8 @@ def main():
                     if new == t['version']:
                         continue
                     replace(folder, out)
+                if t['id'] in TOOL_PATCHES:
+                    TOOL_PATCHES[t['id']](out)
                 summary['tools'].append({'id': t['id'], 'from': t['version'], 'to': new})
                 p = os.path.join(ROOT, 'tools-prebuilt', 'README.md')
                 s = open(p, encoding='utf-8').read().replace('| `%s/` | %s |' % (t['id'], t['version']), '| `%s/` | %s |' % (t['id'], new))
