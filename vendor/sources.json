@@ -25,7 +25,8 @@
         "native/renderd/prebuilt"
       ],
       "patch": {
-        "redline": "redline_no_hud"
+        "redline": "redline_no_hud",
+        "ambient_config": "ambient_music"
       }
     },
     {

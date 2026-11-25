@@ -14,7 +14,7 @@
 | **Redline** (`redline`) | Cuentarrevoluciones a pantalla completa con luces de cambio, marcha y puntuación de cambios. Sin la parte de HUD | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | MIT |
 | **Drag Timer** (`draggy`) | 0-100, ¼ de milla, 100-200, mejores tiempos | cauliflowermossgrape/idrive7-apps | MIT |
 | **Virtual Dyno** (`dyno`) | Curvas de potencia y par a partir de una aceleración a fondo | cauliflowermossgrape/idrive7-apps | MIT |
-| **Ambient config** (`ambient_config`) | Cualquier color en la luz ambiente, un color por modo de conducción, animaciones | cauliflowermossgrape/idrive7-apps | MIT |
+| **Ambient config** (`ambient_config`) | Cualquier color en la luz ambiente, un color por modo de conducción, animaciones, y una ola de colores con la música (Music wave) | cauliflowermossgrape/idrive7-apps + Music wave propia | MIT |
 | **DPF Monitor** (`dpf_monitor`) | Filtro de partículas y regeneraciones (diésel), solo lectura | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | GPL-3.0 |
 | **iDrive Monitor** (`jap_sysmon`) | CPU, memoria y swap de la unidad; avisa cuando va justa | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | MIT |
 | **Maps on cluster** (`robertn_waze_cluster`) | El mapa de CarPlay (Waze, Apple o Google Maps) en el cuadro | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | GPL-3.0 |

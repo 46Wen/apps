@@ -5,7 +5,7 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 
 | Carpeta | Origen | Commit | Licencia | Apps |
 |---|---|---|---|---|
-| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `874f7b8` | MIT | redline 2.0.51, draggy 2.7.2, dyno 1.6.5, ambient_config 2.7.26 |
+| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `874f7b8` | MIT | redline 2.0.51, draggy 2.7.2, dyno 1.6.5, ambient_config 2.7.26 (aquí 2.7.2601) |
 | `namelsmissing/` | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | `d552013` | GPL-3.0 | dpf_monitor 0.2.8 |
 | `justanotherpu/` | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | `42cd224` | MIT | jap_sysmon 1.0.6 |
 | `ridetube/` | [JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) | `eb0973b` | GPL-3.0 | jap_ridetube 0.6.4 |
@@ -19,6 +19,16 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
   quitan las seis interfaces que solo servían al HUD (navegación, CarPlay / Android Auto, llamadas), así
   la app se suscribe a menos señales, y los ajustes del HUD quedan ocultos. `hud.js` se queda porque la
   pantalla usa sus funciones de luces de cambio. Pasa `kit/tools/test_redline_running.js` (68 comprobaciones).
+- **Ambient config** (`idrive7-apps/apps/ambient_config`): con la animación **Music wave** (ola musical).
+  La ola de colores avanza solo mientras suena algo (estado multimedia del HMI, `HmiMediaState`, la misma
+  señal que el panel de música de Cluster Themes), se queda quieta en pausa y gira 45° de tono con cada
+  canción nueva. La señal solo se escucha mientras la Music wave está puesta. Preparada para el volumen real:
+  si algo en la unidad escribe `/dev/shm/mgu-audio-level.json` (`{"level": 0..1}` o solo el número, 10–20
+  veces por segundo), más volumen = ola más rápida, más amplia y más brillante. Ese captador nativo todavía
+  no existe: ninguna app puede leer el audio del coche. El código está en
+  `vendor/patches/ambient_config/music.js`; `scripts/vendor_sync.py` (`ambient_music`) lo vuelve a aplicar
+  tras cada actualización y pone la versión como x.y.(z·100+1) (2.7.26 → 2.7.2601) para que el Store la vea
+  más nueva. Pasa `tools/test_ambient_music.js` (36 comprobaciones).
 - `idrive7-apps/kit/localization/diagnostic-full.*.json` (25 MB, solo los usa el Fault Scanner) no se
   han traído: el coche descarga `kit/` en cada compilación.
 - `ridetube/kit/tools/.font-cache/` (una caché de 17 MB para hornear fuentes) no se ha traído.
