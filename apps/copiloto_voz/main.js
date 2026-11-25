@@ -159,20 +159,21 @@ mgu.run({
                     Object.keys(o).forEach((key) => walk(o[key], here, key));
                 };
                 walk(db, [], 'catalog');
-                log.info('windows fields: ' + hits.slice(0, 8).join(' || '));
-                // who refers to the holders (the attribute): any object whose values mention one of them
+                // which attribute (of which service) has one of the windows' wrapper types: its type names it exactly
+                const wrappers = Object.keys(holders).filter((h) => /Window.*Wrapper$/.test(h));
                 const refs = [];
                 const walk2 = (o, chain, k) => {
                     if (!o || typeof o !== 'object' || refs.length > 12) return;
                     const here = chain.concat([label(o, k)]);
                     Object.keys(o).forEach((key) => {
                         const v = o[key];
-                        if (typeof v === 'string' && key !== 'name' && Object.keys(holders).some((h) => h.length > 6 && h !== 'members' && v.indexOf(h) >= 0)) refs.push(here.slice(-4).join(' > ') + ' [' + key + '=' + v + ']');
-                        else walk2(v, here, key);
+                        if (typeof v === 'string' && key !== 'name' && wrappers.some((w) => v === w || v.slice(-(w.length + 1)) === '.' + w)) {
+                            refs.push(here.slice(-4).join(' > ') + ' [' + key + '=' + v.split('.').pop() + ']');
+                        } else walk2(v, here, key);
                     });
                 };
                 walk2(db, [], 'catalog');
-                log.info('windows holders: ' + Object.keys(holders).join(', ') + ' | used by: ' + refs.slice(0, 8).join(' || '));
+                log.info('windows attributes: ' + (refs.length ? refs.join(' || ') : 'none found for ' + wrappers.join(', ')));
             } catch (e) { log.warn('catalog walk: ' + e.message); }
             // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
             try {
