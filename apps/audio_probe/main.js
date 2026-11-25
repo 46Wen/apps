@@ -20,6 +20,7 @@
  */
 const fs = require('fs');
 const mgu = require('./kit/mgu');
+const G = require('./kit/gauges');
 
 const TOOL = '/var/opt/mgu-audio-probe/current/probe.sh';
 const REQUEST = '/dev/shm/mgu-audio-probe.request';
@@ -29,7 +30,7 @@ const MEDIA = '/media';
 const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';
 const PLAY_MS = 3000;              // the track's time not moving this long: paused
 const ANSWER_MS = 15000;           // the tool must say it runs within this, after the request
-const LINES = 17;                  // report lines on a page
+const LINES = 18;                  // report lines on a page
 
 /** The now-playing feed, as the head unit sends it: what plays and whether it moves. */
 function nowPlaying() {
@@ -104,86 +105,109 @@ mgu.run({
         };
         const pages = () => Math.max(1, Math.ceil(report.length / LINES));
 
+        // the kit's frame: the page tabs (Comprobar, Informe) up in the HMI's title strip where the kit runs the screen
+        // (touch), else a slim bar on top; the page itself from G.TOP down, never under BMW's own header
+        const TABS = ['Comprobar', 'Informe'];
+        const TOP = G.TOP;
         const row = (cv, y, ok, wait, title, sub) => {
-            cv.roundRect(24, y, 1000, 92, 14, C.tile);
-            cv.circle(70, y + 46, 18, ok ? C.green : wait ? C.amber : C.red);
+            cv.roundRect(24, y, 1000, 80, 14, C.tile);
+            cv.circle(66, y + 40, 18, ok ? C.green : wait ? C.amber : C.red);
             const badge = ok ? 'OK' : wait ? '..' : 'NO';
-            cv.text(badge, 70 - cv.textWidth(badge, 20, { font: 'bold', literal: true }) / 2, y + 53, 20, '#0a0d12', { font: 'bold', literal: true });
-            cv.text(title, 108, y + 40, 28, C.text, { font: 'bold', literal: true });
-            cv.text(sub, 108, y + 74, 20, ok ? C.dim : C.amber, { literal: true });
+            cv.text(badge, 66 - cv.textWidth(badge, 20, { font: 'bold', literal: true }) / 2, y + 47, 20, '#0a0d12', { font: 'bold', literal: true });
+            cv.text(title, 102, y + 34, 26, C.text, { font: 'bold', literal: true });
+            cv.text(sub, 102, y + 64, 19, ok ? C.dim : C.amber, { literal: true });
         };
 
         const mode = (st) => (st && st.mode === 'capture' ? 'capture' : 'report');
-        const drawChecks = (cv, s) => {
-            cv.text('Audio probe: el informe del sonido de la unidad', 24, 40, 26, C.text, { font: 'bold', literal: true });
-            row(cv, 60, s.tool, false, '1. La herramienta Audio probe',
+        const drawChecks = (cv, s, t) => {
+            const y0 = TOP + 10;
+            row(cv, y0, s.tool, false, '1. La herramienta Audio probe',
                 s.tool ? 'Instalada en la unidad' : 'No está: instale "Audio probe" (herramienta) en el Store y reinicie la unidad');
             const song = music.title ? (music.title + (music.artist ? ' - ' + music.artist : '')).slice(0, 70) : '';
-            row(cv, 162, s.music, !!music.title, '2. Música sonando',
+            row(cv, y0 + 90, s.music, !!music.title, '2. Música sonando',
                 s.music ? 'Suena: ' + song : music.title ? 'En pausa: ' + song + ' (pulse play)' : music.seen ? 'Nada sonando: ponga música (Bluetooth, CarPlay o USB)' : 'Esperando a que la unidad diga qué suena...');
-            row(cv, 264, s.usb.length > 0, false, '3. USB metido',
+            row(cv, y0 + 180, s.usb.length > 0, false, '3. USB metido',
                 s.usb.length ? 'Visto: ' + s.usb.map((n) => MEDIA + '/' + n).join(', ') : 'No hay ningún USB: meta uno (FAT32 o exFAT)');
-            const ready = s.tool && s.music && s.usb.length > 0;
-            // the right side: what happens next, the last report
-            cv.roundRect(1044, 60, 532, 296, 14, C.tile);
-            if (s.running || (asked && !s.st)) {
-                cv.text(askedMode === 'capture' ? 'Escuchando cada entrada...' : 'Creando el informe...', 1068, 110, 28, C.amber, { font: 'bold', literal: true });
-                cv.text('Unos segundos. No quite el USB.', 1068, 150, 20, C.dim, { literal: true });
+            const ready = s.tool && s.music && s.usb.length > 0, busy = s.running || !!asked;
+            // the right side: what happens next, the last result
+            const px = 1044, pw = 532, ph = 260;
+            cv.roundRect(px, y0, pw, ph, 14, C.tile);
+            const tx = px + 24;
+            if (busy) {
+                cv.text(askedMode === 'capture' ? 'Escuchando cada entrada...' : 'Creando el informe...', tx, y0 + 44, 26, C.amber, { font: 'bold', literal: true });
+                cv.text('Unos segundos. No quite el USB.', tx, y0 + 78, 19, C.dim, { literal: true });
             } else if (ready) {
-                cv.text('Todo listo', 1068, 110, 30, C.green, { font: 'bold', literal: true });
-                cv.text('1. Pulse el botón "Crear informe".', 1068, 150, 20, C.text, { literal: true });
-                cv.text('2. Luego "Prueba de captura" con música,', 1068, 178, 20, C.text, { literal: true });
-                cv.text('    y otra vez con la música en pausa.', 1068, 204, 20, C.text, { literal: true });
+                cv.text('Todo listo', tx, y0 + 44, 28, C.green, { font: 'bold', literal: true });
+                cv.text('1. "Crear informe".', tx, y0 + 78, 19, C.text, { literal: true });
+                cv.text('2. "Prueba de captura" con música y en pausa.', tx, y0 + 104, 19, C.text, { literal: true });
             } else {
-                cv.text('Faltan condiciones', 1068, 110, 28, C.red, { font: 'bold', literal: true });
-                cv.text('El informe solo se crea con las tres en verde.', 1068, 150, 20, C.dim, { literal: true });
+                cv.text('Faltan condiciones', tx, y0 + 44, 26, C.red, { font: 'bold', literal: true });
+                cv.text('El informe solo se crea con las tres en verde.', tx, y0 + 78, 19, C.dim, { literal: true });
             }
             const st = s.st;
             if (st && st.state === 'done') {
                 const when = new Date(st.at * 1000), hh = ('0' + when.getHours()).slice(-2) + ':' + ('0' + when.getMinutes()).slice(-2);
-                cv.text((mode(st) === 'capture' ? 'Última captura: ' : 'Último informe: ') + hh + ', ' + Math.round((st.bytes || 0) / 1024) + ' KB', 1068, 236, 22, C.text, { literal: true });
-                cv.text(st.usb && st.usb.length ? 'Copiado en el USB: ' + st.usb.join(', ') : 'NO se pudo copiar en el USB', 1068, 268, 20,
-                    st.usb && st.usb.length ? C.green : C.red, { literal: true });
-                if (st.file) cv.text(st.file, 1068, 296, 18, C.dim, { literal: true });
-                cv.text('"Ver informe" lo muestra aquí, página a página.', 1068, 330, 18, C.dim, { literal: true });
+                cv.text((mode(st) === 'capture' ? 'Última captura: ' : 'Último informe: ') + hh + ', ' + Math.round((st.bytes || 0) / 1024) + ' KB', tx, y0 + 150, 21, C.text, { literal: true });
+                const okUsb = st.usb && st.usb.length;
+                cv.text(okUsb ? 'Copiado en el USB: ' + st.usb.join(', ') : 'No se pudo copiar en el USB', tx, y0 + 180, 19, okUsb ? C.green : C.red, { literal: true });
+                if (!okUsb && st.usbWhy) cv.text(String(st.usbWhy).slice(0, 52), tx, y0 + 206, 17, C.amber, { literal: true });
+                cv.text('Está en la pestaña "Informe": hágale fotos.', tx, y0 + 236, 18, C.dim, { literal: true });
             }
-            cv.text('Solo lee: no reproduce sonido ni cambia nada. La captura solo escucha 3 s cada entrada libre.', 24, 396, 20, C.dim, { literal: true });
-            // the buttons are BMW's own, in the screen's menu (not in this picture): say where they are
-            cv.text('Los botones "Crear informe", "Prueba de captura" y "Ver informe" están en el menú de esta pantalla de BMW,', 24, 430, 20, C.text, { literal: true });
-            cv.text('como "Cambiar página" en Copiloto de voz (no dentro de este dibujo).', 24, 456, 20, C.text, { literal: true });
+            // the actions: on the page where the kit runs the screen (touch and controller), else in BMW's menu bar
+            const by = y0 + 280;
+            if (cv.own) {
+                G.button(cv, t, 24, by, 320, 60, 'Crear informe', doStart, { key: 'BTN_START', primary: ready && !busy, busy });
+                G.button(cv, t, 364, by, 400, 60, 'Prueba de captura', doCapture, { key: 'BTN_CAPTURE', primary: s.tool && s.usb.length > 0 && !busy, busy });
+                G.button(cv, t, 784, by, 300, 60, 'Ver informe', () => openReport(), { key: 'BTN_PAGE' });
+            } else {
+                cv.text('Los botones "Crear informe", "Prueba de captura" y "Ver informe" están en el menú de BMW de esta', 24, by + 24, 19, C.text, { literal: true });
+                cv.text('pantalla (como "Cambiar página" en Copiloto de voz). El informe también está en la pestaña "Informe".', 24, by + 50, 19, C.text, { literal: true });
+            }
         };
 
-        const drawReport = (cv) => {
-            const n = pages(), p = Math.min(page, n);
-            cv.text('Informe, página ' + p + ' de ' + n + '  (puede hacerle una foto)', 24, 34, 22, C.text, { font: 'bold', literal: true });
-            if (!report.length) { cv.text('Todavía no hay informe.', 24, 80, 22, C.dim, { literal: true }); return; }
-            report.slice((p - 1) * LINES, p * LINES).forEach((l, i) => {
-                let t = l;
-                while (t.length > 1 && cv.textWidth(t, 19, { literal: true }) > 1550) t = t.slice(0, Math.floor(t.length * 0.92));
-                cv.text(t, 24, 66 + i * 26, 19, /^=====/.test(l) ? C.amber : C.text, { literal: true });
-            });
+        const drawReport = (cv, t) => {
+            const n = pages(), p = Math.min(Math.max(page, 1), n);
+            const y0 = TOP + 8;
+            if (!report.length) {
+                cv.text('Todavía no hay informe: créelo en "Comprobar".', 24, y0 + 40, 22, C.dim, { literal: true });
+            } else {
+                report.slice((p - 1) * LINES, p * LINES).forEach((l, i) => {
+                    cv.text(l, 24, y0 + 24 + i * 22, 17, /^=====/.test(l) ? C.amber : C.text, { literal: true });
+                });
+            }
+            const by = G.pageBottom(cv) - 56;
+            cv.text('Página ' + p + ' de ' + n + '  (puede hacerle una foto)', cv.own ? 760 : 24, by + 34, 19, C.dim, { literal: true });
+            if (cv.own) {
+                G.button(cv, t, 24, by, 220, 50, 'Anterior', () => { page = p <= 1 ? n : p - 1; show(); }, { key: 'BTN_PREV' });
+                G.button(cv, t, 264, by, 220, 50, 'Siguiente', () => { page = p >= n ? 1 : p + 1; show(); }, { key: 'BTN_PAGE', primary: true });
+                G.button(cv, t, 504, by, 220, 50, 'Volver', () => { page = 0; show(); }, { key: 'BTN_BACK' });
+            }
         };
+
+        const openReport = () => { loadReport(); page = 1; note = ''; show(); };
 
         const show = () => {
             if (!ui.isVisible(SCREEN)) return;
             const s = state();
             // a report just done: read it, and say so
             if (s.st && s.st.state === 'done' && s.st.at !== lastDone) {
-                if (lastDone || asked) { loadReport(); note = mode(s.st) === 'capture' ? 'Captura hecha: "Ver informe" muestra los niveles.' : 'Informe creado.'; }
+                if (lastDone || asked) { loadReport(); note = mode(s.st) === 'capture' ? 'Captura hecha: está en la pestaña "Informe".' : 'Informe creado: está en la pestaña "Informe".'; }
                 lastDone = s.st.at; asked = 0;
             }
             if (asked && !s.running && Date.now() - asked > ANSWER_MS) {
                 asked = 0;
                 note = 'La herramienta no respondió: ¿está instalada? Reinicie la unidad una vez después de instalarla.';
             }
+            const t = ctx.theme();
             const cv = ctx.canvas(W, H);
             cv.clear(C.bg);
-            try { if (page === 0) drawChecks(cv, s); else drawReport(cv); } catch (e) { log.warn('draw: ' + e.message); }
-            if (note) cv.text(note, 24, 500, 20, C.amber, { literal: true });
+            G.frame(cv, t, TABS, page === 0 ? 0 : 1, []);
+            try { if (page === 0) drawChecks(cv, s, t); else drawReport(cv, t); } catch (e) { log.warn('draw: ' + e.message); }
+            if (note && page === 0) cv.text(note, 24, G.pageBottom(cv) - 8, 19, C.amber, { literal: true });
             ui.image('MAIN_GFX', cv);
         };
 
-        ui.onClick('BTN_START', () => {
+        function doStart() {
             const s = state();
             const missing = [!s.tool && 'la herramienta', !s.music && 'la música', !s.usb.length && 'el USB'].filter(Boolean);
             const anyway = missing.length === 1 && !s.music && Date.now() < anywayUntil;
@@ -203,9 +227,9 @@ mgu.run({
                 } catch (e) { note = 'No se pudo pedir: ' + e.message; }
             }
             show();
-        });
+        }
         // step 2: the capture test; the tool and the stick needed, the music played and then paused (two runs)
-        ui.onClick('BTN_CAPTURE', () => {
+        function doCapture() {
             const s = state();
             const missing = [!s.tool && 'la herramienta', !s.usb.length && 'el USB'].filter(Boolean);
             page = 0;
@@ -220,12 +244,13 @@ mgu.run({
                 } catch (e) { note = 'No se pudo pedir: ' + e.message; }
             }
             show();
-        });
-        ui.onClick('BTN_PAGE', () => {
-            if (page === 0) { loadReport(); page = 1; } else page = page >= pages() ? 0 : page + 1;
-            note = '';
-            show();
-        });
+        }
+        // BMW's menu bar (where the kit does not run the screen) and the page's own buttons do the same
+        ui.onClick('BTN_START', doStart);
+        ui.onClick('BTN_CAPTURE', doCapture);
+        ui.onClick('BTN_PAGE', () => { if (page === 0) openReport(); else { page = page >= pages() ? 1 : page + 1; show(); } });
+        // the tabs, touched or pressed: Comprobar, Informe (pressed again: its next page)
+        if (ctx.onTab) ctx.onTab((i) => { if (i === 0) { page = 0; show(); } else if (page === 0) openReport(); else { page = page >= pages() ? 1 : page + 1; show(); } });
         ui.onVisible((name, on) => { if (name === SCREEN && on) show(); });
         if (ctx.onLayout) ctx.onLayout(show);
         setInterval(show, 2000);

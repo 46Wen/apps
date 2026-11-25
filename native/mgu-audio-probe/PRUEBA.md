@@ -21,12 +21,14 @@ en una sola visita.
 6. Abre **Audio probe**. Espera a ver las tres comprobaciones en verde (OK):
    herramienta, música (con el título de la canción) y USB.
    Si la música suena pero sale en rojo o ámbar (puede pasar con CarPlay), pulsa *Crear informe* dos veces.
-7. Los botones están en el **menú de esa pantalla de BMW** (como "Cambiar página" en Copiloto de voz):
+7. Los botones están **en la propia pantalla** (táctiles; si no aparecen, en el menú de BMW de esa pantalla):
    - **Crear informe** → espera a "Informe creado".
    - **Prueba de captura** con la música **sonando** → espera a "Captura hecha" (unos 3 s por cada entrada).
    - **Pausa la música** y pulsa **Prueba de captura** otra vez.
-8. **Ver informe**: pasa las páginas. Si quieres, haz fotos de la primera página de cada uno.
-9. Saca el USB. Deben estar:
+8. Pestaña **Informe** (o **Ver informe**): pasa las páginas con *Siguiente* y **haz una foto de cada página**.
+   Si el USB no admite la copia (la pantalla dice por qué, por ejemplo *Read-only file system*), las fotos son el
+   informe: con las de la primera página del informe y de cada captura basta para empezar.
+9. Si el USB sí la admitió, sácalo. Deben estar:
    - `mgu-audio-probe-<fecha>.txt` (el informe)
    - dos `mgu-audio-capture-<fecha>.txt` (con música y en pausa)
 10. Mándame los tres archivos (o las fotos).
