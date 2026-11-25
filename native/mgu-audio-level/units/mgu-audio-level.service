@@ -1,0 +1,26 @@
+# mgu-audio-level (46Wen): the music's level for Ambient config's Music wave, from SmartXbar's ring buffers, read only.
+# Idle (one look a second at a file) unless the Music wave or the Audio probe app wants it; then 20 looks a second.
+[Unit]
+Description=mgu-audio-level: the music's level from SmartXbar's buffers (read only), for the Music wave
+
+[Service]
+# no root: a user of its own in the two groups SmartXbar's and AVB's buffers belong to, read only
+DynamicUser=yes
+User=mgu-audio-level
+SupplementaryGroups=mgu_alsa mgu_avbs
+NoNewPrivileges=yes
+ExecStart=/var/opt/mgu-audio-level/current/mgu-audio-level
+Restart=on-failure
+RestartSec=10
+Slice=background.slice
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=5%
+MemoryLimit=16M
+TasksMax=4
+LimitCORE=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

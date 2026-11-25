@@ -8,10 +8,10 @@
  *                 radio, plays while it has a title). The wave rolls only while something plays and stands still in a
  *                 pause; each new track moves the colours on TRACK_HUE degrees. A unit that never says (no HmiMediaState)
  *                 counts as playing: the wave just rolls.
- *   audio level   when something on the unit writes it: LEVEL_FILE, { "level": 0..1 } or a bare number, written whole
- *                 10-20 times a second. No app can read the car's sound (BMW's Audio Manager sends it to the amplifier,
- *                 apps only see the metadata), so this file is the place for a native helper that can; there is none in
- *                 this repository yet. With a fresh level (under LEVEL_STALE_MS old) louder is a faster wave, a wider
+ *   audio level   LEVEL_FILE, { "level": 0..1 } or a bare number, written whole 20 times a second by the tool
+ *                 mgu-audio-level (native/mgu-audio-level: it reads SmartXbar's audio buffers, read only), which works
+ *                 only while WANT_FILE was touched in the last 15 s: this touches it every WANT_MS while it is asked
+ *                 for the level (a Music wave drawn). With a fresh level (under LEVEL_STALE_MS old) louder is a faster wave, a wider
  *                 swing of colour and brighter, quiet is slow, narrow and dim, smoothed (fast up, slow down) so a beat
  *                 shows as a push and the lights don't flicker. Without one, a steady wave with the track.
  *
@@ -27,6 +27,8 @@
 const fs = require('fs');
 
 const LEVEL_FILE = process.env.MGU_AUDIO_LEVEL || '/dev/shm/mgu-audio-level.json';
+const WANT_FILE = '/dev/shm/mgu-audio-level.want';  // touched: mgu-audio-level reads the music for the next 15 s
+const WANT_MS = 5000;
 const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';
 const MEDIA_INSTANCE = 'HMI_CID';          // the centre display's (none is '1': BMW's app manager refuses that)
 const LEVEL_MS = 120;                      // the level file looked at at most this often
@@ -60,7 +62,7 @@ class Music {
         this._clock = 0; this._at = 0;
         this._env = null;                  // the smoothed level, null: none
         this._levelAt = 0;                 // when the last level was read (its file's time)
-        this._mtime = 0; this._lookAt = 0; this._missing = false;
+        this._mtime = 0; this._lookAt = 0; this._missing = false; this._wantAt = 0;
         this._watch = null; this._want = false; this._logged = 0;
     }
 
@@ -94,6 +96,11 @@ class Music {
     /** The audio level now, 0..1 (smoothed), or null: none fresh. Looks at the file when it is due. */
     level() {
         const now = this.now();
+        if (now - this._wantAt >= WANT_MS) {
+            this._wantAt = now;
+            // (the helper's "keep reading"; a car without it: a small empty file, nothing else)
+            try { this.fs.writeFileSync(WANT_FILE, ''); } catch (e) { /* no /dev/shm: no level */ }
+        }
         if (now - this._lookAt >= (this._missing ? MISSING_MS : LEVEL_MS)) { this._lookAt = now; this._read(); }
         if (this._env == null || now - this._levelAt > LEVEL_STALE_MS) return null;
         return this._env;

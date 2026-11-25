@@ -118,7 +118,7 @@ def ambient_music(app_dir):
     scenes.js, its button on the Animations tab, the media state as an optional signal, and the version as
     x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older than the original's next one.
     Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
-    PATCH_REV = 1
+    PATCH_REV = 2
     shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'ambient_config', 'music.js'), os.path.join(app_dir, 'music.js'))
 
     def edit(name, pairs):
@@ -190,6 +190,8 @@ def ambient_music(app_dir):
     x, y, z = (int(n) for n in a['version'].split('.'))
     a['version'] = '%d.%d.%d' % (x, y, z * 100 + PATCH_REV)
     a['description'] = a['description'] + ' (46Wen: with a Music wave)'
+    # the music's level, read from SmartXbar by the tool mgu-audio-level (installed with the app)
+    a.setdefault('requires', {})['mgu-audio-level'] = '0.1.0'
     a['signals']['de.bmw.infotainment.hmi.hmimediastate.HmiMediaState'] = {
         '_instances': 'HMI_CID',
         '_optional': 'now playing: the Music wave rolls while something plays, new colours each track (46Wen)',

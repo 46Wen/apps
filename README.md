@@ -24,6 +24,8 @@ Componentes nativos que se instalan solos con las apps que los necesitan (`tools
 
 **Audio probe** (app `audio_probe` y herramienta `mgu-audio-probe`, propias): un informe de solo lectura sobre cómo está montado el sonido de la unidad, para saber si se puede leer el volumen de la música. La app comprueba antes que suena música y que hay un USB, y el informe solo se crea al pulsar su botón. [Cómo usarlo](native/mgu-audio-probe/README.md)
 
+**Music level** (`mgu-audio-level`, propia, en `native/`): el volumen de la música en vivo para la Music wave de Ambient config, leído de los buffers de SmartXbar sin tocarlos. Se instala con Ambient config. [Cómo funciona](native/mgu-audio-level/README.md)
+
 **Node.js 22 (`jap-node22`) no está aquí:** su binario pesa 137 MB y GitHub no admite archivos de más de 100 MB. RideTube lo necesita: añade también el origen `JustAnotherPU/mgu-apps` (canal *Releases*) en el Store y se instala desde allí.
 
 ## Instalar

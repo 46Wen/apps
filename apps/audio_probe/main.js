@@ -31,7 +31,9 @@ const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';
 const PLAY_MS = 3000;              // the track's time not moving this long: paused
 const ANSWER_MS = 15000;           // the tool must say it runs within this, after the request
 const LINES = 22;                  // report lines on a page
-const AM_FILE = '/dev/shm/mgu-audio-am.txt';   // the Audio Manager's lists, for the SmartXbar report
+const AM_FILE = '/dev/shm/mgu-audio-am.txt';
+const LEVEL_FILE = '/dev/shm/mgu-audio-level.json';   // mgu-audio-level: the music's level, live (step 5)
+const LEVEL_WANT = '/dev/shm/mgu-audio-level.want';   // the Audio Manager's lists, for the SmartXbar report
 const CC_IF = 'org.genivi.am.commandinterface.CommandControl';
 
 /** The now-playing feed, as the head unit sends it: what plays and whether it moves. */
@@ -155,6 +157,15 @@ mgu.run({
                 if (okUsb) cv.text('Copiado en el USB: ' + st.usb.join(', '), tx, y0 + 180, 19, C.green, { literal: true });
                 cv.text('Está en la pestaña "Informe": hágale fotos.', tx, y0 + 236, 18, C.dim, { literal: true });
             }
+            // step 5: the music's level, live, from mgu-audio-level (it reads while this screen touches LEVEL_WANT)
+            const lv = readJson(LEVEL_FILE), fresh = lv && Date.now() - lv.at < 1500;
+            const ly = y0 + 372;
+            cv.text('Nivel de la música en vivo (Music level):', 24, ly, 20, C.text, { font: 'bold', literal: true });
+            cv.roundRect(470, ly - 20, 600, 26, 13, C.tile);
+            if (fresh) {
+                cv.roundRect(470, ly - 20, Math.max(26, 600 * Math.max(0, Math.min(1, lv.level))), 26, 13, lv.level > 0.8 ? C.amber : C.green);
+                cv.text((lv.src === 'none' ? 'nada suena' : Math.round(lv.db) + ' dB  ' + lv.src), 1090, ly, 18, C.dim, { literal: true });
+            } else cv.text(fs.existsSync('/var/opt/mgu-audio-level/current/mgu-audio-level') ? 'esperando...' : 'falta la herramienta Music level', 1090, ly, 18, C.amber, { literal: true });
             // the actions: on the page where the kit runs the screen (touch and controller), else in BMW's menu bar
             const by = y0 + 280;
             if (cv.own) {
@@ -188,8 +199,10 @@ mgu.run({
 
         const openReport = () => { loadReport(); page = 1; note = ''; show(); };
 
+        let wantAt = 0;
         const show = () => {
             if (!ui.isVisible(SCREEN)) return;
+            if (Date.now() - wantAt > 5000) { wantAt = Date.now(); try { fs.writeFileSync(LEVEL_WANT, ''); } catch (e) { /* none */ } }
             const s = state();
             // a report just done: read it, and say so
             if (s.st && s.st.state === 'done' && s.st.at !== lastDone) {
@@ -304,7 +317,9 @@ mgu.run({
         if (ctx.onTab) ctx.onTab((i) => { if (i === 0) { page = 0; show(); } else if (page === 0) openReport(); else { page = page >= pages() ? 1 : page + 1; show(); } });
         ui.onVisible((name, on) => { if (name === SCREEN && on) show(); });
         if (ctx.onLayout) ctx.onLayout(show);
-        setInterval(show, 2000);
+        // the live level moves: four frames a second on the checks page, else every 2 s
+        let ticks = 0;
+        setInterval(() => { ticks++; if (page === 0 || ticks % 8 === 0) show(); }, 250);
 
         const w = await ctx.signals.watch(MEDIA_IF, 'HMI_CID', {
             playerMetadata: (v) => { music.feed('meta', v); },

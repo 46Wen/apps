@@ -2,13 +2,14 @@
   "id": "audio_probe",
   "title": "Audio probe",
   "description": "Comprueba que la herramienta está y que suena música, y solo entonces, al pulsar un botón, crea un informe de solo lectura del sonido de la unidad: general, de SmartXbar y el Audio Manager, o la prueba de captura. Lo muestra en pantalla, página a página.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "vendor": "custom",
   "loggingId": "OAP7",
   "iconGlyph": "AUD",
   "fonts": "es",
   "requires": {
-    "mgu-audio-probe": "0.5.0"
+    "mgu-audio-probe": "0.5.0",
+    "mgu-audio-level": "0.1.0"
   },
   "signals": {
     "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {

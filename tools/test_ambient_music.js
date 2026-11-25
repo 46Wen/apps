@@ -21,6 +21,7 @@ const file = { text: null, mtime: 0, stats: 0, reads: 0 };
 const fakeFs = {
     statSync: () => { file.stats++; if (file.text == null) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; } return { mtimeMs: file.mtime }; },
     readFileSync: () => { file.reads++; return file.text; },
+    writeFileSync: (f) => { file.wants = (file.wants || 0) + (f === '/dev/shm/mgu-audio-level.want' ? 1 : 0); },
 };
 const write = (text) => { file.text = text; file.mtime = now; };
 const mk = () => new Music({ log, now: () => now, fs: fakeFs, file: '/x' });
@@ -70,10 +71,11 @@ ok(m.clock() - c3 <= 1000, 'a long gap: at most a second on');
 
 // the level: fresh drives it, smoothed fast up and slow down; stale or missing: none; not read more than every LEVEL_MS
 m = mk();
-file.text = null; file.stats = 0;
+file.text = null; file.stats = 0; file.wants = 0;
 ok(m.level() === null, 'no file: no level');
 now += 100; m.level(); now += 100; m.level();
 ok(file.stats === 1, 'a missing file is not looked for on every frame (' + file.stats + ')');
+ok(file.wants === 1, 'the level helper asked to read (mgu-audio-level.want touched), once per 5 s (' + file.wants + ')');
 now += 6000; write('1');
 const up = m.level();
 ok(up === 1, 'the first level as it is');

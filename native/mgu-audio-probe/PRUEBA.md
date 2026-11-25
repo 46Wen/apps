@@ -1,6 +1,17 @@
 # Prueba en el coche: Audio probe
 
-## Paso 4: los buffers de SmartXbar (lo siguiente, unos 10 minutos)
+## Paso 5: el volumen real (lo siguiente, unos 10 minutos)
+
+1. Arranca el coche. En el Store (rama **pruebas**) actualiza **Ambient config** (2.7.2602) y **Audio probe** (0.5.0):
+   instalan también la herramienta **Music level**. Reinicia la unidad si lo pide.
+2. Pon música por **Bluetooth o USB**.
+3. Abre **Audio probe**: abajo, **Nivel de la música en vivo** debe moverse con la música (y quedarse en "nada suena"
+   en pausa). Haz un vídeo corto o una foto.
+4. Prueba también con **CarPlay** y con la **radio**: dime qué pone a la derecha de la barra (el nombre del puerto).
+5. **Ambient config → Animations → Music wave** con la música sonando: la ola debe ir más rápida y brillante cuanto
+   más alto suena, y casi parada en los silencios.
+
+## Paso 4 (hecho el 25 de noviembre): los buffers de SmartXbar
 
 1. Arranca el coche. En el Store (origen `46Wen/apps`, rama **pruebas**) actualiza **Audio probe**: app 0.4.0 y
    herramienta 0.5.0. Reinicia la unidad si lo pide.

@@ -1,0 +1,19 @@
+{
+  "id": "mgu-audio-level",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "Music level",
+  "description": "The music's level, live, for Ambient config's Music wave: read from SmartXbar's audio buffers without touching them (read only, nothing played or changed), 20 times a second only while the Music wave or Audio probe wants it, idle otherwise.",
+  "mguHmi": ["ID7"],
+  "files": [
+    { "path": "mgu-audio-level", "mode": "0755", "from": "files/mgu-audio-level" }
+  ],
+  "units": [
+    { "name": "mgu-audio-level.service", "from": "units/mgu-audio-level.service" }
+  ],
+  "enable": [
+    { "unit": "mgu-audio-level.service", "target": "multi-user.target" }
+  ],
+  "recmgr": [],
+  "restart": ["mgu-audio-level.service"]
+}
