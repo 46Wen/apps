@@ -70,6 +70,20 @@ Se abre la página Diagnóstico: cada aviso en azul (en cola), verde (sonó) o r
 grabación», «el coche no conectó el audio», «el reproductor no pudo con el archivo»). Lo que no suena en 5 minutos sale
 en rojo. El detalle, en la página Registro. **Probar la siguiente frase** sigue reproduciéndolas una a una.
 
+## Aprender las ventanillas
+
+Ninguna app pública lee las ventanillas, así que la app aprende de su coche qué campo dice «abierta». En el menú,
+**Aprender ventanillas** (se abre la página Diagnóstico y abajo sale qué hacer):
+
+1. Con todo cerrado y el contacto dado, pulse **Aprender ventanillas** dos veces: la primera empieza, la segunda guarda
+   «todo cerrado».
+2. Abra la ventanilla del conductor y pulse otra vez. Ciérrela, abra la del acompañante y pulse; y así con las traseras
+   y el techo. Si una no la tiene o no quiere enseñarla, pulse sin abrir nada: se salta.
+3. Al final dice cuántas aprendió. Desde entonces la fila **Puertas y ventanillas** de Diagnóstico muestra en directo
+   qué está abierto, y el aviso de ventanillas al apagar usa lo aprendido (se guarda; volver a aprender lo sustituye).
+
+Hasta aprenderlas, la app adivina por el nombre de los campos («sin aprender» en Diagnóstico). Las puertas no cuentan.
+
 ## Cómo suena
 
 Como RideTube (JustAnotherPU/ridetube, probado en un X5 G05): el gestor de audio de BMW conecta la fuente de medios
@@ -82,8 +96,7 @@ Todo está probado fuera del coche, no en él todavía. Si algo no funciona, la 
 (`copiloto_voz.log`) dicen por qué:
 
 - **El sonido** desde una app (RideTube lo hace desde un servicio): la demo.
-- **Ventanillas y techo**: ninguna app los lee aún; el registro guarda una vez los campos que manda el coche
-  (`doors/windows fields: …`) para ajustarlo.
+- **Ventanillas y techo**: hay que enseñárselas una vez (Aprender ventanillas, arriba).
 - **El aviso de neumáticos de BMW**: se reconoce por el nombre del mensaje de Check Control (en español, alemán o
   inglés); el registro anota los mensajes activos.
 - **Mantenimiento** (la lista de Service), **aceite**, **llamadas**:

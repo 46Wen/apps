@@ -2,7 +2,7 @@
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
   "description": "Su copiloto con voz (español, voz Elvira): bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas. Con demo, diagnóstico y registro.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "vendor": "custom",
   "autostart": true,
   "requires": {
@@ -88,6 +88,10 @@
         [
           "BTN_DEMO",
           "Demo: viaje simulado con los 10 avisos"
+        ],
+        [
+          "BTN_LEARN",
+          "Aprender ventanillas"
         ],
         [
           "BTN_TEST",

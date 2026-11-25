@@ -37,6 +37,7 @@ const { phraseFor } = require('./phrases');
 const D = require('./decode');
 const V = require('./voices');
 const { Demo } = require('./demo');
+const { Windows } = require('./windows');
 
 const PHRASES = ['bienvenida', 'bienvenida_manana', 'bienvenida_tarde', 'bienvenida_noche'].concat(EVENTS.filter((e) => e !== 'bienvenida'));
 const TITLES = { combustible: 'Combustible', neumaticos: 'Neumáticos', hielo: 'Posible hielo', motor_frio: 'Motor frío',
@@ -119,6 +120,25 @@ mgu.run({
         };
         recordings();
         demo = new Demo({ add: (ev) => announcer.add(ev), log: (m) => log.info(m) });
+        const winFile = path.join(bg.dataDir, 'ventanillas.json');
+        let winSaved = null;
+        try { winSaved = JSON.parse(fs.readFileSync(winFile, 'utf8')); } catch (e) { /* nothing learned yet */ }
+        const windows = new Windows(winSaved);
+        log.info('windows: ' + (windows.learned() ? windows.summary() : 'not learned yet: guessed by field name'));
+        const learnWindows = () => {
+            const r = windows.press();
+            log.info('windows learn: ' + r.msg + (windows.lastFields && windows.lastFields.length ? ' [' + windows.lastFields.map((k) => k + '=' + JSON.stringify(windows.last[k])).join(', ') + ']' : ''));
+            if (r.save) {
+                try { fs.writeFileSync(winFile, JSON.stringify(r.save)); } catch (e) { log.warn('windows: ' + e.message); }
+            }
+            if (windows.last) {
+                const o = windows.open() || D.openingsOf(windows.last);
+                mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado') + (windows.learned() ? '' : ' (sin aprender)'));
+                engine.openings(o);
+            }
+            changed();
+            return r.msg;
+        };
         const startDemo = () => {
             if (engine.state().cond === 10) { log.warn('demo: only parked (the car is drive-ready)'); return 'Solo con el coche parado'; }
             if (demo.running) return 'La demo ya está en marcha';
@@ -181,13 +201,15 @@ mgu.run({
                 engine.service(items);
             },
         }, { pollMs: 10 * 60000 });
-        // windows and the roof: the fields this car sends are logged once, to confirm which ones say "open"
+        // windows and the roof: learned from the car (windows.js, «Aprender ventanillas»), else guessed by field name;
+        // the fields this car sends are logged once
         let doorKeys = false;
         await W('de.bmw.body.DoorsWindowsRoofMirrors', ['ventanillas'], { CentralLockingSystemAndPanelStatus: (v) => {
             if (!doorKeys && v && typeof v === 'object') { doorKeys = true; log.info('doors/windows fields: ' + JSON.stringify(v).slice(0, 900)); }
-            const o = D.openingsOf(v);
-            mark('ventanillas', o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado (' + Object.keys(v || {}).length + ' campos)');
-            engine.openings(D.openingsOf(v));
+            windows.feed(v);
+            const o = windows.open() || D.openingsOf(v);
+            mark('ventanillas', (o.length ? 'abierto: ' + o.join(', ') : 'todo cerrado') + (windows.learned() ? '' : ' (sin aprender)'));
+            engine.openings(o);
             changed();
         } });
         // the audio side ready before the first phrase
@@ -195,7 +217,7 @@ mgu.run({
         };
         setTimeout(() => { subscribe().catch((e) => log.error('subscribe', e)); }, 0);
         setInterval(() => { engine.tick(); announcer.pump(); demo.expire(); saveMemo(); }, 5000);
-        return { engine, speaker, announcer, demo, startDemo, sig, SIGNALS, lastResult, ring, lang, voice, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
+        return { engine, speaker, announcer, demo, startDemo, windows, learnWindows, sig, SIGNALS, lastResult, ring, lang, voice, inCall: () => call > 0, onChange: (fn) => listeners.push(fn) };
     },
 
     async start(ctx) {
@@ -364,6 +386,11 @@ mgu.run({
         if (ctx.ui.onClick) {
             ctx.ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; show(); });
             if (ctx.onTab) ctx.onTab((i) => { if (i >= 0 && i < PAGES.length && i !== page) { page = i; show(); } });
+            ctx.ui.onClick('BTN_LEARN', () => {
+                note = bgs.learnWindows();
+                page = 1;
+                show();
+            });
             ctx.ui.onClick('BTN_DEMO', () => {
                 const why = bgs.startDemo();
                 note = why || 'Demo: un viaje simulado con los 10 avisos, uno tras otro (unos dos minutos)';

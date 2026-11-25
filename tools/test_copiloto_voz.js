@@ -240,6 +240,23 @@ ok(r.said.length === 0, 'welcome off in the settings');
     d2.run(); d2.expire(Date.now() + 6 * 60000);
     ok(!d2.running && d2.summary().failed === 10, 'demo: never said -> failed after 5 minutes');
 
+    // windows.js: learned from the car: closed, then each opening (a press with nothing changed skips it)
+    const { Windows } = require(path.join(APP, 'windows'));
+    const wv = { statusDoorSwitchDRD: 0, fhDR: 'ZU', fhPS: 'ZU', shd: 0, lock: 1 };
+    const w = new Windows(null);
+    ok(w.open() === null && /no llega/.test(w.press().msg), 'windows: nothing learned, no signal yet');
+    w.feed(Object.assign({}, wv));
+    w.press(); w.press();                                              // start, everything closed
+    w.feed(Object.assign({}, wv, { fhDR: 'AUF', statusDoorSwitchDRD: 1 })); w.press();   // driver's window (+ the door: ignored)
+    w.feed(Object.assign({}, wv, { fhPS: 'AUF' })); w.press();          // passenger's
+    w.press(); w.press();                                              // the rear ones: nothing changed, skipped
+    w.feed(Object.assign({}, wv, { shd: 35 })); const wr = w.press();    // the roof, as a position
+    ok(wr.done && wr.save && Object.keys(wr.save.fields).sort().join() === 'fhDR,fhPS,shd', 'windows learned: ' + JSON.stringify(wr.save && wr.save.fields));
+    w.feed(Object.assign({}, wv, { fhDR: 'AUF', shd: 10 }));
+    ok(w.open().join() === 'ventanilla del conductor,techo', 'windows open from what was learned, got ' + w.open());
+    const w2 = new Windows(wr.save); w2.feed(Object.assign({}, wv));
+    ok(w2.learned() && w2.open().length === 0, 'windows: learned kept across starts, all closed');
+
     console.log('copiloto_voz: ' + checks + ' checks, ' + fails + ' failed');
     process.exit(fails ? 1 : 0);
 })().catch((e) => { console.log('FAIL ' + (e && e.stack || e)); process.exit(1); });
