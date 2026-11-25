@@ -20,6 +20,7 @@ const SOURCE_ID = 1046, SINK_ID = 1024;     // the apps' media source and the ma
 const LANG = 7695972;                       // the languageCode RideTube passes to playFile
 const MAX_PHRASE_MS = 20000;                // a phrase that has not ended by then is stopped
 const TMP_DIR = '/tmp/copiloto_voz';
+const ROUTE_MS = 700;      // after the connection is up: the amplifier's ramp, so the first syllable is heard
 // each folder on the way to f: its mode and owner, to see in the log which one stops BMW's media engine
 function modes(f) {
     const out = [];
@@ -49,12 +50,23 @@ class Speaker {
         this.state = null;                  // the player's state, as it says it
         this.time = null;                   // {elapsed, total}
         this.ended = null;                  // resolves the phrase playing now
+        this.lastConnId = null;            // our last connection (listed a moment after its disconnect)
         this.useCopy = null;                // 'copy' | 'tmp': the place that worked where the installed file did not
         this.modesLogged = false;
     }
 
     /** The file for a phrase (bienvenida -> bienvenida.m4a ...), or null. */
     file(name) {
+        // looked up once: a found file is kept, a missing one looked for again after a minute
+        const c = this._files || (this._files = {});
+        const hit = c[name];
+        if (hit && (hit.path || Date.now() - hit.at < 60000)) return hit.path;
+        const p = this._find(name);
+        c[name] = { path: p, at: Date.now() };
+        return p;
+    }
+
+    _find(name) {
         const dirs = typeof this.dirs === 'function' ? this.dirs() : this.dirs;
         for (let i = 0; i < dirs.length; i++) {
             for (let j = 0; j < EXT.length; j++) {
@@ -81,12 +93,14 @@ class Speaker {
                 const watch = (name, fn) => this.signals.on(this.mp, name, fn, { warn: (m) => this.log.warn(m) }).catch((e) => this.log.warn('subscribe ' + name + ': ' + errText(e)));
                 await watch('playerState', (v) => {
                     this.state = typeof v === 'object' && v ? (v.playerState || JSON.stringify(v)) : v;
-                    if (this.ended && /STOP/.test(String(this.state)) && this.started) this.ended('player stopped');
+                    if (this.ended && /STOP/.test(String(this.state)) && this.started && Date.now() - this.playAt > 700) this.ended('player stopped');
                     if (/PLAY/.test(String(this.state))) this.started = true;
                 });
                 await watch('currentItemTime', (v) => {
                     this.time = v;
-                    if (this.ended && v && v.total > 0 && v.elapsed >= v.total - 150) this.ended('end of the phrase');
+                    // the end of THIS phrase: the player playing it (PLAY seen since playFile) for a moment at least; the
+                    // last item's time, still sent right after playFile, is not taken for it
+                    if (this.ended && this.started && Date.now() - this.playAt > 700 && v && v.total > 0 && v.elapsed >= v.total - 150) this.ended('end of the phrase');
                 });
                 await watch('playbackErrorEvent', (v) => {
                     const ev = v && (v.event !== undefined ? v.event : v);
@@ -114,23 +128,35 @@ class Speaker {
         if (!file) throw new Error('falta la grabación ' + name);
         await this.init();
         this.busy = true;
-        let connId = null, before = null;
+        let connId = null, before = null, onShared = false;
         try {
             const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
             const conns = Array.isArray(list) ? list : [];
-            // the apps' media source already on the speakers (RideTube open): only a video that is playing stops the
-            // phrase; RideTube paused or stopped, the phrase is said on its connection, which is left as it was
-            const shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
+            // the apps' media source already on the speakers (RideTube open): the phrase is said on that connection, which
+            // is left as it was. A video playing is stopped first: RideTube holds it as paused where it was (its
+            // service treats a STOP it did not ask for mid-file so), and the driver resumes it with Play
+            let shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
+            // our own connection of the last phrase, still listed for a moment after its disconnect: not RideTube's
+            if (shared && this.lastConnId !== null && shared.mainConnectionID === this.lastConnId) {
+                shared = (await this._gone(this.lastConnId)) ? null : shared;
+                if (!shared) conns.splice(0, conns.length, ...((await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null)) || []));
+            }
             if (shared) {
+                onShared = true;
                 const st = await this.signals.get(this.mp, 'playerState').catch(() => this.state);
-                const playing = /PLAY/.test(String(st && typeof st === 'object' ? st.playerState : st)) && !/PAUSE|STOP/.test(String(st && typeof st === 'object' ? st.playerState : st));
-                if (playing) throw new Error('RideTube está reproduciendo: no habla encima');
-                this.log.info('speaker: the media source is already connected (RideTube open, not playing): said on it');
+                const s0 = String(st && typeof st === 'object' ? st.playerState : st);
+                if (/PLAY/.test(s0) && !/PAUSE|STOP/.test(s0)) {
+                    await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
+                    await sleep(500);
+                    this.log.info('speaker: RideTube was playing: stopped for the phrase (it stays paused)');
+                    this.interrupted = true;
+                } else this.log.info('speaker: the media source is already connected (RideTube open, not playing): said on it');
             } else {
                 before = conns.filter((c) => c && c.sinkID === SINK_ID)[0] || null;
                 const r = await this.signals.call(this.cc, 'connect', { sourceID: SOURCE_ID, sinkID: SINK_ID }, 5000);
                 if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
                 connId = r.mainConnectionID;
+                await this._routed(connId);
             }
             // BMW's media engine opens the file as its own user: every folder on the way must let it through
             // (RideTube's cache is 0711 under /var/opt). Installed, then a copy in the data folder, then one in /tmp
@@ -147,27 +173,75 @@ class Speaker {
                 if (!this.modesLogged) this.log.info('speaker: folders: ' + modes(f));
                 if (i === tries.length - 1) this.modesLogged = true;
             }
+            this._audioState('after ' + name).catch(() => {});
             if (/^error/.test(reason)) throw new Error('el reproductor no pudo con ' + path.basename(file) + ' (' + why.join('; ') + ')');
             this.lastSaid = { name: name, at: Date.now() };
             this.lastError = null;
-            this.log.info('speaker: said ' + name + ' (' + reason + ')');
+            this.log.info('speaker: said ' + name + ' (' + reason + (this.time && this.time.total ? ', ' + this.time.elapsed + ' of ' + this.time.total + ' ms' : '') + ', player ' + this.state + ')');
         } finally {
+            if (onShared) await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
             if (connId !== null) {
                 await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
                 const d = await this.signals.call(this.cc, 'disconnect', { mainConnectionID: connId }, 5000).catch((e) => errText(e));
                 this.log.info('speaker: disconnect ' + JSON.stringify(d));
+                this.lastConnId = connId;
+                await this._gone(connId);
                 if (before) await this._restore(before);
             }
             this.busy = false;
         }
     }
 
+    // the connection actually on the speakers before the phrase: connect answers at once, but the Audio Manager ramps
+    // the amplifier up after; a phrase of 2 s played meanwhile is not heard. Waits for CS_CONNECTED (at most 3 s), then
+    // a little more for the ramp; the connection's fields are logged once, to see what this car sends
+    async _routed(id) {
+        const t0 = Date.now();
+        let c = null;
+        for (let i = 0; i < 15; i++) {
+            const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+            c = Array.isArray(list) ? list.filter((x) => x && x.mainConnectionID === id)[0] : null;
+            const st = c && c.connectionState;
+            if (st === 'CS_CONNECTED' || st === 2) break;
+            await sleep(200);
+        }
+        if (!this.connLogged) { this.connLogged = true; this.log.info('speaker: connection ' + JSON.stringify(c)); }
+        await sleep(ROUTE_MS);
+        this.log.info('speaker: routed in ' + (Date.now() - t0) + ' ms (' + (c ? c.connectionState : 'not listed') + ')');
+    }
+
+    // what the Audio Manager says while a phrase plays: the connections (with their state: connected or suspended),
+    // the main sink's volume and mute, and our source; logged to find why a phrase played without sound
+    async _audioState(when) {
+        const conns = await this.signals.get(this.cc, 'listOfMainConnections').catch((e) => 'error ' + errText(e));
+        const sinks = await this.signals.call(this.cc, 'getListMainSinks', {}, 3000).catch((e) => ({ e: errText(e) }));
+        const srcs = await this.signals.call(this.cc, 'getListMainSources', {}, 3000).catch((e) => ({ e: errText(e) }));
+        const sink = ((sinks && sinks.listMainSinks) || []).filter((k) => k && k.sinkID === SINK_ID)[0];
+        const src = ((srcs && srcs.listMainSources) || []).filter((k) => k && k.sourceID === SOURCE_ID)[0];
+        this.log.info('audio ' + when + ': connections ' + JSON.stringify(conns).slice(0, 400) + ' | sink ' + SINK_ID + ' ' +
+            (sink ? JSON.stringify(sink).slice(0, 200) : JSON.stringify(sinks).slice(0, 120)) + ' | source ' + SOURCE_ID + ' ' +
+            (src ? JSON.stringify(src).slice(0, 200) : JSON.stringify(srcs).slice(0, 120)) + ' | player ' + JSON.stringify(this.state));
+    }
+
+    // wait (at most 3 s) for a connection to leave the Audio Manager's list; -> true when it did
+    async _gone(id) {
+        for (let i = 0; i < 15; i++) {
+            const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+            if (!Array.isArray(list) || !list.some((c) => c && c.mainConnectionID === id)) return true;
+            await sleep(200);
+        }
+        this.log.warn('speaker: connection ' + id + ' still listed 3 s after its disconnect');
+        return false;
+    }
+
     // playFile and wait for its end; -> why it ended ('error ...' when it did not play)
     async _play(file) {
         this.started = false;
+        this.playAt = Date.now();
         const done = new Promise((resolve) => { this.ended = resolve; });
         const r = await this.signals.call(this.mp, 'playFile', { path: file, languageCode: LANG }, 5000);
         if (!r || r.EntError !== 'OK') { this.ended = null; return 'error playFile ' + (r && r.EntError); }
+        setTimeout(() => { this._audioState('1 s into ' + path.basename(file)).catch(() => {}); }, 1000);
         const why = await Promise.race([done, sleep(MAX_PHRASE_MS).then(() => 'time limit')]);
         this.ended = null;
         await sleep(250);     // the last syllable out of the amplifier before the source goes
