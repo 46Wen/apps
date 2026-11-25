@@ -678,6 +678,10 @@ def build(app_id, language='en'):
             }],
         },
     }
+    # app.json "hidden": true - no tile in the apps menu (an app that only works in the background, as BMW's own
+    # start widgets have no entry point either): autostart runs its background() at every start
+    if spec.get('hidden') is True:
+        app_json['application']['entryPoints'] = []
     pr = os.path.join(src, 'rhmiData')
     os.makedirs(os.path.join(pr, 'uiDescriptions', 'ID7'))
     os.makedirs(os.path.join(pr, 'variantGroups', 'Common', 'texts'))
