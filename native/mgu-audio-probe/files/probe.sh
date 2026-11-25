@@ -3,7 +3,7 @@
 # be listened to (its level, for Ambient config's Music wave). It only reads: no sound is captured or played, no
 # device is opened for audio, no setting is changed. What it writes: its report, in
 #   /var/opt/mgu-audio-probe/reports/  (the last 5),  /dev/shm/mgu-audio-probe.txt,
-#   and a copy on every USB stick it can write to (/media/<label>/mgu-audio-probe-<time>.txt).
+#   a copy on every USB stick it can write to (/media/<label>/mgu-audio-probe-<time>.txt), and on stdout (the journal).
 # Each look is cut short (timeout, head -c) so a report stays small and nothing can hang the run.
 # Run as root by mgu-audio-probe.service: once after the install, and 3 minutes after each start of the head unit.
 # Also by hand over SSH:  ssh root@<head unit> 'sh -s' < probe.sh > report.txt
@@ -145,6 +145,9 @@ for m in /media/*; do
     cp "$TMP" "$m/mgu-audio-probe-$STAMP.txt" 2>/dev/null && sync && copied="$copied $m"
 done
 size=$(wc -c < "$TMP" 2>/dev/null)
+# the report on stdout too: in the journal (the Store's Phone access, logs) when the service runs it, and in the
+# file when it is run by hand over SSH
+cat "$TMP"
 rm -f "$TMP"
 msg="report of $size bytes in $DIR/probe-$STAMP.txt and /dev/shm/mgu-audio-probe.txt; USB:${copied:- none writable}"
 command -v logger >/dev/null 2>&1 && logger -t mgu-audio-probe "$msg"
