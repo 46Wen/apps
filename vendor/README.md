@@ -5,11 +5,11 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 
 | Carpeta | Origen | Commit | Licencia | Apps |
 |---|---|---|---|---|
-| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `2645ebe` | MIT | redline 2.0.49, draggy 2.7.2, dyno 1.6.5, ambient_config 2.7.23 |
-| `namelsmissing/` | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | `58d26d3` | GPL-3.0 | dpf_monitor 0.2.8 |
+| `idrive7-apps/` | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | `874f7b8` | MIT | redline 2.0.51, draggy 2.7.2, dyno 1.6.5, ambient_config 2.7.26 |
+| `namelsmissing/` | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | `d552013` | GPL-3.0 | dpf_monitor 0.2.8 |
 | `justanotherpu/` | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | `42cd224` | MIT | jap_sysmon 1.0.6 |
 | `ridetube/` | [JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) | `eb0973b` | GPL-3.0 | jap_ridetube 0.6.4 |
-| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `6ae9c16` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.15 |
+| `robertnisipeanu/` | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | `9da968c` | GPL-3.0 (cliente de cluster-render: MPL-2.0) | robertn_waze_cluster 0.6.16 |
 
 ## Qué se ha cambiado respecto al original
 
@@ -22,6 +22,10 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
 - `idrive7-apps/kit/localization/diagnostic-full.*.json` (25 MB, solo los usa el Fault Scanner) no se
   han traído: el coche descarga `kit/` en cada compilación.
 - `ridetube/kit/tools/.font-cache/` (una caché de 17 MB para hornear fuentes) no se ha traído.
+- **Prioridad baja en cada kit** (`<origen>/kit/runtime/priority.js`, nuestro, y dos líneas en su
+  `kit/runtime/mgu.js` justo después de `new OnlineApp()`): las apps corren con nice 10 y E/S en clase
+  *idle*, por debajo de CarPlay y del HMI. `scripts/vendor_sync.py` lo vuelve a aplicar tras cada
+  actualización (`kit_low_priority`).
 - Nada más: el resto es el código de sus autores tal cual.
 
 ## Código fuente de los nativos

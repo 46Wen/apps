@@ -1,0 +1,148 @@
+{
+  "_comment": "Copiloto de voz: el texto de cada aviso en cada idioma, y las voces que se generan (scripts/generar_voces.py). Se edita con la página editora o a mano; luego se ejecuta el script en el PC. Las claves de 'frases' son los nombres de archivo: no cambiarlas.",
+  "idiomas": {
+    "es": {
+      "nombre": "Español",
+      "voces": [
+        {
+          "id": "es-ES-ElviraNeural",
+          "nombre": "Elvira (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "es-ES-XimenaNeural",
+          "nombre": "Ximena (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "es-ES-AlvaroNeural",
+          "nombre": "Álvaro (masculina)",
+          "genero": "M"
+        }
+      ]
+    },
+    "zh": {
+      "nombre": "中文 (普通话)",
+      "voces": [
+        {
+          "id": "zh-CN-XiaoxiaoNeural",
+          "nombre": "Xiaoxiao (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "zh-CN-XiaoyiNeural",
+          "nombre": "Xiaoyi (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "zh-CN-YunxiNeural",
+          "nombre": "Yunxi (masculina)",
+          "genero": "M"
+        },
+        {
+          "id": "zh-CN-YunjianNeural",
+          "nombre": "Yunjian (masculina)",
+          "genero": "M"
+        }
+      ]
+    },
+    "en": {
+      "nombre": "English (UK)",
+      "voces": [
+        {
+          "id": "en-GB-SoniaNeural",
+          "nombre": "Sonia (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "en-GB-LibbyNeural",
+          "nombre": "Libby (femenina)",
+          "genero": "F"
+        },
+        {
+          "id": "en-GB-RyanNeural",
+          "nombre": "Ryan (masculina)",
+          "genero": "M"
+        },
+        {
+          "id": "en-GB-ThomasNeural",
+          "nombre": "Thomas (masculina)",
+          "genero": "M"
+        }
+      ]
+    }
+  },
+  "velocidad": "-5%",
+  "frases": {
+    "combustible": {
+      "es": "Nivel de combustible bajo.",
+      "zh": "燃油不足，请尽快加油。",
+      "en": "Fuel level low."
+    },
+    "neumaticos": {
+      "es": "Atención: el sistema indica presión baja en un neumático. Revíselo en cuanto pueda.",
+      "zh": "注意：系统提示有轮胎气压过低，请尽快检查。",
+      "en": "Attention: the system reports low pressure in a tyre. Please check it as soon as you can."
+    },
+    "hielo": {
+      "es": "Atención: la temperatura exterior es baja. Puede haber hielo en la carretera.",
+      "zh": "注意：车外温度较低，路面可能结冰。",
+      "en": "Attention: the outside temperature is low. There may be ice on the road."
+    },
+    "motor_frio": {
+      "es": "El motor aún está frío. Le recomiendo no superar las dos mil quinientas revoluciones.",
+      "zh": "发动机仍然冷却，建议转速不要超过两千五百转。",
+      "en": "The engine is still cold. I recommend staying below two thousand five hundred revs."
+    },
+    "bateria": {
+      "es": "La batería tiene poca carga. Le recomiendo revisarla.",
+      "zh": "蓄电池电量不足，建议您检查一下。",
+      "en": "The battery charge is low. I recommend having it checked."
+    },
+    "bienvenida_manana": {
+      "es": "Buenos días. Bienvenido a bordo. Su BMW está listo para el viaje.",
+      "zh": "早上好，欢迎上车。您的宝马已准备就绪。",
+      "en": "Good morning. Welcome aboard. Your BMW is ready for the journey."
+    },
+    "bienvenida_tarde": {
+      "es": "Buenas tardes. Bienvenido a bordo. Su BMW está listo para el viaje.",
+      "zh": "下午好，欢迎上车。您的宝马已准备就绪。",
+      "en": "Good afternoon. Welcome aboard. Your BMW is ready for the journey."
+    },
+    "bienvenida_noche": {
+      "es": "Buenas noches. Bienvenido a bordo. Su BMW está listo para el viaje.",
+      "zh": "晚上好，欢迎上车。您的宝马已准备就绪。",
+      "en": "Good evening. Welcome aboard. Your BMW is ready for the journey."
+    },
+    "bienvenida": {
+      "es": "Bienvenido a bordo. BMW listo para el viaje.",
+      "zh": "欢迎上车，宝马已准备出发。",
+      "en": "Welcome aboard. BMW ready for the journey."
+    },
+    "mantenimiento": {
+      "es": "Se acerca un mantenimiento. Puede consultarlo en el estado del vehículo.",
+      "zh": "保养时间临近，您可以在车辆状态中查看。",
+      "en": "A service is coming up. You can check it in the vehicle status."
+    },
+    "ventanillas": {
+      "es": "Atención: ha quedado una ventanilla o el techo abierto.",
+      "zh": "注意：有车窗或天窗未关闭。",
+      "en": "Attention: a window or the sunroof has been left open."
+    },
+    "fin_viaje": {
+      "es": "Fin del viaje. Hasta la próxima.",
+      "zh": "行程结束，下次再见。",
+      "en": "End of the journey. See you next time."
+    },
+    "descanso": {
+      "es": "Lleva dos horas conduciendo. Le recomiendo hacer una pausa.",
+      "zh": "您已连续驾驶两个小时，建议休息一下。",
+      "en": "You have been driving for two hours. I recommend taking a break."
+    },
+    "motor_caliente": {
+      "es": "Motor a temperatura. Ya puede exigirle.",
+      "zh": "发动机已达到工作温度，可以尽情驾驶了。",
+      "en": "The engine is at temperature. You can push it now."
+    }
+  }
+}

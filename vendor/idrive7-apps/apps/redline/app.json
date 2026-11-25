@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard (46Wen: without the HUD output)",
-  "version": "2.0.49",
+  "version": "2.0.51",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",

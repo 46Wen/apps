@@ -115,6 +115,28 @@ def redline_no_hud(app_dir):
 
 PATCHES = {'redline_no_hud': redline_no_hud}
 
+PRIORITY_MARK = "require('./priority').lower(log, SPEC.config)"
+
+
+def kit_low_priority(base):
+    """Every app of an origin's kit below the car's own processes, CarPlay first (kit/runtime/priority.js, ours):
+    the module is copied in and the kit's mgu.js calls it at start. Applied again after every kit update; nothing is
+    done to an origin without kit/runtime/mgu.js. Fails (PatchError) when mgu.js no longer has the line it goes after."""
+    mgu = os.path.join(base, 'kit', 'runtime', 'mgu.js')
+    if not os.path.exists(mgu):
+        return
+    shutil.copy2(os.path.join(ROOT, 'kit', 'runtime', 'priority.js'), os.path.join(base, 'kit', 'runtime', 'priority.js'))
+    s = open(mgu, encoding='utf-8').read()
+    if PRIORITY_MARK in s:
+        return
+    a = "    const app = new OnlineApp();\n"
+    if s.count(a) != 1:
+        raise PatchError('kit mgu.js: %r found %d times, expected once' % (a.strip(), s.count(a)))
+    s = s.replace(a, a + "    // 46Wen: below the car's own processes (CarPlay first): kit/runtime/priority.js, app.json config.nice\n"
+                  "    try { " + PRIORITY_MARK + "; } catch (e) { log.warn('priority: ' + e); }\n")
+    open(mgu, 'w', encoding='utf-8', newline='\n').write(s)
+    subprocess.run(['node', '--check', mgu], check=True)
+
 
 # ---------- native components ----------
 
@@ -253,6 +275,10 @@ def main():
                         shutil.rmtree(p)
                     elif os.path.exists(p):
                         os.remove(p)
+                try:
+                    kit_low_priority(base)
+                except (PatchError, subprocess.CalledProcessError) as e:
+                    summary['failed'].append('%s: the low priority patch no longer fits its kit (%s)' % (v['repo'], e))
                 for readme in ('vendor/README.md',):
                     p = os.path.join(ROOT, readme)
                     s = open(p, encoding='utf-8').read().replace('`%s`' % v['commit'][:7], '`%s`' % head[:7])
