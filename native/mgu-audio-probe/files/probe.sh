@@ -4,7 +4,7 @@
 # device is opened for audio, no setting is changed. What it writes: its report, in
 #   /var/opt/mgu-audio-probe/reports/  (the last 5),  /dev/shm/mgu-audio-probe.txt,
 #   a copy on every USB stick it can write to (/media/<label>/mgu-audio-probe-<time>.txt), and on stdout (the journal).
-# Step 2, the capture test (mode capture): see capture() below.
+# Step 2, the capture test (mode capture): see capture() below. Step 3, SmartXbar (mode smartx): smartx() below.
 # Each look is cut short (timeout, head -c) so a report stays small and nothing can hang the run.
 # Run as root by mgu-audio-probe.service only when the Audio probe app asks (its button, once music plays and a USB
 # stick is in: the request file /dev/shm/mgu-audio-probe.request, mgu-audio-probe.path). Its state for the app goes to
@@ -13,7 +13,7 @@
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.3.1
+VERSION=0.4.0
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
@@ -26,8 +26,11 @@ NOW=$(date +%s 2>/dev/null || echo 0)
 MODE=report
 grep -q '"mode" *: *"capture"' "$REQUEST" 2>/dev/null && MODE=capture
 [ "$1" = "capture" ] && MODE=capture
+grep -q '"mode" *: *"smartx"' "$REQUEST" 2>/dev/null && MODE=smartx
+[ "$1" = "smartx" ] && MODE=smartx
 NAME=mgu-audio-probe
 [ "$MODE" = capture ] && NAME=mgu-audio-capture
+[ "$MODE" = smartx ] && NAME=mgu-audio-smartx
 BIN=$(dirname "$0")/mgu-audio-capture
 # the request taken (the path unit would start this again while it is there), the app told it runs
 rm -f "$REQUEST" 2>/dev/null
@@ -190,7 +193,89 @@ capture() {
 }
 
 mkdir -p "$DIR" 2>/dev/null
-if [ "$MODE" = capture ]; then capture > "$TMP" 2>&1; else probe > "$TMP" 2>&1; fi
+# Step 3, SmartXbar (mode smartx): the first report showed ALSA only carries the hands-free phone (BT Playback /
+# Capture, held by AlsaRoutingAdapter) and no stream running with music on; the music goes through Intel's SmartXbar
+# (the smartx / avb ALSA plugins) under BMW's Audio Manager. This looks, read only, at how SmartXbar is built on this
+# unit: its processes (their command lines: system services, no personal data), the shared-memory buffers they map,
+# its libraries and configuration, the Audio Manager's configuration and units, and its sockets. The app adds the
+# Audio Manager's own lists (sinks, sources, connections) in /dev/shm/mgu-audio-am.txt before asking.
+AUDIO_RE='audio|smartx|xbar|ias|avb|alsa|routing|amp|dsp|media|carplay|handsfree|genivi|tuner|radio|sound'
+strs() {                                   # printable strings of a binary, 6 chars or more
+    if busybox strings "$1" >/dev/null 2>&1; then busybox strings "$1" 2>/dev/null
+    else tr -c '[:print:]' '\n' < "$1" 2>/dev/null | grep -E '.{6,}'; fi
+}
+smartx() {
+    echo "mgu-audio-smartx $VERSION  $STAMP"
+    echo "Read only: SmartXbar and the Audio Manager as they are on this unit. Nothing played, connected or changed."
+    sec "hints"
+    n=$(ls /dev/shm 2>/dev/null | grep -v '^mgu-audio' | grep -ciE 'smartx|ias|audio|avb|xbar|pcm|ring')
+    echo "shared-memory files with an audio-like name in /dev/shm: $n"
+    for p in /proc/[0-9]*; do
+        c=$(cat "$p/comm" 2>/dev/null)
+        echo "$c" | grep -qiE "$AUDIO_RE" || continue
+        m=$(grep -oE '/dev/shm/[^ ]+' "$p/maps" 2>/dev/null | sort -u | head -n 6 | tr '\n' ' ')
+        [ -n "$m" ] && echo "${p#/proc/} $c maps: $m"
+    done
+    [ -s /dev/shm/mgu-audio-am.txt ] && echo "Audio Manager lists: below (from the app)" || echo "Audio Manager lists: none (the app did not write them)"
+    sec "Audio Manager (from the app: sinks, sources, connections)"
+    show /dev/shm/mgu-audio-am.txt 9000
+    sec "audio processes (pid, name, memory, command line)"
+    for p in /proc/[0-9]*; do
+        c=$(cat "$p/comm" 2>/dev/null)
+        echo "$c" | grep -qiE "$AUDIO_RE" || continue
+        rss=$(awk '/^VmRSS/ {print $2 " kB"}' "$p/status" 2>/dev/null)
+        cmd=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-240)
+        echo "${p#/proc/} $c $rss: $cmd"
+    done
+    sec "what they map and hold (shared memory, sound devices, sockets)"
+    for p in /proc/[0-9]*; do
+        c=$(cat "$p/comm" 2>/dev/null)
+        echo "$c" | grep -qiE "$AUDIO_RE" || continue
+        shm=$(grep -oE '/dev/shm/[^ ]+|/run/[^ ]+' "$p/maps" 2>/dev/null | sort -u | head -n 10 | tr '\n' ' ')
+        fds=$(ls -l "$p/fd" 2>/dev/null | grep -oE '/dev/[^ ]+|socket:\[[0-9]+\]|/run/[^ ]+' | sed 's/socket:.*/socket/' | sort | uniq -c | awk '{print $2 "x" $1}' | tr '\n' ' ' | cut -c1-300)
+        libs=$(grep -oE '/[^ ]*(smartx|ias|xbar|avb|audio)[^ ]*\.so[^ ]*' "$p/maps" 2>/dev/null | sort -u | head -n 8 | tr '\n' ' ')
+        echo "${p#/proc/} $c"
+        [ -n "$shm" ] && echo "   maps: $shm"
+        [ -n "$fds" ] && echo "   holds: $fds"
+        [ -n "$libs" ] && echo "   libs: $libs"
+    done
+    sec "/dev/shm"
+    ls -la /dev/shm 2>&1 | head -n 80
+    sec "SmartXbar and AVB files (names only)"
+    find /usr/bin /usr/sbin /usr/lib /lib /opt /etc /usr/share -maxdepth 5 \( -iname '*smartx*' -o -iname '*xbar*' -o -iname 'libias*' \
+        -o -iname 'ias*' -o -iname '*avb*' -o -iname '*audiomanager*' -o -iname '*routingadapter*' \) 2>/dev/null | head -n 100
+    sec "the smartx ALSA plugin: its words (ports, paths, names)"
+    for f in /usr/lib/alsa-lib/libasound_module_pcm_smartx.so; do
+        [ -e "$f" ] || continue
+        echo "--- $f"
+        strs "$f" | grep -iE 'shm|/dev|/run|/tmp|\.xml|\.json|port|connect|sink|source|ias_|smartx|ring|routing|name|direction|capture|playback' | sort -u | head -n 80
+    done
+    sec "Audio Manager and SmartXbar configuration (small text files)"
+    for d in /usr/share/audiomanager /usr/lib/audiomanager /opt/audio /etc/smartx /etc/ias /etc/audiomanager /etc/audio; do
+        [ -d "$d" ] || continue
+        echo "--- $d"
+        ls -laR "$d" 2>/dev/null | head -n 60
+    done
+    k=0
+    for f in $(find /usr/share/audiomanager /etc/smartx /etc/ias /etc/audiomanager /etc/audio /opt/audio -maxdepth 4 -type f \
+               \( -name '*.xml' -o -name '*.conf' -o -name '*.json' -o -name '*.txt' -o -name '*.cfg' -o -name '*.ini' -o -name '*.yaml' \) 2>/dev/null | head -n 30); do
+        sz=$(wc -c < "$f" 2>/dev/null); [ "${sz:-0}" -gt 0 ] || continue
+        k=$((k + 1)); [ "$k" -gt 10 ] && break
+        show "$f" 3500
+    done
+    sec "systemd units for sound"
+    for u in /etc/systemd/system/multi-user.target.wants/alsaroutingadapters.service /etc/systemd/system/multi-user.target.wants/audiomanager.service \
+             $(ls /lib/systemd/system/*smartx* /lib/systemd/system/*ias* /lib/systemd/system/*avb* /lib/systemd/system/*audio* /etc/systemd/system/*smartx* 2>/dev/null | head -n 8); do
+        [ -e "$u" ] || continue
+        echo "--- $u -> $(readlink -f "$u")"
+        grep -vE '^\s*(#|$)' "$u" 2>/dev/null | head -n 30
+    done
+    sec "sockets with a sound-like name (/proc/net/unix)"
+    awk '{print $NF}' /proc/net/unix 2>/dev/null | grep -iE 'smartx|ias|audio|am_|routing|avb|xbar|pcm|sound' | sort -u | head -n 40
+    echo "end"
+}
+
+if [ "$MODE" = capture ]; then capture > "$TMP" 2>&1; elif [ "$MODE" = smartx ]; then smartx > "$TMP" 2>&1; else probe > "$TMP" 2>&1; fi
 cp "$TMP" "$DIR/$MODE-$STAMP.txt" 2>/dev/null
 cp "$TMP" /dev/shm/mgu-audio-probe.txt 2>/dev/null && chmod 0644 /dev/shm/mgu-audio-probe.txt
 # the last 5 reports only
