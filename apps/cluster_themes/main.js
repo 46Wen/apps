@@ -8,9 +8,14 @@
  * closed (OAP apps stay up in the background), so the page is only needed for changes. The kit's own
  * settings list stays one tap away (the bar's All settings).
  */
+const path = require('path');
 const mgu = require('./kit/mgu');
 const HudApp = require('./hud');
 const Page = require('./page');
+const logring = require('./logring');
+
+/** The log's last lines for the page's Log tab (logring.js), kept from the first moment the app runs. */
+function ring(ctx) { return logring.attach(ctx.log, ctx.dataDir ? path.join(ctx.dataDir, ctx.spec.id + '.log') : null); }
 
 /** The engine, started once: by background() when the car starts the app (app.json "autostart", issue #16), or by
  * start() when it was opened first. null when it failed (nothing drawn, but the app stays up: an exit here would
@@ -29,17 +34,20 @@ function startHud(ctx) {
 
 mgu.run({
     background(bg) {
+        ring(bg);
         // "Start with the car" off: nothing drawn until the app is opened (start() then starts the engine)
         if (bg.settings.get('autoStart') === false) { bg.log.info('Start with the car is off: waiting to be opened'); return null; }
         return startHud(bg);
     },
     start(ctx) {
+        const logRing = ring(ctx);
         const hud = ctx.background || startHud(ctx);
         if (!hud) return;
         new Page(ctx, hud, {
             title: ctx.spec.title, what: 'cluster',
             look: { name: 'Themes', style: 'hero', tags: { gt3: 'race dash', m: 'M8 style', mview: 'M3 / M5 look', vector: 'music panel', sport: 'Live Cockpit', minimal: 'just the speed', track: 'tyres + temps', drag: '0-60 timer', rally: 'rev arc · G-meter', retro80s: '80s digital', cruise: 'calm · trip', dyno: 'safety tiles', ribbon: 'calm · holidays' } },
-            tabs: ['look', 'readouts', 'badge', 'map', 'alerts', 'gmeter', 'settings'],
+            tabs: ['look', 'readouts', 'badge', 'map', 'alerts', 'gmeter', 'settings', 'log'],
+            logRing,
             settings: ['units', 'tempUnits', 'pressureUnits', 'clock', 'timeZone', 'tankLitres', 'redline', 'shiftBefore', 'coldGuard', 'showBoost', 'nightDim', 'cameraNotch', 'keepStrip', 'autoStart', 'holiday', 'demo'],
             // the drive mode check's candidates this app's app.json listens to (issue #8; shared/hud.js modeDiagLines)
             modeCheck: ['HMI', 'MDrive', 'Engine', 'Sport2'],

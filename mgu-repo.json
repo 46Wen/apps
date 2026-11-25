@@ -37,6 +37,7 @@
           "shared/visible.js",
           "shared/page.js",
           "shared/waze.js",
+          "shared/logring.js",
           "shared/previews.js",
           "shared/sensors.js",
           "shared/badges.js",

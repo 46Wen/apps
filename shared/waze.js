@@ -30,6 +30,20 @@
  * Never sent: "cluster" (would turn the map off), "guide" (saved by the tool). Never touched: patch.sock (root).
  * Facts from the waze-on-cluster 0.9.3 source (main.cpp, control.cpp, map_feed.cpp, the .socket unit), read
  * Nov 7 2026, and 0.14.12 with cluster-render 0.8.11 (PROTOCOL.md, map_feed.cpp, main.cpp), read Nov 24 2026.
+ * The trace (46Wen, Nov 25 2026): the map never came into the theme on several cars ("Moving the map into the theme"
+ * for ever, bimmer-lab/apps#34) and nothing in the log said where it stopped. Every attempt now gets a number and
+ * each of its steps goes to the log once, when it changes, as "[waze#<n>] <step>. <what>":
+ *   1 wanted        the setting, the drive mode's switch, the theme and its map window (hud.js says why)
+ *   2 service       cluster-render's hello: hosts from layers or not
+ *   3 host sent     the window we asked cluster-render to put the map in
+ *   4 answer        cluster-render's "hosting" event: live, or waiting with its reason
+ *   5 Waze          waze-on-cluster's status file: state, target, hosted, reason
+ * When the map is not in the theme STUCK_MS after it was wanted, the step it stopped at is worked out and logged
+ * with every step's last word ("STUCK at step n"). If the map exists (Waze shows it somewhere) but can't come in,
+ * we give up: the host ends, the window stays closed and the theme stays whole (no black box over BMW's panels),
+ * and the page says so. It is tried again on a drive mode change, a setting change, "Try again" on the Map tab,
+ * and by itself every GIVEUP_RETRY_MS (at most GIVEUP_AUTO times a run). Waiting for the phone's map (Waze idle,
+ * CarPlay not connected) is not a failure: logged once as waiting, never given up on.
  * Plain Node 8 (the car's 8.16.2).
  */
 const fs = require('fs');
@@ -46,6 +60,12 @@ const IGNORED_SENDS = 4;         // "start panel" taken this many times running 
 const IGNORED_RETRY_MS = 600000; // then asked again only this often (Waze on Cluster may have been updated)
 const DOWN_GRACE_MS = 8000;      // hosting: the window stays open this long after the map left it (a rebuild's gap)
 const OLD_WAZE_MS = 20000;       // hosting: our host live and the map showing this long without "hosted": too old
+const STUCK_MS = 15000;          // the trace: the map wanted and not in the theme this long: find the step, maybe give up
+const GIVEUP_RETRY_MS = 180000;  // given up: tried again by itself this often
+const GIVEUP_AUTO = 3;           // at most this many times a run (then only on a change or "Try again")
+// status.json fields left out of the log's comparison: they change all the time without meaning anything new
+const VOLATILE = /fps|frame|time|stamp|^ts$|age|count|bytes|uptime|seq|since|latency|ms$|_at$/i;
+const STEP_NAME = { 1: 'wanted', 2: 'cluster-render', 3: 'host sent', 4: 'cluster-render\'s answer', 5: 'Waze on Cluster' };
 
 class Waze {
     /**
@@ -74,6 +94,49 @@ class Waze {
         try { this.moved = JSON.parse(fs.readFileSync(this.memo, 'utf8')).moved === true; } catch (e) { /* first run */ }
         this.lastText = null;
         this.changePending = false;
+        // the trace (see the header)
+        this.attempt = 0;            // grows each time the map becomes wanted (or is tried again)
+        this.wantSince = 0;          // when this attempt started
+        this.why = '';               // hud.js: why the map is wanted or not (step 1)
+        this.steps = {};             // step -> its last line
+        this.gaveUp = null;          // { step, text, at } while given up on this attempt
+        this.autoRetries = 0;
+        this.waitLogged = '';        // the "waiting" line already logged for this attempt
+        this.statusKey = null;       // the last status logged (VOLATILE fields left out)
+        this.onGiveUp = null;        // hud.js: end the host, keep the window closed
+    }
+
+    /** The trace's tag: "[waze#3]". */
+    _tag() { return '[waze#' + this.attempt + ']'; }
+
+    /** A step's new state: kept, and logged when it changed (always kept, logged only while an attempt is on). */
+    note(step, text, warn) {
+        if (this.steps[step] === text) return;
+        this.steps[step] = text;
+        if (this.attempt) this.log[warn ? 'warn' : 'info'](this._tag() + ' ' + step + '. ' + text);
+    }
+
+    /** Whether we gave up on this attempt (hud.js keeps the window closed and the host ended). */
+    blocked() { return !!this.gaveUp; }
+
+    /** Try again after giving up (a drive mode or setting change, "Try again", the timer). */
+    retry(reason) {
+        if (!this.gaveUp) return;
+        this.gaveUp = null;
+        this._begin('trying again: ' + reason);
+        this.nextTry = 0;
+        this._refresh();
+        this._changed();
+    }
+
+    /** A new attempt: its number, its start, the steps logged again from here. */
+    _begin(what) {
+        this.attempt++;
+        this.wantSince = Date.now();
+        this.waitLogged = '';
+        this.log.info(this._tag() + ' ' + what);
+        // the steps known so far, once, so each attempt's lines tell the whole story on their own
+        [2, 3, 4, 5].forEach((k) => { if (this.steps[k]) this.log.info(this._tag() + ' ' + k + '. ' + this.steps[k]); });
     }
 
     start() {
@@ -87,12 +150,19 @@ class Waze {
         if (this.moved && this.st && this.st.target === 'panel') this._send('map');
     }
 
-    /** Whether the theme wants the map on the panel now (the setting, and a layout with a map window). */
-    want(on) {
+    /** Whether the theme wants the map on the panel now (the setting, and a layout with a map window); why: step 1's text. */
+    want(on, why) {
         on = on === true;
-        if (on === this.wanted) return;
+        why = why || '';
+        if (on === this.wanted) {
+            if (on && why && why !== this.why) { this.why = why; this.log.info(this._tag() + ' 1. still wanted: ' + why); }
+            return;
+        }
         this.wanted = on;
+        this.why = why;
         this.nextTry = 0;
+        if (on) { this.gaveUp = null; this.autoRetries = 0; this._begin('1. map wanted: ' + why); }
+        else if (this.attempt) this.log.info(this._tag() + ' map not wanted any more: ' + (why || '?') + (this.up ? '' : this.gaveUp ? ' (it had been given up on)' : ' (it never came in)'));
         this._refresh();
     }
 
@@ -101,7 +171,8 @@ class Waze {
         on = on === true;
         if (on === this.hostMode) return;
         this.hostMode = on;
-        this.log.info('waze: ' + (on ? 'cluster-render hosts the map in the theme (host from layers)' : 'cluster-render can\'t host the map; asking Waze on Cluster for "start panel" (0.10.9 and older)'));
+        this.note(2, on ? 'cluster-render can host the map in the theme (hello host_layers 1)' : 'cluster-render can NOT host the map (no host_layers in its hello: older than 0.8.2); falling back to "start panel"', !on);
+        if (!this.attempt) this.log.info('waze: ' + (on ? 'cluster-render hosts the map in the theme (host from layers)' : 'cluster-render can\'t host the map; asking Waze on Cluster for "start panel" (0.10.9 and older)'));
         this.nextTry = 0;
         this._refresh();
     }
@@ -111,13 +182,15 @@ class Waze {
         const h = state ? { state: String(state), reason: reason ? String(reason) : '' } : null;
         if (JSON.stringify(h) === JSON.stringify(this.host)) return;
         this.host = h;
-        if (h) this.log.info('waze: our host of the map is ' + h.state + (h.reason ? ' (' + h.reason + ')' : ''));
+        if (h) this.note(4, 'cluster-render: our host is ' + h.state + (h.reason ? ' (' + h.reason + ')' : ''));
+        else if (this.steps[4]) this.note(4, 'no answer from cluster-render for the current host (none sent, a new one, or the connection went)');
         this._refresh();
     }
 
     /** For the page: { text, up, ok } (ok: false when something is wrong). */
     info() {
         const s = this.st;
+        if (this.wanted && this.gaveUp) return { text: 'Waze map did not come in (step ' + this.gaveUp.step + ', ' + STEP_NAME[this.gaveUp.step] + '): theme kept whole. See the Log tab', up: false, ok: false, gaveUp: true };
         if (!s) return { text: 'Waze on Cluster isn\'t running', up: false, ok: false };
         if (s.state === 'unsupported') return { text: 'Waze on Cluster: this car isn\'t supported', up: false, ok: false };
         if (s.state === 'off') return { text: 'Waze map is turned off in the Waze app', up: false, ok: false };
@@ -167,7 +240,7 @@ class Waze {
             if (err || Date.now() - st.mtime.getTime() > STALE_MS) return this._update(null);
             fs.readFile(this.statusPath, 'utf8', (e, txt) => {
                 let s = null;
-                try { if (!e) { const j = JSON.parse(txt); s = { state: String(j.state || ''), target: j.target == null ? null : String(j.target), hosted: j.hosted === 1 }; } } catch (x) { s = null; }
+                try { if (!e) { const j = JSON.parse(txt); s = { state: String(j.state || ''), target: j.target == null ? null : String(j.target), hosted: j.hosted === 1, raw: j }; } } catch (x) { s = null; }
                 this._update(s);
             });
         });
@@ -175,6 +248,7 @@ class Waze {
 
     _update(s) {
         this.st = s;
+        this._noteStatus(s);
         if (s && s.target === 'map' && !this.wanted && this.moved) this._setMoved(false);   // it's back
         if (s && s.target === 'panel' && this.problem) this.problem = null;
         if (s && s.target === 'panel') this.ignored = 0;
@@ -202,6 +276,8 @@ class Waze {
         const was = this.up;
         if (up !== was && this.hostMode) this.log.info('waze: the map ' + (up ? 'is in the theme' : 'left the theme') + (s ? ' (' + s.state + (s.hosted ? ', hosted' : '') + ')' : ''));
         this.up = up;
+        if (up && !was && this.attempt) this.log.info(this._tag() + ' OK: the map is in the theme, ' + Math.round((now - this.wantSince) / 100) / 10 + ' s after it was wanted');
+        this._stuckCheck(now);
         const text = this.info().text;
         const changed = up !== was || text !== this.lastText;
         this.lastText = text;
@@ -220,6 +296,7 @@ class Waze {
         const s = this.st;
         if (this.sending || Date.now() < this.nextTry || !s) return;
         if (s.state === 'unsupported' || s.state === 'off') return;
+        if (this.gaveUp) { if (this.moved && s.target === 'panel') this._send('map'); return; }
         if (this.wanted && s.target !== 'panel' && this.hostMode === false) this._send('panel');
         else if (!this.wanted && this.moved && s.target === 'panel') this._send('map');
     }
@@ -260,6 +337,64 @@ class Waze {
             sock.write(JSON.stringify({ cmd: 'start', target }) + '\n');
             setTimeout(() => { try { sock.end(); } catch (e) { /* closed */ } }, LINGER_MS);
         });
+    }
+
+    /** Step 5: waze-on-cluster's status as it changes (VOLATILE fields left out), or the file missing / stale. */
+    _noteStatus(s) {
+        let key, text;
+        if (!s) { key = 'none'; text = 'no status: ' + this.statusPath + ' missing, unreadable or older than ' + STALE_MS / 1000 + ' s (Waze on Cluster not running?)'; }
+        else {
+            const j = s.raw || {}, keep = {};
+            Object.keys(j).sort().forEach((k) => { if (!VOLATILE.test(k) && typeof j[k] !== 'object') keep[k] = j[k]; });
+            key = JSON.stringify(keep);
+            text = 'Waze on Cluster: state=' + s.state + ' target=' + s.target + ' hosted=' + (s.hosted ? 1 : 0) +
+                Object.keys(keep).filter((k) => ['state', 'target', 'hosted'].indexOf(k) < 0).map((k) => ' ' + k + '=' + String(keep[k]).slice(0, 80)).join('');
+        }
+        if (key === this.statusKey) return;
+        this.statusKey = key;
+        this.note(5, text, !s || s.state === 'error' || s.state === 'unsupported');
+    }
+
+    /**
+     * Where the map stopped, from what we know now: { step, text, hard }. hard: the map exists (Waze shows it) but
+     * can't come in, so we give up; otherwise it is only waiting (for the phone, the service, the theme).
+     */
+    _diagnose() {
+        const s = this.st, host = this.host, showing = !!(s && s.state === 'showing');
+        if (!s) return { step: 5, text: 'Waze on Cluster is not running (no fresh status file)', hard: false };
+        if (s.state === 'unsupported' || s.state === 'off') return { step: 5, text: 'Waze on Cluster says ' + s.state, hard: false };
+        if (this.hostMode === null) return { step: 2, text: 'no hello from cluster-render yet (is it running?)', hard: false };
+        if (this.hostMode) {
+            if (!host) return showing ? { step: this.steps[3] ? 4 : 3, text: this.steps[3] ? 'cluster-render never answered our host (no "hosting" event)' : 'no host sent (the theme has no usable map window?)', hard: true }
+                : { step: 5, text: 'waiting for the phone\'s map (Waze on Cluster ' + s.state + ')', hard: false };
+            if (host.state !== 'live') return { step: 4, text: 'cluster-render keeps our host waiting: ' + (host.reason || 'no reason given'), hard: showing };
+            if (!showing) return { step: 5, text: 'host live, waiting for the phone\'s map (Waze on Cluster ' + s.state + ')', hard: false };
+            if (!s.hosted) return { step: 5, text: 'host live and the map showing, but Waze on Cluster never says hosted (it stays on ' + s.target + '; needs Waze on Cluster 0.14.5+)', hard: true };
+            return { step: 5, text: 'hosted and showing, yet not counted as in the theme', hard: true };
+        }
+        if (s.target !== 'panel') return { step: 3, text: '"start panel" not taken' + (this.problem ? ' (' + this.problem + ')' : '') + ' after ' + this.ignored + ' sends', hard: showing };
+        return { step: 5, text: 'on the panel, waiting for the map (' + s.state + ')', hard: false };
+    }
+
+    /** STUCK_MS after the map was wanted and it isn't in: log where, and give up when it can't come (see the header). */
+    _stuckCheck(now) {
+        if (!this.wanted || this.up || !this.attempt) return;
+        if (this.gaveUp) {
+            if (this.autoRetries < GIVEUP_AUTO && now - this.gaveUp.at >= GIVEUP_RETRY_MS) { this.autoRetries++; setImmediate(() => this.retry('by itself (' + this.autoRetries + ' of ' + GIVEUP_AUTO + ')')); }
+            return;
+        }
+        if (now - this.wantSince < STUCK_MS) return;
+        const d = this._diagnose();
+        if (!d.hard) {
+            if (this.waitLogged !== d.text) { this.waitLogged = d.text; this.log.info(this._tag() + ' waiting at step ' + d.step + ' (' + STEP_NAME[d.step] + '): ' + d.text); }
+            return;
+        }
+        this.gaveUp = { step: d.step, text: d.text, at: now };
+        this.log.warn(this._tag() + ' STUCK at step ' + d.step + ' (' + STEP_NAME[d.step] + ') after ' + Math.round((now - this.wantSince) / 1000) + ' s: ' + d.text);
+        this.log.warn(this._tag() + ' giving up: the host ends, the window stays closed, the theme stays whole; trying again on a mode or setting change, "Try again", or in ' + GIVEUP_RETRY_MS / 60000 + ' min');
+        this.log.info(this._tag() + ' summary: 1. ' + (this.why || '?'));
+        [2, 3, 4, 5].forEach((k) => this.log.info(this._tag() + ' summary: ' + k + '. ' + (this.steps[k] || '(nothing yet)')));
+        if (this.onGiveUp) setImmediate(() => { try { this.onGiveUp(d); } catch (e) { this.log.warn('waze: give up: ' + e); } });
     }
 
     _setMoved(on) {

@@ -331,7 +331,10 @@ const MODE_KEY = { comfort: 'inComfort', sport: 'inSport', eco: 'inEco' };
 // "Show Waze map inside the theme" per drive mode (Cluster Themes): while byMode is on and the mode is known, the
 // mode's own switch also has to be on. All on by default, so the map shows in every mode as before.
 const MAP_MODE_KEY = { comfort: 'mapComfort', sport: 'mapSport', eco: 'mapEco' };
-const MAP_MODE_KEYS = ['mapComfort', 'mapSport', 'mapEco'];
+const MAP_MODE_KEYS = ['mapComfort', 'mapSport', 'mapEco', 'mapAdaptive'];
+// Adaptive (FES 10) counts as Comfort, but has its own theme ("inAdaptive") and Waze switch ("mapAdaptive": same / on /
+// off) when the driver picks one; both start on "same", which follows Comfort, so nothing changes until then
+const ADAPTIVE_KEY = 'inAdaptive', ADAPTIVE_MAP_KEY = 'mapAdaptive';
 // a plug-in hybrid's eDrive mode (issue #31; the idea from FDX100's KurdBimmer Themes): its own theme when the driver
 // picked one ("In Hybrid" / "In Electric", Cluster Themes), else the drive mode's
 const PHEV_KEY = { hybrid: 'inHybrid', electric: 'inElectric' };
@@ -602,8 +605,11 @@ class HudApp {
         this.mapLayout = false;          // the active layout has a map window (a widget with holeWhen "mapUp")
         // the Waze map inside the theme (Cluster Themes, config.waze; waze.js): "mapUp" is on while it shows
         this.waze = this.config.waze ? new Waze(Object.assign({ dataDir: ctx.dataDir }, this.config.waze), this.log, () => this._guard('waze', () => {
-            if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
+            this._wazeWant();      // a retry or a give-up changes whether the host goes out
+            if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { this._mapWindowLog(); if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
         })) : null;
+        // given up (waze.js trace): the host ends and the window closes, the theme stays whole
+        if (this.waze) this.waze.onGiveUp = () => this._guard('waze give up', () => this._mapCheck());
         this.mapShown = false;           // "mapUp" when the layout was built (or last opened / closed, mapLive)
         this.mapLive = false;            // the active layout opens and closes its map window without a rebuild
         this.mapRect = null;             // where the active layout hosts the map (_mapHostRect), null: no window
@@ -630,7 +636,8 @@ class HudApp {
         this.layouts.onChange(() => this._rebuild());
         ctx.settings.onChange((key) => {
             // a theme or layout picked anywhere (the page asks first, the kit's All settings list doesn't): no longer stepping aside
-            if (['hudLayout', 'inComfort', 'inSport', 'inEco', 'inHybrid', 'inElectric', 'byMode'].indexOf(key) >= 0 && this.screen.yielded) this.screen.release();
+            if (['hudLayout', 'inComfort', 'inSport', 'inEco', 'inAdaptive', 'inHybrid', 'inElectric', 'byMode'].indexOf(key) >= 0 && this.screen.yielded) this.screen.release();
+            if (['mapInTheme', 'byMode'].concat(MAP_MODE_KEYS).indexOf(key) >= 0 && this.waze) this.waze.retry('setting ' + key + ' changed');
             if (PLACE_KEYS.indexOf(key) >= 0) this._guard('place', () => this._place());
             else if (MAP_MODE_KEYS.indexOf(key) >= 0) this._guard('map mode', () => this._mapCheck());
             else if (LIVE_KEYS.indexOf(key) >= 0) this.widgets.forEach((x) => { x.last = null; });
@@ -916,7 +923,7 @@ class HudApp {
         });
         c.on('host', (target, ev) => {
             if (target !== 'map' || ci !== 0) return;
-            this.log.info('cluster-render: the map ' + (ev.into ? 'hosted on ' + ev.into + ' at ' + ev.x + ',' + ev.y + ' ' + ev.w + 'x' + ev.h + (ev.shown === 0 ? ', shown nowhere' : '') : 'on its own slot'));
+            this.log.info((this.waze ? this.waze._tag() + ' ' : '') + 'cluster-render: the map ' + (ev.into ? 'hosted on ' + ev.into + ' at ' + ev.x + ',' + ev.y + ' ' + ev.w + 'x' + ev.h + (ev.shown === 0 ? ', shown nowhere' : '') : 'on its own slot'));
         });
         c.on('layer', (ref, state, reason) => {
             const key = ci + ':' + ref;
@@ -1038,9 +1045,23 @@ class HudApp {
     /** Waze's map on the panel only while the setting is on (for this drive mode) and the theme shown has a map window. */
     _wazeWant() {
         if (!this.waze) return;
-        const on = !!(this.started && !this.hidden && this._mapWanted() && this.mapLayout);
-        this.waze.want(on);
-        this._mapHost(on ? this.mapRect : null);
+        const mw = this._mapWhy();
+        const on = !!(this.started && !this.hidden && mw.on && this.mapLayout);
+        // step 1 of the trace (waze.js): why, in one line
+        const theme = '"' + (this.activeName || '?') + '"';
+        const why = !this.started ? 'app not started' : !mw.on ? mw.why
+            : this.hidden ? mw.why + '; theme ' + theme + ' hidden (BMW\'s own cluster in this mode)'
+                : !this.mapLayout ? mw.why + '; theme ' + theme + ' has no map window'
+                    : mw.why + '; theme ' + theme + ', window ' + (this.mapRect ? this.mapRect.w + 'x' + this.mapRect.h + ' at ' + this.mapRect.x + ',' + this.mapRect.y : 'too small to host');
+        this.waze.want(on, why);
+        this._mapHost(on && !this.waze.blocked() ? this.mapRect : null);
+    }
+
+    /** The trace: the map window opening or closing in the theme (where the black box would show if the map isn't there). */
+    _mapWindowLog() {
+        const open = this.setting('mapUp') === true, r = this.mapRect;
+        this.log.info((this.waze ? this.waze._tag() + ' ' : '') + 'map window ' + (open ? 'opens' : 'closes') + ' in "' + this.activeName + '"' +
+            (r ? ' (' + r.w + 'x' + r.h + ' at ' + r.x + ',' + r.y + ')' : '') + (this.mapLive ? ', live' : ', by a rebuild'));
     }
 
     /**
@@ -1048,17 +1069,43 @@ class HudApp {
      * car has said which mode it is in, that mode's own switch on (mapComfort / mapSport / mapEco). With the mode not
      * known yet, or byMode off, the setting alone decides.
      */
-    _mapWanted() {
-        if (this.ctx.settings.get('mapInTheme') !== true) return false;
-        if (this.setting('byMode') !== true || !this.driveMode || !MAP_MODE_KEY[this.driveMode]) return true;
+    _mapWanted() { return this._mapWhy().on; }
+
+    /**
+     * Whether the map is wanted in this drive mode, and why, as one line for the log ({ on, why }). Adaptive: its own
+     * switch (mapAdaptive on / off), or "same" = Comfort's.
+     */
+    _mapWhy() {
+        if (this.ctx.settings.get('mapInTheme') !== true) return { on: false, why: 'Show Waze map inside the theme is off' };
+        if (this.setting('byMode') !== true) return { on: true, why: 'setting on (theme does not change with the drive mode)' };
+        if (!this.driveMode || !MAP_MODE_KEY[this.driveMode]) return { on: true, why: 'setting on, drive mode not known yet' };
+        const mode = this._modeLabel();
+        if (this.driveVariant === 'adaptive' && this.ctx.settings.item(ADAPTIVE_MAP_KEY)) {
+            const a = this.setting(ADAPTIVE_MAP_KEY);
+            if (a === 'on' || a === 'off') return { on: a === 'on', why: 'mode ' + mode + ': Waze map in Adaptive ' + a };
+        }
         const k = MAP_MODE_KEY[this.driveMode];
-        return !this.ctx.settings.item(k) || this.setting(k) !== false;
+        const on = !this.ctx.settings.item(k) || this.setting(k) !== false;
+        return { on, why: 'mode ' + mode + ': ' + k + ' ' + (on ? 'on' : 'off') + (this.driveVariant === 'adaptive' ? ' (Adaptive: same as Comfort)' : '') };
+    }
+
+    /** The drive mode as the log says it: "Comfort", "Sport plus", "Comfort adaptive", "Comfort (hybrid)". */
+    _modeLabel() {
+        if (!this.driveMode) return 'unknown';
+        return (MODE_NAME[this.driveMode] || this.driveMode) + (this.driveVariant ? ' ' + this.driveVariant : '') + (this.drivePhev ? ' (' + this.drivePhev + ')' : '');
+    }
+
+    /** The theme a drive mode cell has: Adaptive's own unless "same" (then Comfort's). */
+    _modeThemes() {
+        const out = ['inComfort', 'inSport', 'inEco'].map((k) => this.setting(k));
+        if (this.ctx.settings.item(ADAPTIVE_KEY)) { const a = this.setting(ADAPTIVE_KEY); if (a && a !== 'same') out.push(a); }
+        return out;
     }
 
     /** The map wanted or not after a drive mode or a per-mode switch changed: tell Waze, open or close the window. */
     _mapCheck() {
         this._wazeWant();
-        if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
+        if (this.mapLayout && this.setting('mapUp') !== this.mapShown) { this._mapWindowLog(); if (this.mapLive) this._mapLive(); else this._rebuild(); } else this._status();
     }
 
     /**
@@ -1095,9 +1142,9 @@ class HudApp {
         this.hostKey = key;
         this.hostCi = r ? r.conn : null;
         this.waze.hostState(null);
-        if (!r) { if (was) this.log.info('waze: map host ended'); return; }
+        if (!r) { if (was) this.waze.note(3, 'host ended (the map goes back to its own slot)'); return; }
         this._clientAt(r.conn).host('panel', { target: 'map', x: r.x, y: r.y, w: r.w, h: r.h, src_x: r.src_x, src_y: r.src_y, src_w: r.src_w, src_h: r.src_h });
-        this.log.info('waze: map host at ' + r.x + ',' + r.y + ' ' + r.w + 'x' + r.h + ', the map\'s ' + r.src_w + 'x' + r.src_h + ' at ' + r.src_x + ',' + r.src_y +
+        this.waze.note(3, 'host sent: "map" into "panel" at ' + r.x + ',' + r.y + ' ' + r.w + 'x' + r.h + ', the map\'s ' + r.src_w + 'x' + r.src_h + ' at ' + r.src_x + ',' + r.src_y +
             ', connection ' + (r.conn + 1) + (this.clients[r.conn].ready ? (this.clients[r.conn].hostLayers ? '' : ' (kept: this cluster-render can\'t host)') : ' (sent once connected)'));
     }
 
@@ -1274,6 +1321,10 @@ class HudApp {
             const v = this.setting(PHEV_KEY[this.drivePhev]);
             if (v && v !== 'same') return v;
         }
+        if (this.setting('byMode') === true && this.driveVariant === 'adaptive' && this.ctx.settings.item(ADAPTIVE_KEY)) {
+            const v = this.setting(ADAPTIVE_KEY);
+            if (v && v !== 'same') return v;
+        }
         if (this.setting('byMode') === true && this.driveMode && MODE_KEY[this.driveMode]) {
             const v = this.setting(MODE_KEY[this.driveMode]);
             if (v) return v;
@@ -1441,6 +1492,12 @@ class HudApp {
         if (m === this.driveMode && variant === this.driveVariant && phev === this.drivePhev) return;
         this.log.info('drive mode ' + MODE_NAME[m] + (variant ? ' ' + variant : '') + (phev ? ' (' + phev + ')' : '') + ' (' + raw + ')');
         this.driveMode = m; this.driveVariant = variant; this.drivePhev = phev;
+        if (this.target === 'panel' && this.setting('byMode') === true) {
+            const own = variant === 'adaptive' && this.ctx.settings.item(ADAPTIVE_KEY) ? this.setting(ADAPTIVE_KEY) : null;
+            this.log.info('[mode] ' + this._modeLabel() + ': theme "' + this._chosenName() + '"' + (variant === 'adaptive' ? ' (In Adaptive: ' + (own && own !== 'same' ? own : 'same as Comfort') + ')' : '') +
+                (this.waze ? ', Waze map ' + (this._mapWanted() ? 'wanted' : 'not wanted') : ''));
+        }
+        if (this.waze) this.waze.retry('drive mode ' + this._modeLabel());
         if (this._buildName() !== this.activeName) this._rebuild(); else { this._applyHidden(); this._mapCheck(); }
     }
 
@@ -2037,7 +2094,7 @@ class HudApp {
         if (this.screen.yielded || this.claimBy || this.vstate.hold()) return null;
         if (this._chosenName() !== 'off') return null;
         const themes = [];
-        ['inComfort', 'inSport', 'inEco'].forEach((k) => { const v = this.setting(k); if (v && v !== 'off' && themes.indexOf(v) < 0) themes.push(v); });
+        this._modeThemes().forEach((v) => { if (v && v !== 'off' && themes.indexOf(v) < 0) themes.push(v); });
         return themes.length === 1 && !CAL_LAYOUTS[themes[0]] ? themes[0] : null;
     }
     /** The layout to build: the one to show, or the one kept ready while BMW's own shows. */
@@ -2064,7 +2121,7 @@ class HudApp {
         if (this.target !== 'panel' || !this.started || this.setting('byMode') !== true) return false;
         if (this.scenesApart === false || this.claimBy || this.screen.yielded) return false;   // the HUD needs the shared scene
         if (this.vstate.hold() || this.vstate.drop()) return false;                            // switching off: let go of everything
-        return ['inComfort', 'inSport', 'inEco'].some((k) => { const v = this.setting(k); return v && v !== 'off'; });
+        return this._modeThemes().some((v) => v && v !== 'off');
     }
 
     /** The see-through hold layer up or down as wanted (cheap; from every status update). */
@@ -2101,6 +2158,7 @@ class HudApp {
         clearTimeout(this.statusAskT); this.statusAskT = null;
         this.car.setRedline(this.setting('redline'));
         const name = this._buildName();
+        if (this.waze && name !== this.activeName) this.waze.retry('theme "' + name + '"');
         this.activeName = name;
         // kept ready in the background (_prebuildName): every layer made hidden from the start, none ever drawn
         this.hidden = name !== 'off' && !!this._prebuildName();
