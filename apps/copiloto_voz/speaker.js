@@ -19,6 +19,15 @@ const MP = 'de.bmw.infotainment.entertainment.mediaplayer.MediaPlayer';
 const SOURCE_ID = 1046, SINK_ID = 1024;     // the apps' media source and the main sink (as RideTube)
 const LANG = 7695972;                       // the languageCode RideTube passes to playFile
 const MAX_PHRASE_MS = 20000;                // a phrase that has not ended by then is stopped
+const TMP_DIR = '/tmp/copiloto_voz';
+// each folder on the way to f: its mode and owner, to see in the log which one stops BMW's media engine
+function modes(f) {
+    const out = [];
+    for (let d = f; d && d !== path.dirname(d); d = path.dirname(d)) {
+        try { const st = fs.statSync(d); out.unshift(path.basename(d) + ' ' + (st.mode & 0o777).toString(8) + ' ' + st.uid); } catch (e) { out.unshift(path.basename(d) + ' ?'); }
+    }
+    return out.join(' / ');
+}
 const EXT = ['.m4a', '.mp3', '.aac', '.wav'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,7 +49,8 @@ class Speaker {
         this.state = null;                  // the player's state, as it says it
         this.time = null;                   // {elapsed, total}
         this.ended = null;                  // resolves the phrase playing now
-        this.useCopy = false;               // the copy in the data folder worked where the installed file did not
+        this.useCopy = null;                // 'copy' | 'tmp': the place that worked where the installed file did not
+        this.modesLogged = false;
     }
 
     /** The file for a phrase (bienvenida -> bienvenida.m4a ...), or null. */
@@ -122,15 +132,20 @@ class Speaker {
                 if (!r || (r.amError !== 'E_OK' && r.amError !== 'E_ALREADY_EXISTS')) throw new Error('el coche no conectó el audio (' + (r && r.amError) + ')');
                 connId = r.mainConnectionID;
             }
-            const tries = this.useCopy ? ['copy'] : ['installed', 'copy'];
+            // BMW's media engine opens the file as its own user: every folder on the way must let it through
+            // (RideTube's cache is 0711 under /var/opt). Installed, then a copy in the data folder, then one in /tmp
+            const tries = this.useCopy ? [this.useCopy] : ['installed', 'copy', 'tmp'];
             let reason = null;
             const why = [];
             for (let i = 0; i < tries.length; i++) {
-                const f = tries[i] === 'copy' ? this._copy(file) : file;
+                const f = tries[i] === 'copy' ? this._copy(file) : tries[i] === 'tmp' ? this._copy(file, TMP_DIR) : file;
+                if (tries[i] === 'installed') this._openUp(path.dirname(f));
                 reason = await this._play(f);
-                if (!/^error/.test(reason)) { if (tries[i] === 'copy') this.useCopy = true; break; }
-                why.push((tries[i] === 'copy' ? 'copia' : 'instalado') + ': ' + reason.replace(/^error /, ''));
+                if (!/^error/.test(reason)) { if (tries[i] !== 'installed') this.useCopy = tries[i]; break; }
+                why.push({ installed: 'instalado', copy: 'copia', tmp: '/tmp' }[tries[i]] + ': ' + reason.replace(/^error /, ''));
                 this.log.warn('speaker: ' + f + ' (' + tries[i] + '): ' + reason);
+                if (!this.modesLogged) this.log.info('speaker: folders: ' + modes(f));
+                if (i === tries.length - 1) this.modesLogged = true;
             }
             if (/^error/.test(reason)) throw new Error('el reproductor no pudo con ' + path.basename(file) + ' (' + why.join('; ') + ')');
             this.lastSaid = { name: name, at: Date.now() };
@@ -159,8 +174,25 @@ class Speaker {
         return why;
     }
 
-    // the phrase copied into the data folder, readable by the media player's user
-    _copy(file) {
+    // the app's own folders on the way to dir (from oap_<uid> down) opened for passing through (o+x), as RideTube's
+    _openUp(dir) {
+        const uid = process.getuid ? process.getuid() : -1;
+        for (let d = dir; d && d !== path.dirname(d) && !/^\/var\/opt\/public\/oap$/.test(d); d = path.dirname(d)) {
+            try { const st = fs.statSync(d); if (st.uid === uid && !(st.mode & 0o001)) fs.chmodSync(d, (st.mode & 0o777) | 0o011); } catch (e) { /* not ours */ }
+            if (/\/oap_\d+$/.test(d)) break;
+        }
+    }
+
+    // the phrase copied into the data folder (or dir), readable by the media player's user
+    _copy(file, dirIn) {
+        if (dirIn) {
+            try { fs.mkdirSync(dirIn); } catch (e) { /* there */ }
+            try { fs.chmodSync(dirIn, 0o755); } catch (e) { /* not ours */ }
+            const o = path.join(dirIn, path.basename(path.dirname(file)) + '_' + path.basename(file));
+            try { if (!fs.existsSync(o) || fs.statSync(o).size !== fs.statSync(file).size) fs.writeFileSync(o, fs.readFileSync(file)); fs.chmodSync(o, 0o644); } catch (e) { this.log.warn('speaker: copy to ' + dirIn + ': ' + errText(e)); }
+            return o;
+        }
+        this._openUp(this.dataDir);
         const dir = path.join(this.dataDir, 'voces');
         try { fs.mkdirSync(dir); } catch (e) { /* there */ }
         try { fs.chmodSync(this.dataDir, 0o711); fs.chmodSync(dir, 0o711); } catch (e) { /* not ours to change */ }

@@ -338,14 +338,25 @@ mgu.run({
 
         // the log's last lines, newest at the bottom
         const showLog = (cv) => {
-            const lines = bgs.ring.slice(-16);
-            cv.text('Últimas líneas del registro (también en el archivo copiloto_voz.log)', 30, 112, 19, C.dim, { literal: true });
-            if (!lines.length) cv.text('Todavía no hay nada.', 30, 146, 20, C.faint, { literal: true });
-            lines.forEach((l, k) => {
+            const LW = 1460, rows = [];
+            // the last lines, newest at the bottom; a long one wraps onto the next rows (the whole path shows)
+            bgs.ring.slice(-16).forEach((l) => {
                 const d = new Date(l.at), hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+                let msg = l.msg.replace(/\s+/g, ' '), first = true;
+                while (msg) {
+                    let n = msg.length;
+                    while (n > 1 && cv.textWidth(msg.slice(0, n), 16, { literal: true }) > LW) n = Math.floor(n * 0.9);
+                    rows.push({ hh: first ? hh : '', text: msg.slice(0, n), level: l.level });
+                    msg = msg.slice(n); first = false;
+                }
+            });
+            const shown = rows.slice(-16);
+            cv.text('Últimas líneas del registro (también en el archivo copiloto_voz.log)', 30, 112, 19, C.dim, { literal: true });
+            if (!shown.length) cv.text('Todavía no hay nada.', 30, 146, 20, C.faint, { literal: true });
+            shown.forEach((r, k) => {
                 const y = 142 + k * 21;
-                cv.text(hh, 30, y, 16, C.faint, { literal: true });
-                cv.text(fit(cv, l.msg.replace(/\s+/g, ' '), 16, 1460), 112, y, 16, l.level === 'error' ? C.red : l.level === 'warn' ? C.amber : C.text, { literal: true });
+                if (r.hh) cv.text(r.hh, 30, y, 16, C.faint, { literal: true });
+                cv.text(r.text, 112, y, 16, r.level === 'error' ? C.red : r.level === 'warn' ? C.amber : C.text, { literal: true });
             });
         };
 
