@@ -4,7 +4,7 @@
     {
       "dir": "idrive7-apps",
       "repo": "cauliflowermossgrape/idrive7-apps",
-      "commit": "2645ebe49b24b70ab4d572c180694e43689084ec",
+      "commit": "874f7b8e1e1ef3c0d2e6a6228b4bb91d5b27b4e2",
       "apps": [
         "redline",
         "draggy",
@@ -31,7 +31,7 @@
     {
       "dir": "namelsmissing",
       "repo": "NamelsMissing/mgu-apps",
-      "commit": "58d26d33520ae20826aad68e80122be64b40cf7f",
+      "commit": "d552013915e92f2462fee79ca43e9bf5fd406b61",
       "apps": [
         "dpf_monitor"
       ],
@@ -76,7 +76,7 @@
     {
       "dir": "robertnisipeanu",
       "repo": "robertnisipeanu/idrive-apps",
-      "commit": "6ae9c166ef5794bdf1468c13dd58e5ddcffef8eb",
+      "commit": "9da968c8644ef4f6bcce174b0836f9f24d8db7fb",
       "apps": [
         "robertn_waze_cluster"
       ],
@@ -91,12 +91,12 @@
     {
       "id": "cluster-render",
       "catalog": "robertnisipeanu/idrive-apps",
-      "version": "0.8.12"
+      "version": "0.8.13"
     },
     {
       "id": "waze-on-cluster",
       "catalog": "robertnisipeanu/idrive-apps",
-      "version": "0.14.12"
+      "version": "0.14.15"
     },
     {
       "id": "jap-ridetube-d",

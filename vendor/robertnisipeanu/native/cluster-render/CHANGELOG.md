@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.8.13
+
+The service runs in the head unit's slice for standard services, level
+with the HMI.
+
 ## 0.8.12
 
 `--skip` shows a scene file's animation sequence at its end on iDrive 7: at
