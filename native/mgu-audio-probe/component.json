@@ -1,20 +1,38 @@
 {
   "id": "mgu-audio-probe",
   "kind": "tool",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Audio probe",
-  "description": "Read-only report on how the head unit's sound is built (ALSA cards and running streams, sound servers, who holds the devices), to see whether the music's level can be read. Nothing is captured, played or changed. The report goes to a USB stick when one is in, and to /var/opt/mgu-audio-probe/reports. Play music while it runs: after the install and 3 minutes after each start.",
-  "mguHmi": ["ID7", "ID8"],
+  "description": "Read-only report on how the head unit's sound is built (ALSA cards and running streams, sound servers, who holds the devices), to see whether the music's level can be read. Nothing is captured, played or changed, and nothing runs by itself: the Audio probe app asks for it with its button, once music plays and a USB stick is in. The report goes to the stick, to the app's screen and to /var/opt/mgu-audio-probe/reports.",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
   "files": [
-    { "path": "probe.sh", "mode": "0755", "from": "files/probe.sh" }
+    {
+      "path": "probe.sh",
+      "mode": "0755",
+      "from": "files/probe.sh"
+    }
   ],
   "units": [
-    { "name": "mgu-audio-probe.service", "from": "units/mgu-audio-probe.service" },
-    { "name": "mgu-audio-probe.timer", "from": "units/mgu-audio-probe.timer" }
+    {
+      "name": "mgu-audio-probe.service",
+      "from": "units/mgu-audio-probe.service"
+    },
+    {
+      "name": "mgu-audio-probe.path",
+      "from": "units/mgu-audio-probe.path"
+    }
   ],
   "enable": [
-    { "unit": "mgu-audio-probe.timer", "target": "timers.target" }
+    {
+      "unit": "mgu-audio-probe.path",
+      "target": "paths.target"
+    }
   ],
   "recmgr": [],
-  "restart": ["mgu-audio-probe.service"]
+  "restart": [
+    "mgu-audio-probe.path"
+  ]
 }

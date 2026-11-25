@@ -5,16 +5,26 @@
 #   /var/opt/mgu-audio-probe/reports/  (the last 5),  /dev/shm/mgu-audio-probe.txt,
 #   a copy on every USB stick it can write to (/media/<label>/mgu-audio-probe-<time>.txt), and on stdout (the journal).
 # Each look is cut short (timeout, head -c) so a report stays small and nothing can hang the run.
-# Run as root by mgu-audio-probe.service: once after the install, and 3 minutes after each start of the head unit.
+# Run as root by mgu-audio-probe.service only when the Audio probe app asks (its button, once music plays and a USB
+# stick is in: the request file /dev/shm/mgu-audio-probe.request, mgu-audio-probe.path). Its state for the app goes to
+# /dev/shm/mgu-audio-probe.status: { state: running | done, at, bytes, usb: [...], file }.
 # Also by hand over SSH:  ssh root@<head unit> 'sh -s' < probe.sh > report.txt
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.1.0
+VERSION=0.2.0
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
 MAX=6000                                   # bytes kept of any one look
+REQUEST=/dev/shm/mgu-audio-probe.request
+STATUS=/dev/shm/mgu-audio-probe.status
+NOW=$(date +%s 2>/dev/null || echo 0)
+
+# the request taken (the path unit would start this again while it is there), the app told it runs
+rm -f "$REQUEST" 2>/dev/null
+status() { echo "$1" > "$STATUS.tmp" 2>/dev/null && chmod 0644 "$STATUS.tmp" && mv -f "$STATUS.tmp" "$STATUS"; }
+status "{\"state\":\"running\",\"at\":$NOW}"
 
 T=""
 command -v timeout >/dev/null 2>&1 && T="timeout 8"
@@ -145,6 +155,8 @@ for m in /media/*; do
     cp "$TMP" "$m/mgu-audio-probe-$STAMP.txt" 2>/dev/null && sync && copied="$copied $m"
 done
 size=$(wc -c < "$TMP" 2>/dev/null)
+usbjson=$(for m in $copied; do printf '"%s",' "$m"; done | sed 's/,$//')
+status "{\"state\":\"done\",\"at\":$(date +%s 2>/dev/null || echo 0),\"bytes\":${size:-0},\"usb\":[$usbjson],\"file\":\"mgu-audio-probe-$STAMP.txt\"}"
 # the report on stdout too: in the journal (the Store's Phone access, logs) when the service runs it, and in the
 # file when it is run by hand over SSH
 cat "$TMP"
