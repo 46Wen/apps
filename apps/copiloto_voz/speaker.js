@@ -49,6 +49,7 @@ class Speaker {
         this.state = null;                  // the player's state, as it says it
         this.time = null;                   // {elapsed, total}
         this.ended = null;                  // resolves the phrase playing now
+        this.lastConnId = null;            // our last connection (listed a moment after its disconnect)
         this.useCopy = null;                // 'copy' | 'tmp': the place that worked where the installed file did not
         this.modesLogged = false;
     }
@@ -121,7 +122,12 @@ class Speaker {
             // the apps' media source already on the speakers (RideTube open): the phrase is said on that connection, which
             // is left as it was. A video playing is stopped first: RideTube holds it as paused where it was (its
             // service treats a STOP it did not ask for mid-file so), and the driver resumes it with Play
-            const shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
+            let shared = conns.filter((c) => c && c.sourceID === SOURCE_ID)[0] || null;
+            // our own connection of the last phrase, still listed for a moment after its disconnect: not RideTube's
+            if (shared && this.lastConnId !== null && shared.mainConnectionID === this.lastConnId) {
+                shared = (await this._gone(this.lastConnId)) ? null : shared;
+                if (!shared) conns.splice(0, conns.length, ...((await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null)) || []));
+            }
             if (shared) {
                 onShared = true;
                 const st = await this.signals.get(this.mp, 'playerState').catch(() => this.state);
@@ -163,10 +169,23 @@ class Speaker {
                 await this.signals.call(this.mp, 'sendButtonEvent', { button: 'STOP', action: 'PRESS' }, 3000).catch(() => {});
                 const d = await this.signals.call(this.cc, 'disconnect', { mainConnectionID: connId }, 5000).catch((e) => errText(e));
                 this.log.info('speaker: disconnect ' + JSON.stringify(d));
+                this.lastConnId = connId;
+                await this._gone(connId);
                 if (before) await this._restore(before);
             }
             this.busy = false;
         }
+    }
+
+    // wait (at most 3 s) for a connection to leave the Audio Manager's list; -> true when it did
+    async _gone(id) {
+        for (let i = 0; i < 15; i++) {
+            const list = await this.signals.get(this.cc, 'listOfMainConnections').catch(() => null);
+            if (!Array.isArray(list) || !list.some((c) => c && c.mainConnectionID === id)) return true;
+            await sleep(200);
+        }
+        this.log.warn('speaker: connection ' + id + ' still listed 3 s after its disconnect');
+        return false;
     }
 
     // playFile and wait for its end; -> why it ended ('error ...' when it did not play)
