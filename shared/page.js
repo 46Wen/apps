@@ -47,7 +47,7 @@ const MAP_MODE_KEY = { comfort: 'mapComfort', sport: 'mapSport', eco: 'mapEco' }
 const ADAPTIVE_MODE = ['inAdaptive', 'Adaptive'];
 const MAP_KEYS = ['mapComfort', 'mapSport', 'mapEco', 'mapAdaptive'];
 // the Log tab's filters (logring.js kind())
-const LOG_FILTERS = [['all', 'All'], ['waze', 'Waze map'], ['mode', 'Drive mode'], ['problems', 'Problems']];
+const LOG_FILTERS = [['all', 'All'], ['waze', 'Waze map'], ['mode', 'Drive mode'], ['slots', 'Cluster slots'], ['problems', 'Problems']];
 const TAB = {
     look: { icon: 'screen' },
     readouts: { name: 'Readouts', icon: 'lines' },

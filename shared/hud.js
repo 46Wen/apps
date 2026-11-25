@@ -965,6 +965,15 @@ class HudApp {
         c.on('budget', (capKb, maxKb, reason) => this.log.info('budget' + tag + ' ' + capKb + '/' + maxKb + ' kb/s (' + reason + ')'));
         c.on('status', (text) => {
             this.log.info('cluster-render status: ' + text);
+            // the KOMBI's slots (its own boxes, the black ones over a theme among them): one line each, under the
+            // Log tab's "Cluster slots" chip, logged again only when they change, with the drive mode and what we show
+            const slots = String(text).split(/\n|;\s*/).map((l) => l.trim()).filter((l) => /slot 0x[0-9a-f]+/i.test(l));
+            const key = slots.join('|');
+            if (slots.length && key !== this.slotsSaid) {
+                this.slotsSaid = key;
+                const at = (this.driveMode ? MODE_NAME[this.driveMode] || this.driveMode : 'mode unknown') + ', ' + (this.shownLayout ? this.shownLayout() : '?');
+                slots.forEach((l) => this.log.info('[slots] ' + at + ': ' + l.slice(0, 160)));
+            }
             this._stallsFromStatus(text);
             const ids = sceneIdsOf(text);
             if (!ids) return;
@@ -1027,7 +1036,11 @@ class HudApp {
             this._status();
             if (this.client.ready) this.client.status();      // the scene ids (scenesApart) can change: guard, update
         }), 60000);
-        this.statusTimer = setInterval(() => this._guard('status', () => this._status()), 5000);
+        this.statusTimer = setInterval(() => this._guard('status', () => {
+            this._status();
+            // config.slotWatch (M Cluster): while the theme shows, cluster-render's status (the KOMBI's slots) every 10 s
+            if (this.config.slotWatch && this.client.ready && this.activeName !== 'off' && !this.hidden && (this.slotTick = (this.slotTick || 0) + 1) % 2 === 0) this.client.status();
+        }), 5000);
         if (this.target === 'hud') this.claimTimer = setInterval(() => this._guard('hud claim', () => this._hudClaim()), CLAIM_MS);
         this._status();
         this._startDme();

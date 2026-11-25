@@ -80,6 +80,7 @@ function kind(l) {
     const m = l.msg;
     if (/^\[waze#|^waze[: ]|map host|map window|cluster-render: the map|hosts from layers/.test(m)) return 'waze';
     if (/^drive mode|^theme |^"[^"]*" (ready|shown)|^off: |no drive mode|^\[adaptive\]|^\[mode\]/.test(m)) return 'mode';
+    if (/^\[slots\]/.test(m)) return 'slots';
     return 'other';
 }
 

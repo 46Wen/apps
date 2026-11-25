@@ -10,7 +10,7 @@ con sí / no y haz las fotos marcadas con 📷.
 
 | App / herramienta | Versión |
 |---|---|
-| M Cluster | 0.2.0 (nueva) |
+| M Cluster | 0.2.1 (nueva) |
 | Copiloto de voz | 0.8.3 |
 | Ambient config | 2.7.2704 |
 | Audio probe | app 0.6.0, herramienta 0.6.0 |
@@ -31,8 +31,9 @@ con sí / no y haz las fotos marcadas con 📷.
 
 1. En **Comfort** y **Eco Pro**: el cuadro de BMW de siempre, con el mapa de Waze. ¿Sí?
 2. Pasa a **Sport** y a **Sport+**: sale el cuadro M en uno o dos segundos. ¿Sí?
-3. ¿Se ven los **recuadros negros** abajo, junto a la marcha? Si salen: 📷 foto, y prueba **M Cluster → Settings →
-   Leave BMW's bottom strip clear** → On. ¿Desaparecen?
+3. ¿Se ven los **recuadros negros**? Si salen: 📷 foto del cuadro (que se vea dónde están), y sin salir de Sport abre
+   **M Cluster → Log → Cluster slots**: 📷 foto de esas líneas (dicen qué está dibujando BMW en cada hueco del cuadro).
+   Prueba también a poner D y R con el freno pisado y repite la foto del Log si cambian.
 4. Vuelve a Comfort: ¿vuelve el mapa de Waze al cuadro de BMW?
 
 ## 4. Música y Music wave (5 min)

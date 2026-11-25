@@ -2,7 +2,7 @@
   "id": "m_cluster",
   "title": "M Cluster",
   "description": "M-style instrument cluster in SPORT and SPORT PLUS (an M8's cluster: shift lights, boost and temperatures); in every other mode BMW's own cluster stays, untouched (and Waze on Cluster's map with it). The light version of Cluster Themes: install one or the other, not both.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "vendor": "custom",
   "loggingId": "OAC2",
   "autostart": true,
@@ -1224,6 +1224,7 @@
       "powerKw": 285
     },
     "media": false,
-    "hideMap": true
+    "hideMap": true,
+    "slotWatch": true
   }
 }
