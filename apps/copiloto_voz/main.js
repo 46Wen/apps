@@ -195,7 +195,8 @@ mgu.run({
                 };
                 walk2(db, [], 'catalog');
                 const ids = Object.keys(db.interfaces || {}).filter((k) => /WindowsRoofMaster/.test(k));
-                log.info('WindowsRoofMaster in the catalog as: ' + (ids.join(', ') || 'none'));
+                log.info('WindowsRoofMaster in the catalog as: ' + (ids.join(', ') || 'none') + '; instances ' +
+                    ids.map((k) => JSON.stringify((db.instanceIDs || {})[k] || null)).join(', '));
                 log.info('windows attributes: ' + (refs.length ? refs.join(' || ') : 'none found for ' + wrappers.join(', ')));
             } catch (e) { log.warn('catalog walk: ' + e.message); }
             // this app's own config of DoorsWindowsRoofMirrors (made by MainApp at install): its attributes
@@ -215,7 +216,7 @@ mgu.run({
                 if (!doorProxy) doorProxy = await bg.signals.proxy('de.bmw.body.DoorsWindowsRoofMirrors', '1').catch(() => null);
                 const v = doorProxy ? await bg.signals.get(doorProxy, 'CentralLockingSystemAndPanelStatus', 3000).catch(() => null) : null;
                 if (v && typeof v === 'object') doorsLast = v;
-                if (!winProxy) winProxy = await bg.signals.proxy('de.bmw.body.WindowsRoofMaster', '1').catch(() => null);
+                if (!winProxy) winProxy = await bg.signals.proxy('de.bmw.body.doorsandwindows.WindowsRoofMaster', '1').catch(() => null);
                 for (const d of ['DRD', 'PSD']) {
                     const w = winProxy ? await bg.signals.get(winProxy, 'statusWindowsRoofMaster' + d, 3000).catch(() => null) : null;
                     if (w && typeof w === 'object') Object.keys(w).forEach((k) => { winLast['W' + d + '.' + k] = w[k]; });
@@ -312,7 +313,7 @@ mgu.run({
             engine.openings(o);
             changed();
         } });
-        await W('de.bmw.body.WindowsRoofMaster', ['ventanillas'], {
+        await W('de.bmw.body.doorsandwindows.WindowsRoofMaster', ['ventanillas'], {
             statusWindowsRoofMasterDRD: (v) => winFeed('DRD', v),
             statusWindowsRoofMasterPSD: (v) => winFeed('PSD', v),
         });
