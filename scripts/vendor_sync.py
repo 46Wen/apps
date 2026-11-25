@@ -113,7 +113,93 @@ def redline_no_hud(app_dir):
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
-PATCHES = {'redline_no_hud': redline_no_hud}
+def ambient_music(app_dir):
+    """Ambient config with the Music wave (46Wen): music.js from vendor/patches/ambient_config, a 'music' scene in
+    scenes.js, its button on the Animations tab, the media state as an optional signal, and the version as
+    x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older than the original's next one.
+    Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
+    PATCH_REV = 1
+    shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'ambient_config', 'music.js'), os.path.join(app_dir, 'music.js'))
+
+    def edit(name, pairs):
+        p = os.path.join(app_dir, name)
+        s = open(p, encoding='utf-8').read()
+        for a, b in pairs:
+            if s.count(a) != 1:
+                raise PatchError('ambient_config %s: %r found %d times, expected once' % (name, a[:60], s.count(a)))
+            s = s.replace(a, b)
+        open(p, 'w', encoding='utf-8', newline='\n').write(s)
+        subprocess.run(['node', '--check', p], check=True)
+
+    edit('scenes.js', [
+        (" *   welcome    a sweep",
+         " *   music      (46Wen, music.js) the Colour wave going with the music: rolling only while something plays, a new\n"
+         " *              track's colours further round; with an audio level, louder = faster, a wider swing and brighter\n"
+         " *   welcome    a sweep"),
+        ("const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave'];",
+         "const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave', 'music'];"),
+        ("wave: 'Colour wave',", "wave: 'Colour wave', music: 'Music wave',"),
+        ("/** What a light shows: the scene,",
+         "/* 46Wen: the Music wave's music (music.js: clock(), level(), hueShift()); without it, a Colour wave. */\n"
+         "let music = null;\n"
+         "function setMusic(m) { music = m; }\n\n"
+         "/** What a light shows: the scene,"),
+        ("    case 'welcome': {",
+         "    case 'music': {\n"
+         "        // (46Wen) the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens it,\n"
+         "        // the brightness in steps of 5 so a level's small changes don't cost writes\n"
+         "        const at = typeof light.bus === 'number' ? light.bus * 0.25 : light.y;\n"
+         "        const lv = music ? music.level() : null, clock = music ? music.clock() : t;\n"
+         "        const swing = lv == null ? 60 : 25 + 65 * lv, turn = music ? music.hueShift() : 0;\n"
+         "        const h = hueOf(base.rgb) + turn + swing * Math.sin(2 * Math.PI * (clock / (5000 * k) - at));\n"
+         "        const bright = lv == null ? base.bright : Math.max(5, Math.round(base.bright * (0.35 + 0.65 * lv) / 5) * 5);\n"
+         "        return { rgb: hsv(((h % 360) + 360) % 360, 1, 1), bright };\n"
+         "    }\n"
+         "    case 'welcome': {"),
+        ("module.exports = { KINDS, NAMES, lightAt, setDecor,", "module.exports = { KINDS, NAMES, lightAt, setDecor, setMusic,"),
+    ])
+
+    edit('main.js', [
+        (" *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, how fast,",
+         " *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, Music wave (46Wen: music.js), how fast,"),
+        ("const S = require('./scenes');", "const S = require('./scenes');\nconst { Music } = require('./music');"),
+        ("    S.setDecor(settings.get('decorWith'));\n",
+         "    S.setDecor(settings.get('decorWith'));\n"
+         "    // 46Wen: the Music wave's music (music.js), before the first scene goes on\n"
+         "    const music = new Music({ log });\n"
+         "    S.setMusic(music);\n"),
+        ("    control.start();\n",
+         "    control.start();\n"
+         "    // (46Wen) the media state watched only while a Music wave is on (the driver's look or a driving mode's)\n"
+         "    const musicOn = () => music.use(!!lights.scene && lights.scene.kind === 'music', signals);\n"
+         "    lights.on('change', musicOn);\n"
+         "    musicOn();\n"),
+        ("    return { ambient, lights, control, active, others, strobe, checks, lookAgain:",
+         "    return { ambient, lights, control, active, others, strobe, checks, music, lookAgain:"),
+        ("const { ambient, lights, control, active, others, strobe, checks, lookAgain } = ctx.background",
+         "const { ambient, lights, control, active, others, strobe, checks, music, lookAgain } = ctx.background"),
+        ("['wave', 'Colour rolling from side to side']];",
+         "['wave', 'Colour rolling from side to side'], ['music', music.label()]];"),
+        ("const y = 92 + i * 66, on = isOn() && l.kind === k;", "const y = 92 + i * 58, on = isOn() && l.kind === k;"),
+        ("G.button(cv, t, 44, y, 220, 50, S.NAMES[k],", "G.button(cv, t, 44, y, 220, 46, S.NAMES[k],"),
+        ("cv.text(d, 284, y + 32, 20,", "cv.text(d, 284, y + 30, 20,"),
+    ])
+
+    p = os.path.join(app_dir, 'app.json')
+    a = json.load(open(p, encoding='utf-8'))
+    x, y, z = (int(n) for n in a['version'].split('.'))
+    a['version'] = '%d.%d.%d' % (x, y, z * 100 + PATCH_REV)
+    a['description'] = a['description'] + ' (46Wen: with a Music wave)'
+    a['signals']['de.bmw.infotainment.hmi.hmimediastate.HmiMediaState'] = {
+        '_instances': 'HMI_CID',
+        '_optional': 'now playing: the Music wave rolls while something plays, new colours each track (46Wen)',
+        'playerMetadata': 'rs',
+        'trackProgress': 'rs',
+    }
+    open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
+
+
+PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music}
 
 PRIORITY_MARK = "require('./priority').lower(log, SPEC.config)"
 

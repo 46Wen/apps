@@ -1,13 +1,19 @@
 {
   "id": "ambient_config",
   "title": "Ambient config",
-  "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.7.26",
+  "description": "Any colour on the ambient light, animations, and a look for each driving mode (46Wen: with a Music wave)",
+  "version": "2.7.2601",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
-  "mguHmi": ["ID7", "ID8"],
-  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
   "autostart": true,
   "signals": {
     "de.bmw.infotainment.misc.ComfortFunctionIuK": {
@@ -48,6 +54,12 @@
       "_optional": "the car's speed: driven (for a car that does not say it is locked and left), and the light show only standing still",
       "statusCarSpeed2": "rs",
       "statusLightStatus": "rs"
+    },
+    "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {
+      "_instances": "HMI_CID",
+      "_optional": "now playing: the Music wave rolls while something plays, new colours each track (46Wen)",
+      "playerMetadata": "rs",
+      "trackProgress": "rs"
     }
   },
   "screens": [
@@ -107,7 +119,16 @@
       "label": "Decor lights (dash, under the door trim) with",
       "type": "choice",
       "default": "upper",
-      "options": [["upper", "Upper lights"], ["lower", "Lower lights (like BMW)"]]
+      "options": [
+        [
+          "upper",
+          "Upper lights"
+        ],
+        [
+          "lower",
+          "Lower lights (like BMW)"
+        ]
+      ]
     },
     {
       "key": "nightDim",
@@ -185,7 +206,16 @@
       "type": "choice",
       "default": "all",
       "hidden": true,
-      "options": [["all", "All lights"], ["high", "High beam"]]
+      "options": [
+        [
+          "all",
+          "All lights"
+        ],
+        [
+          "high",
+          "High beam"
+        ]
+      ]
     },
     {
       "key": "strobeEvery",
@@ -193,7 +223,28 @@
       "type": "choice",
       "default": "0",
       "hidden": true,
-      "options": [["0", "Max"], ["250", "4"], ["333", "3"], ["500", "2"], ["1000", "1"]]
+      "options": [
+        [
+          "0",
+          "Max"
+        ],
+        [
+          "250",
+          "4"
+        ],
+        [
+          "333",
+          "3"
+        ],
+        [
+          "500",
+          "2"
+        ],
+        [
+          "1000",
+          "1"
+        ]
+      ]
     },
     {
       "key": "policeBurst",
@@ -201,7 +252,24 @@
       "type": "choice",
       "default": "4",
       "hidden": true,
-      "options": [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]]
+      "options": [
+        [
+          "1",
+          "1"
+        ],
+        [
+          "2",
+          "2"
+        ],
+        [
+          "3",
+          "3"
+        ],
+        [
+          "4",
+          "4"
+        ]
+      ]
     },
     {
       "key": "strobeFlashMs",
@@ -209,7 +277,24 @@
       "type": "choice",
       "default": "80",
       "hidden": true,
-      "options": [["50", "50 ms"], ["80", "80 ms"], ["100", "100 ms"], ["150", "150 ms"]]
+      "options": [
+        [
+          "50",
+          "50 ms"
+        ],
+        [
+          "80",
+          "80 ms"
+        ],
+        [
+          "100",
+          "100 ms"
+        ],
+        [
+          "150",
+          "150 ms"
+        ]
+      ]
     },
     {
       "key": "policeOrder",
@@ -217,7 +302,20 @@
       "type": "choice",
       "default": "lbr",
       "hidden": true,
-      "options": [["lbr", "Left, both, right"], ["lrb", "Left, right, both"], ["lr", "Left, right"]]
+      "options": [
+        [
+          "lbr",
+          "Left, both, right"
+        ],
+        [
+          "lrb",
+          "Left, right, both"
+        ],
+        [
+          "lr",
+          "Left, right"
+        ]
+      ]
     },
     {
       "key": "strobePattern",
@@ -225,7 +323,20 @@
       "type": "choice",
       "default": "police",
       "hidden": true,
-      "options": [["police", "Police"], ["both", "Strobe"], ["alternate", "In turn"]]
+      "options": [
+        [
+          "police",
+          "Police"
+        ],
+        [
+          "both",
+          "Strobe"
+        ],
+        [
+          "alternate",
+          "In turn"
+        ]
+      ]
     },
     {
       "key": "strobeLever",
@@ -240,7 +351,20 @@
       "type": "choice",
       "default": "normal",
       "hidden": true,
-      "options": [["fast", "Fast"], ["normal", "Normal"], ["slow", "Slow"]]
+      "options": [
+        [
+          "fast",
+          "Fast"
+        ],
+        [
+          "normal",
+          "Normal"
+        ],
+        [
+          "slow",
+          "Slow"
+        ]
+      ]
     },
     {
       "key": "showRate",
@@ -248,7 +372,16 @@
       "type": "choice",
       "default": "normal",
       "hidden": true,
-      "options": [["fast", "Fast"], ["normal", "Normal"]]
+      "options": [
+        [
+          "fast",
+          "Fast"
+        ],
+        [
+          "normal",
+          "Normal"
+        ]
+      ]
     },
     {
       "key": "drive",

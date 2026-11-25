@@ -5,7 +5,7 @@
  * Tabs:
  *   Colour         the colour ring (and white) for the whole car, the upper lights or the lower ones, the
  *                  brightness, and the car from above lit as the car is; Original colour gives the light back
- *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, how fast, shown moving on the car picture;
+ *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, Music wave (46Wen: music.js), how fast, shown moving on the car picture;
  *                  Turn signal glow (that side's door lines blink green with it), Open door red (its line blinking) and
  *                  Hazard red (every light pulses red while the hazards are on), each off until switched on
  *   Driving modes  for each driving mode the car has: Choose colour (the Colour and Animations tabs change that mode's
@@ -35,6 +35,7 @@ const { legendMark } = require('./cabin');
 const { drawCarView, MAX_PITCH, MAX_ROLL } = require('./carview');
 const { sample } = require('./lin');
 const S = require('./scenes');
+const { Music } = require('./music');
 
 const W = 1600, H = 520;
 const TABS = ['Colour', 'Animations', 'Driving modes', 'Favourites'];
@@ -83,12 +84,19 @@ async function background(bg) {
     diag.quiet = true; diag.busyLog = false;
     // the lights found at an earlier start: the colour goes out at once, and the buses are read again after it
     S.setDecor(settings.get('decorWith'));
+    // 46Wen: the Music wave's music (music.js), before the first scene goes on
+    const music = new Music({ log });
+    S.setMusic(music);
     // light reads that failed (busy or silent) READ_FAILS times in a row: the body module's write is tried first and the
     // reads are left out, as they hang it on some cars (#197, lights.js "Blind")
     const READ_FAILS = 3;
     const lights = new Lights({ diag, log, known: settings.get('lightsKnown'), writeFirst: (Number(settings.get('lightsReadFails')) || 0) >= READ_FAILS });
     const control = new Control({ settings, lights, ambient, log });
     control.start();
+    // (46Wen) the media state watched only while a Music wave is on (the driver's look or a driving mode's)
+    const musicOn = () => music.use(!!lights.scene && lights.scene.kind === 'music', signals);
+    lights.on('change', musicOn);
+    musicOn();
     // with the lights answering, the driving modes' looks replace BMW's colours by mode (ambient.js)
     lights.on('change', () => { ambient.slotsOff = lights.lights.length > 0; });
     lights.on('found', (l) => settings.set('lightsKnown', l));
@@ -233,7 +241,7 @@ async function background(bg) {
         if (key === 'strobeLever') watchLever();
     });
     // (the car locked and left mid-flash: the gate says no at the next step and the strobe stops)
-    return { ambient, lights, control, active, others, strobe, checks, lookAgain: () => lights.find({ force: true }).then(counted) };
+    return { ambient, lights, control, active, others, strobe, checks, music, lookAgain: () => lights.find({ force: true }).then(counted) };
 }
 
 const nearest = (rgb) => {
@@ -250,7 +258,7 @@ mgu.run({
     background,
     async start(ctx) {
         const { ui, settings, log } = ctx;
-        const { ambient, lights, control, active, others, strobe, checks, lookAgain } = ctx.background || await background(ctx);
+        const { ambient, lights, control, active, others, strobe, checks, music, lookAgain } = ctx.background || await background(ctx);
         // the Strobe tab only with its experimental setting on
         const tabs = () => TABS.concat(settings.get('strobe') === true ? ['Strobe'] : []);
         // editing: null (the driver's own look) or a driving mode whose look the Colour and Animations tabs change
@@ -393,11 +401,11 @@ mgu.run({
             const l = look();
             G.panel(cv, t, 24, 44, 640, 468, editing ? 'Animation for ' + MODE_NAMES[editing] : 'Animation');
             const kinds = [['solid', 'No animation, a steady colour'], ['breathing', 'Slowly brighter and dimmer'], ['rainbow', 'Every colour in turn'],
-                ['fade', 'Upper colour to lower colour and back'], ['wave', 'Colour rolling from side to side']];
+                ['fade', 'Upper colour to lower colour and back'], ['wave', 'Colour rolling from side to side'], ['music', music.label()]];
             kinds.forEach(([k, d], i) => {
-                const y = 92 + i * 66, on = isOn() && l.kind === k;
-                G.button(cv, t, 44, y, 220, 50, S.NAMES[k], () => { setLook({ kind: k }); return redraw(); }, { primary: on, key: 'k-' + k });
-                cv.text(d, 284, y + 32, 20, on ? t.text : t.dim);
+                const y = 92 + i * 58, on = isOn() && l.kind === k;
+                G.button(cv, t, 44, y, 220, 46, S.NAMES[k], () => { setLook({ kind: k }); return redraw(); }, { primary: on, key: 'k-' + k });
+                cv.text(d, 284, y + 30, 20, on ? t.text : t.dim);
             });
             cv.text('Speed', 44, 470, 20, t.dim);
             G.segment(cv, t, 120, 440, 436, 48, [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']]

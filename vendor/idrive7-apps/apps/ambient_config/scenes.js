@@ -8,13 +8,15 @@
  *   rainbow    the whole cabin through every colour
  *   fade       slowly from the upper colour to the lower one and back
  *   wave       a band of colour rolling from one side of the cabin to the other (bus by bus)
+ *   music      (46Wen, music.js) the Colour wave going with the music: rolling only while something plays, a new
+ *              track's colours further round; with an audio level, louder = faster, a wider swing and brighter
  *   welcome    a sweep of the colour from the dash to the rear, once (then solid)
  *   pulse      red for 1.5 s, then the colour (Sport)
  * speed: 1 slow, 2 normal, 3 fast.
  */
-const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave'];
+const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave', 'music'];
 const ONCE = { welcome: 2600, pulse: 2000 };
-const NAMES = { solid: 'Solid', breathing: 'Breathing', rainbow: 'Rainbow', fade: 'Smooth fade', wave: 'Colour wave', welcome: 'Welcome sweep', pulse: 'Sport pulse' };
+const NAMES = { solid: 'Solid', breathing: 'Breathing', rainbow: 'Rainbow', fade: 'Smooth fade', wave: 'Colour wave', music: 'Music wave', welcome: 'Welcome sweep', pulse: 'Sport pulse' };
 const PERIOD = { 1: 1.6, 2: 1, 3: 0.55 };      // x the base time of each animation
 
 function hsv(h, s, v) {
@@ -52,6 +54,10 @@ let decorLower = false;
 function setDecor(v) { decorLower = v === 'lower'; }
 const partOf = (light) => (light.part === 'upper' && decorLower && /\bdecor\b/i.test(light.name || '') ? 'lower' : light.part);
 
+/* 46Wen: the Music wave's music (music.js: clock(), level(), hueShift()); without it, a Colour wave. */
+let music = null;
+function setMusic(m) { music = m; }
+
 /** What a light shows: the scene, the light ({ part, name, y }), t ms since the scene started. */
 function lightAt(scene, light, t) {
     const own = scene[partOf(light) === 'upper' ? 'upper' : 'lower'] || scene.upper;
@@ -75,6 +81,16 @@ function lightAt(scene, light, t) {
         const h = hueOf(base.rgb) + 60 * Math.sin(2 * Math.PI * (t / (5000 * k) - at));
         return { rgb: hsv((h + 360) % 360, 1, 1), bright: base.bright };
     }
+    case 'music': {
+        // (46Wen) the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens it,
+        // the brightness in steps of 5 so a level's small changes don't cost writes
+        const at = typeof light.bus === 'number' ? light.bus * 0.25 : light.y;
+        const lv = music ? music.level() : null, clock = music ? music.clock() : t;
+        const swing = lv == null ? 60 : 25 + 65 * lv, turn = music ? music.hueShift() : 0;
+        const h = hueOf(base.rgb) + turn + swing * Math.sin(2 * Math.PI * (clock / (5000 * k) - at));
+        const bright = lv == null ? base.bright : Math.max(5, Math.round(base.bright * (0.35 + 0.65 * lv) / 5) * 5);
+        return { rgb: hsv(((h % 360) + 360) % 360, 1, 1), bright };
+    }
     case 'welcome': {
         // the lights come on from the dash to the rear
         const front = t / ONCE.welcome * 1.4 - 0.2, f = Math.max(0, Math.min(1, (front - light.y) / 0.2));
@@ -89,4 +105,4 @@ function lightAt(scene, light, t) {
     }
 }
 
-module.exports = { KINDS, NAMES, lightAt, setDecor, partOf, lasts, moves, hsv, hueOf, snapHue, stepHue, hex, mix };
+module.exports = { KINDS, NAMES, lightAt, setDecor, setMusic, partOf, lasts, moves, hsv, hueOf, snapHue, stepHue, hex, mix };
