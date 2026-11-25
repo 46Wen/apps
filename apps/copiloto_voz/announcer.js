@@ -21,6 +21,7 @@ class Announcer {
         this.waiting = [];        // [{ event, at }]
         this.speaking = null;     // the event being said
         this.dropped = 0;
+        this.gapMs = opts.gapMs === undefined ? 1500 : opts.gapMs;
     }
 
     add(event) {
@@ -41,8 +42,9 @@ class Announcer {
         const next = this.waiting.shift();
         this.speaking = next.event;
         Promise.resolve().then(() => this.speak(next.event)).catch(() => {}).then(() => {
-            this.speaking = null;
-            this.pump();
+            // a pause between two phrases, so one does not run into the next
+            const next2 = () => { this.speaking = null; this.pump(); };
+            if (this.gapMs > 0) setTimeout(next2, this.gapMs); else next2();
         });
     }
 

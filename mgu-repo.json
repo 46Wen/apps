@@ -1,21 +1,130 @@
 {
   "schema": 1,
-  "apps": {
-    "path": "apps/*",
-    "manifest": "app.json",
-    "mguHmi": [
-      "ID7"
-    ],
-    "build": {
-      "python": "kit/tools/build.py",
-      "args": [
-        "{id}"
-      ],
-      "sdk": "oap-sdk",
-      "output": "dist/{id}@{version}.tgz"
-    }
-  },
   "components": [
+    {
+      "id": "cluster_themes",
+      "kind": "app",
+      "path": "apps/cluster_themes",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk",
+          "shared/hud.js",
+          "shared/hud_text.js",
+          "shared/hud_data.js",
+          "shared/hud_themes.js",
+          "shared/layouts.js",
+          "shared/shaders.js",
+          "shared/icons.js",
+          "shared/shift_score.js",
+          "shared/demo_script.js",
+          "shared/sun.js",
+          "shared/cluster_render_client.js",
+          "shared/calibration.js",
+          "shared/visible.js",
+          "shared/page.js",
+          "shared/waze.js",
+          "shared/previews.js",
+          "shared/sensors.js",
+          "shared/badges.js",
+          "shared/screen.js",
+          "shared/runs.js",
+          "shared/tz.js",
+          "shared/holidays.js",
+          "shared/vehicle_state.js",
+          "shared/shift_cue.js",
+          "shared/smart_temps.js",
+          "shared/hud_holiday.js",
+          "shared/garland.js"
+        ]
+      }
+    },
+    {
+      "id": "fuel_link",
+      "kind": "app",
+      "path": "apps/fuel_link",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk"
+        ]
+      }
+    },
+    {
+      "id": "copiloto_voz",
+      "kind": "app",
+      "path": "apps/copiloto_voz",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk",
+          "shared/tz.js"
+        ]
+      }
+    },
+    {
+      "id": "audio_probe",
+      "kind": "app",
+      "path": "apps/audio_probe",
+      "mguHmi": [
+        "ID7"
+      ],
+      "build": {
+        "python": "kit/tools/build.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit/tools",
+          "kit/runtime",
+          "kit/platform",
+          "kit/localization",
+          "kit/LICENSE",
+          "oap-sdk"
+        ]
+      }
+    },
     {
       "id": "redline",
       "kind": "app",
@@ -282,11 +391,26 @@
       ]
     },
     {
+      "id": "copiloto-voz-voces",
+      "kind": "tool",
+      "path": "tools-prebuilt/copiloto-voz-voces",
+      "title": "Copiloto de voz: voces",
+      "description": "La voz de Copiloto de voz (español, Elvira) en /var/opt, donde el reproductor de BMW puede abrirla",
+      "requires": {
+        "mgu-deploy": "0.4.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
+    },
+    {
       "id": "mgu-audio-probe",
       "kind": "tool",
       "path": "native/mgu-audio-probe",
       "title": "Audio probe",
-      "description": "Read-only report on how the head unit's sound is built, to see whether the music's level can be read (46Wen, for Ambient config's Music wave). Nothing is captured, played or changed; the report goes to a USB stick",
+      "description": "Read-only report on how the head unit's sound is built, to see whether the music's level can be read (46Wen, for Ambient config's Music wave). Nothing is played or changed, and nothing runs by itself: the Audio probe app asks for it",
       "optional": true,
       "uninstallable": true,
       "mguHmi": [

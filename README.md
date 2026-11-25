@@ -9,8 +9,8 @@
 | App | Para qué sirve | De dónde viene | Licencia |
 |---|---|---|---|
 | **Cluster Themes** (`cluster_themes`) | Redibuja el cuadro de instrumentos con un tema (GT3, M, M view, Vector, Sport, Cruise...), también según el modo de conducción | [bimmer-lab/apps](https://github.com/bimmer-lab/apps) + cambios propios | MIT |
-| **Fuel Link** (`fuel_link`) | Combustible y autonomía en el móvil por la tailnet | propia | MIT |
-| **Copiloto de voz** (`copiloto_voz`) | Su BMW le habla, por prioridad y nunca durante una llamada: bienvenida al arrancar, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas. [Cómo funciona](apps/copiloto_voz/README.md) | propia | MIT |
+| **Fuel Link** (`fuel_link`) | Combustible y autonomía en el móvil por la tailnet; sin icono ni pantalla, funciona en segundo plano | propia | MIT |
+| **Copiloto de voz** (`copiloto_voz`) | Su BMW le habla, por prioridad y nunca durante una llamada: bienvenida al arrancar, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, mantenimiento, ventanillas y pausas, con la voz Elvira. [Cómo funciona](apps/copiloto_voz/README.md) | propia | MIT |
 | **Redline** (`redline`) | Cuentarrevoluciones a pantalla completa con luces de cambio, marcha y puntuación de cambios. Sin la parte de HUD | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | MIT |
 | **Drag Timer** (`draggy`) | 0-100, ¼ de milla, 100-200, mejores tiempos | cauliflowermossgrape/idrive7-apps | MIT |
 | **Virtual Dyno** (`dyno`) | Curvas de potencia y par a partir de una aceleración a fondo | cauliflowermossgrape/idrive7-apps | MIT |

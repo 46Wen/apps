@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Copiloto de voz: genera las grabaciones de las frases con voces neuronales naturales (las de «Leer en voz alta» de
-Microsoft Edge), en cada idioma y voz de apps/copiloto_voz/voces/frases.json.
+Microsoft Edge), en cada idioma y voz de tools-prebuilt/copiloto-voz-voces/frases.json.
 
 En el PC (Windows, con Python e internet), desde la carpeta del repositorio:
 
@@ -9,7 +9,7 @@ En el PC (Windows, con Python e internet), desde la carpeta del repositorio:
     py scripts\\generar_voces.py --idioma es     solo español
     py scripts\\generar_voces.py --todo          todas otra vez, aunque no hayan cambiado
 
-Deja apps/copiloto_voz/voces/<idioma>/<voz>/<aviso>.m4a (p. ej. voces/es/es-ES-ElviraNeural/fin_viaje.m4a; AAC, como
+Deja tools-prebuilt/copiloto-voz-voces/<idioma>/<voz>/<aviso>.m4a (p. ej. voces/es/es-ES-ElviraNeural/fin_viaje.m4a; AAC, como
 RideTube: el reproductor del coche no acepta el MP3 de edge-tts; hace falta ffmpeg) y en cada
 carpeta un .textos.json con el texto de cada archivo, para saber cuáles cambiaron. Después: git add, commit y push (o
 GitHub Desktop), y el MGU Store instala la app con las voces nuevas. En el coche, Ajustes → Idioma y Voz.
@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-VOCES = os.path.join(ROOT, 'apps', 'copiloto_voz', 'voces')
+VOCES = os.path.join(ROOT, 'tools-prebuilt', 'copiloto-voz-voces')
 
 
 FFMPEG = shutil.which('ffmpeg')
@@ -88,6 +88,8 @@ async def generate(doc, only_lang=None, all_again=False):
             with open(memo_file, 'w', encoding='utf-8') as f:
                 json.dump(memo, f, ensure_ascii=False, indent=1)
     print('%d generadas, %d sin cambios, %d con error' % (made, skipped, len(failed)))
+    if made:
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'voces_componente.py')])
     if made and not FFMPEG:
         print('AVISO: sin ffmpeg quedan en MP3, que el coche no reproduce. Instale ffmpeg (winget install ffmpeg) y ejecute otra vez con --todo.')
     for f in failed:

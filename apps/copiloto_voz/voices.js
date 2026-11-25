@@ -26,7 +26,15 @@ function dirsFor(root, lang, voice) {
     return out;
 }
 
+// the recordings installed by the Store tool copiloto-voz-voces (root's, under /var/opt: BMW's media engine opens them)
+const TOOL_ROOT = '/var/opt/copiloto-voz-voces/current';
+/** Where the recordings are: the tool's folder when installed, else the app's own voces/ (bench, older installs). */
+function root(own) {
+    try { if (fs.statSync(path.join(TOOL_ROOT, 'es')).isDirectory()) return TOOL_ROOT; } catch (e) { /* not installed */ }
+    return own;
+}
+
 /** The voice's display name from its id: es-ES-ElviraNeural -> Elvira. */
 const voiceName = (id) => String(id || '').replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '');
 
-module.exports = { LANGS, DEFAULT, LANG_NAME, dirsFor, voiceName };
+module.exports = { LANGS, DEFAULT, LANG_NAME, TOOL_ROOT, root, dirsFor, voiceName };

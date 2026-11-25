@@ -1,10 +1,13 @@
 {
   "id": "copiloto_voz",
   "title": "Copiloto de voz",
-  "description": "Su copiloto con voz, en español, chino o inglés, con voz femenina o masculina: bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, batería, mantenimiento, ventanillas y pausas. Con demo, diagnóstico y registro.",
-  "version": "0.5.3",
+  "description": "Su copiloto con voz (español, voz Elvira): bienvenida, fin del viaje, combustible bajo, neumáticos, hielo, motor frío y caliente, mantenimiento, ventanillas y pausas, por prioridad y sin hablar durante las llamadas. Con demo, diagnóstico y registro.",
+  "version": "0.8.1",
   "vendor": "custom",
   "autostart": true,
+  "requires": {
+    "copiloto-voz-voces": "1.0.1"
+  },
   "loggingId": "OAV1",
   "iconGlyph": "VOZ",
   "shared": [
@@ -45,24 +48,21 @@
     },
     "de.bmw.body.DoorsWindowsRoofMirrors": {
       "_optional": "ventanillas y techo abiertos al apagar",
-      "CentralLockingSystemAndPanelStatus": "s"
+      "CentralLockingSystemAndPanelStatus": "rs"
     },
-    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
-      "_optional": "leer la tensión de la batería de 12 V (diagnosis de solo lectura)",
-      "_instances": "SystemFunctionsInternalTasuInst1",
-      "_methods": [
-        "sendTasuRequest"
-      ],
-      "_broadcasts": [
-        "sendTasuResponse"
-      ]
+    "de.bmw.body.doorsandwindows.WindowsRoofMaster": {
+      "_optional": "ventanillas: su posición y si el elevalunas se mueve",
+      "statusWindowsRoofMasterDRD": "rs",
+      "statusWindowsRoofMasterPSD": "rs"
     },
     "org.genivi.am.commandinterface.CommandControl": {
       "_optional": "el gestor de audio: conectar la voz a los altavoces (como RideTube)",
       "_instances": "1",
       "_methods": [
         "connect",
-        "disconnect"
+        "disconnect",
+        "getListMainSinks",
+        "getListMainSources"
       ],
       "listOfMainConnections": "rs"
     },
@@ -92,7 +92,11 @@
         ],
         [
           "BTN_DEMO",
-          "Demo: viaje simulado con los 11 avisos"
+          "Demo: viaje simulado con los 10 avisos"
+        ],
+        [
+          "BTN_LEARN",
+          "Aprender ventanillas"
         ],
         [
           "BTN_TEST",
@@ -106,94 +110,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "idioma",
-      "label": "Idioma de la voz",
-      "type": "choice",
-      "default": "es",
-      "options": [
-        [
-          "es",
-          "Español"
-        ],
-        [
-          "zh",
-          "Chino (mandarín)"
-        ],
-        [
-          "en",
-          "Inglés (británico)"
-        ]
-      ]
-    },
-    {
-      "key": "voz_es",
-      "label": "Voz en español",
-      "type": "choice",
-      "default": "es-ES-ElviraNeural",
-      "options": [
-        [
-          "es-ES-ElviraNeural",
-          "Elvira (femenina)"
-        ],
-        [
-          "es-ES-XimenaNeural",
-          "Ximena (femenina)"
-        ],
-        [
-          "es-ES-AlvaroNeural",
-          "Álvaro (masculina)"
-        ]
-      ]
-    },
-    {
-      "key": "voz_zh",
-      "label": "Voz en chino (mandarín)",
-      "type": "choice",
-      "default": "zh-CN-XiaoxiaoNeural",
-      "options": [
-        [
-          "zh-CN-XiaoxiaoNeural",
-          "Xiaoxiao (femenina)"
-        ],
-        [
-          "zh-CN-XiaoyiNeural",
-          "Xiaoyi (femenina)"
-        ],
-        [
-          "zh-CN-YunxiNeural",
-          "Yunxi (masculina)"
-        ],
-        [
-          "zh-CN-YunjianNeural",
-          "Yunjian (masculina)"
-        ]
-      ]
-    },
-    {
-      "key": "voz_en",
-      "label": "Voz en inglés (británico)",
-      "type": "choice",
-      "default": "en-GB-SoniaNeural",
-      "options": [
-        [
-          "en-GB-SoniaNeural",
-          "Sonia (femenina)"
-        ],
-        [
-          "en-GB-LibbyNeural",
-          "Libby (femenina)"
-        ],
-        [
-          "en-GB-RyanNeural",
-          "Ryan (masculina)"
-        ],
-        [
-          "en-GB-ThomasNeural",
-          "Thomas (masculina)"
-        ]
-      ]
-    },
     {
       "key": "on_combustible",
       "label": "1  Combustible bajo",
@@ -235,44 +151,38 @@
       "default": true
     },
     {
-      "key": "on_bateria",
-      "label": "5  Batería baja (< 11,8 V al arrancar)",
-      "type": "bool",
-      "default": true
-    },
-    {
       "key": "on_bienvenida",
-      "label": "6  Bienvenida al arrancar",
+      "label": "5  Bienvenida al arrancar",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_mantenimiento",
-      "label": "7  Mantenimiento (2.000 km / 60 días)",
+      "label": "6  Mantenimiento (2.000 km / 60 días)",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_ventanillas",
-      "label": "8  Ventanillas o techo abiertos al apagar",
+      "label": "7  Ventanillas o techo abiertos al apagar",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_fin_viaje",
-      "label": "9  Fin del viaje",
+      "label": "8  Fin del viaje",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_descanso",
-      "label": "10  Pausa cada 2 horas",
+      "label": "9  Pausa cada 2 horas",
       "type": "bool",
       "default": true
     },
     {
       "key": "on_motor_caliente",
-      "label": "11  Motor a temperatura (80 °C)",
+      "label": "10  Motor a temperatura (80 °C)",
       "type": "bool",
       "default": true
     },
