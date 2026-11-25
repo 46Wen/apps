@@ -1,14 +1,14 @@
 {
   "id": "audio_probe",
   "title": "Audio probe",
-  "description": "Comprueba que la herramienta está y que suena música, y solo entonces, al pulsar un botón, crea un informe de solo lectura del sonido de la unidad: general, de SmartXbar y el Audio Manager, o la prueba de captura. Lo muestra en pantalla, página a página.",
-  "version": "0.5.1",
+  "description": "La fase final del audio: el nivel de la música en vivo (Music level) y, si no llega, por qué; \"Explorar SmartXbar\" crea el informe de solo lectura (Music level, los buffers de SmartXbar y el Audio Manager) y lo muestra en pantalla, página a página.",
+  "version": "0.6.0",
   "vendor": "custom",
   "loggingId": "OAP7",
   "iconGlyph": "AUD",
   "fonts": "es",
   "requires": {
-    "mgu-audio-probe": "0.5.1",
+    "mgu-audio-probe": "0.6.0",
     "mgu-audio-level": "0.1.1"
   },
   "signals": {
@@ -37,14 +37,6 @@
         [
           "BTN_SMARTX",
           "Explorar SmartXbar"
-        ],
-        [
-          "BTN_START",
-          "Crear informe"
-        ],
-        [
-          "BTN_CAPTURE",
-          "Prueba de captura"
         ],
         [
           "BTN_PAGE",

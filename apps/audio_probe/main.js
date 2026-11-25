@@ -1,19 +1,15 @@
 'use strict';
 /**
- * Audio probe (46Wen): the screen for the mgu-audio-probe tool. Before anything is read it checks, on screen, the
- * three things the report needs:
- *   1. the tool is on the unit           /var/opt/mgu-audio-probe/current/probe.sh
- *   2. music plays, and it is seen       the head unit's now playing (HmiMediaState, front screen): the title, and
- *                                        its time moving (a source without a time, the radio, counts with a title)
- *   3. a USB stick is in                 a folder under /media
- * Only when the three are green does "Crear informe" ask the tool for a report (it writes the request file
- * /dev/shm/mgu-audio-probe.request; the tool's path unit starts the read-only probe as root). Nothing runs by itself.
- * "Prueba de captura" (step 2) asks for the capture test instead ({"mode":"capture"}): every capture device listened
- * to for 3 s, its level every 0.1 s; it needs the tool and the stick, and is meant to be run twice, with the music
- * playing and then paused, so the device that follows the music shows.
- * The tool writes its state to /dev/shm/mgu-audio-probe.status ({ state: running | done, usb, bytes, ... }) and the
- * report to /dev/shm/mgu-audio-probe.txt, which "Ver informe" shows here page by page: it can be photographed even
- * when the stick did not take the copy.
+ * Audio probe (46Wen), 0.6: the last step of the audio work, the music's live level for Ambient config's Music wave.
+ *   - the level live, from the tool Music level (/dev/shm/mgu-audio-level.json), and when there is none, why (its
+ *     heartbeat /dev/shm/mgu-audio-level.status: not running, not asked, no buffers, cannot write);
+ *   - "Explorar SmartXbar" (the tool mgu-audio-probe, read only, as root through its path unit): first the Music level
+ *     section (its service, journal, files and what it sees), then SmartXbar's ring buffers, the Audio Manager's lists
+ *     (read here, written to /dev/shm/mgu-audio-am.txt for the tool) and who maps which buffer; shown on the
+ *     "Informe" tab page by page, to be photographed.
+ * It asks for the report only with the tool installed and music playing (a second press within 10 s goes on anyway:
+ * CarPlay may not say what plays). Steps 1 and 2 (the general report, the capture test, the USB stick) are done and
+ * left out.
  *
  * Light on the unit: the screen is drawn only while it is shown and only when something on it changed (the level bar
  * at most twice a second, the checks every 3 s), the media state is a push signal. Node 8.
@@ -26,7 +22,6 @@ const TOOL = '/var/opt/mgu-audio-probe/current/probe.sh';
 const REQUEST = '/dev/shm/mgu-audio-probe.request';
 const STATUS = '/dev/shm/mgu-audio-probe.status';
 const REPORT = '/dev/shm/mgu-audio-probe.txt';
-const MEDIA = '/media';
 const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';
 const PLAY_MS = 3000;              // the track's time not moving this long: paused
 const ANSWER_MS = 15000;           // the tool must say it runs within this, after the request
@@ -61,16 +56,6 @@ function nowPlaying() {
     };
     m.playing = () => !!m.title && (!m.timed || Date.now() - m.movedAt < PLAY_MS);
     return m;
-}
-
-/** The sticks in: the folders under /media that are a mount of their own (an empty mount point left behind is
- *  on /media's own file system, so it is no stick). */
-function sticks() {
-    let names = [], dev;
-    try { names = fs.readdirSync(MEDIA); dev = fs.statSync(MEDIA).dev; } catch (e) { return []; }
-    return names.filter((n) => {
-        try { const st = fs.statSync(MEDIA + '/' + n); return st.isDirectory() && st.dev !== dev; } catch (e) { return false; }
-    });
 }
 
 function readJson(f) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return null; } }
@@ -119,7 +104,6 @@ mgu.run({
             const st = readJson(STATUS);
             return {
                 tool: fs.existsSync(TOOL),
-                usb: sticks(),
                 music: music.playing(),
                 st,
                 running: !!(st && st.state === 'running' && Date.now() / 1000 - st.at < 120),
@@ -157,9 +141,6 @@ mgu.run({
             const song = music.title ? (music.title + (music.artist ? ' - ' + music.artist : '')).slice(0, 70) : '';
             row(cv, y0 + 90, s.music, !!music.title, '2. Música sonando',
                 s.music ? 'Suena: ' + song : music.title ? 'En pausa: ' + song + ' (pulse play)' : music.seen ? 'Nada sonando: ponga música (Bluetooth, CarPlay o USB)' : 'Esperando a que la unidad diga qué suena...');
-            // (the stick: this car mounts it read only, so it is no longer needed: the report is on the screen)
-            row(cv, y0 + 180, true, false, '3. USB (opcional)',
-                s.usb.length ? 'Visto: ' + s.usb.map((n) => MEDIA + '/' + n).join(', ') + ' (el coche lo monta de solo lectura)' : 'No hace falta: el informe sale en la pestaña "Informe"');
             const ready = s.tool && s.music, busy = s.running || !!asked;
             // the right side: what happens next, the last result
             const px = 1044, pw = 532, ph = 260;
@@ -180,8 +161,6 @@ mgu.run({
             if (st && st.state === 'done') {
                 const when = new Date(st.at * 1000), hh = ('0' + when.getHours()).slice(-2) + ':' + ('0' + when.getMinutes()).slice(-2);
                 cv.text((mode(st) === 'capture' ? 'Última captura: ' : mode(st) === 'smartx' ? 'Última exploración: ' : 'Último informe: ') + hh + ', ' + Math.round((st.bytes || 0) / 1024) + ' KB', tx, y0 + 150, 21, C.text, { literal: true });
-                const okUsb = st.usb && st.usb.length;
-                if (okUsb) cv.text('Copiado en el USB: ' + st.usb.join(', '), tx, y0 + 180, 19, C.green, { literal: true });
                 cv.text('Está en la pestaña "Informe": hágale fotos.', tx, y0 + 236, 18, C.dim, { literal: true });
             }
             // step 5: the music's level, live, from mgu-audio-level (it reads while this screen touches LEVEL_WANT)
@@ -197,10 +176,9 @@ mgu.run({
             const by = y0 + 280;
             if (cv.own) {
                 G.button(cv, t, 24, by, 420, 60, 'Explorar SmartXbar', doSmartx, { key: 'BTN_SMARTX', primary: ready && !busy, busy });
-                G.button(cv, t, 464, by, 300, 60, 'Crear informe', doStart, { key: 'BTN_START', busy });
-                G.button(cv, t, 784, by, 300, 60, 'Ver informe', () => openReport(), { key: 'BTN_PAGE' });
+                G.button(cv, t, 464, by, 300, 60, 'Ver informe', () => openReport(), { key: 'BTN_PAGE' });
             } else {
-                cv.text('Los botones "Explorar SmartXbar", "Crear informe" y "Ver informe" están en el menú de BMW de esta', 24, by + 24, 19, C.text, { literal: true });
+                cv.text('Los botones "Explorar SmartXbar" y "Ver informe" están en el menú de BMW de esta', 24, by + 24, 19, C.text, { literal: true });
                 cv.text('pantalla (como "Cambiar página" en Copiloto de voz). El informe también está en la pestaña "Informe".', 24, by + 50, 19, C.text, { literal: true });
             }
         };
@@ -249,44 +227,6 @@ mgu.run({
             ui.image('MAIN_GFX', cv);
         };
 
-        function doStart() {
-            const s = state();
-            const missing = [!s.tool && 'la herramienta', !s.music && 'la música'].filter(Boolean);
-            const anyway = missing.length === 1 && !s.music && Date.now() < anywayUntil;
-            page = 0;
-            if (s.running || asked) note = 'Ya se está creando.';
-            else if (missing.length === 1 && !s.music && !anyway) {
-                // the unit may not say what CarPlay plays: the driver hears it, so a second press is enough
-                anywayUntil = Date.now() + 10000;
-                note = 'No veo la música (CarPlay puede no decirlo). Si suena, pulse "Crear informe" otra vez antes de 10 s.';
-            } else if (missing.length && !anyway) note = 'Todavía no: falta ' + missing.join(', ') + '.';
-            else {
-                anywayUntil = 0;
-                try {
-                    fs.writeFileSync(REQUEST, JSON.stringify({ mode: 'report', at: Date.now(), title: music.title, usb: s.usb }));
-                    asked = Date.now(); askedMode = 'report'; note = '';
-                    log.info('report asked for (music: ' + music.title + ', usb: ' + s.usb.join(',') + ')');
-                } catch (e) { note = 'No se pudo pedir: ' + e.message; }
-            }
-            show();
-        }
-        // step 2: the capture test; the tool and the stick needed, the music played and then paused (two runs)
-        function doCapture() {
-            const s = state();
-            const missing = [!s.tool && 'la herramienta'].filter(Boolean);
-            page = 0;
-            if (s.running || asked) note = 'Ya se está haciendo.';
-            else if (missing.length) note = 'Todavía no: falta ' + missing.join(', ') + '.';
-            else {
-                try {
-                    fs.writeFileSync(REQUEST, JSON.stringify({ mode: 'capture', at: Date.now(), title: music.title, playing: s.music }));
-                    asked = Date.now(); askedMode = 'capture';
-                    note = s.music ? 'Captura con música sonando. Después, pause la música y repítala.' : 'Captura sin música (en pausa): compárela con la de música sonando.';
-                    log.info('capture asked for (music playing: ' + s.music + ')');
-                } catch (e) { note = 'No se pudo pedir: ' + e.message; }
-            }
-            show();
-        }
         // step 3: SmartXbar. The Audio Manager's own lists first (sinks, sources, connections: read only, as Copiloto
         // de voz reads them), written to AM_FILE for the tool, which adds them to its report on SmartXbar
         let cc = null;
@@ -337,8 +277,6 @@ mgu.run({
         }
         // BMW's menu bar (where the kit does not run the screen) and the page's own buttons do the same
         ui.onClick('BTN_SMARTX', doSmartx);
-        ui.onClick('BTN_START', doStart);
-        ui.onClick('BTN_CAPTURE', doCapture);
         ui.onClick('BTN_PAGE', () => { if (page === 0) openReport(); else { page = page >= pages() ? 1 : page + 1; show(); } });
         // the tabs, touched or pressed: Comprobar, Informe (pressed again: its next page)
         if (ctx.onTab) ctx.onTab((i) => { if (i === 0) { page = 0; show(); } else if (page === 0) openReport(); else { page = page >= pages() ? 1 : page + 1; show(); } });
