@@ -13,7 +13,7 @@
 # Busybox sh. No personal data: process names only (never their command lines or environment), no file contents
 # but sound configuration.
 
-VERSION=0.3.0
+VERSION=0.3.1
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)
 DIR=/var/opt/mgu-audio-probe/reports
 TMP=/tmp/mgu-audio-probe.$$
@@ -56,6 +56,10 @@ probe() {
     show /proc/uptime 100
     head -n 3 /proc/meminfo 2>/dev/null
     show /proc/cpuinfo 1200
+
+    sec "USB sticks (how they are mounted)"
+    grep -E " /media/| /run/media/| /mnt/" /proc/mounts 2>/dev/null | head -n 10
+    ls -ld /media /media/* 2>&1 | head -n 10
 
     sec "programs for sound"
     for b in arecord aplay amixer alsactl alsaucm pactl pacmd pulseaudio pipewire pw-cli pw-dump wpctl \
@@ -191,14 +195,20 @@ cp "$TMP" "$DIR/$MODE-$STAMP.txt" 2>/dev/null
 cp "$TMP" /dev/shm/mgu-audio-probe.txt 2>/dev/null && chmod 0644 /dev/shm/mgu-audio-probe.txt
 # the last 5 reports only
 ls -1t "$DIR"/"$MODE"-*.txt 2>/dev/null | tail -n +6 | while read -r f; do rm -f "$f"; done
-copied=""
+copied=""; why=""
 for m in /media/*; do
     [ -d "$m" ] || continue
-    cp "$TMP" "$m/$NAME-$STAMP.txt" 2>/dev/null && sync && copied="$copied $m"
+    if err=$(cp "$TMP" "$m/$NAME-$STAMP.txt" 2>&1); then sync; copied="$copied $m"
+    else
+        # why not, for the app's screen: cp's own words and how the stick is mounted (ro: read only)
+        opts=$(awk -v m="$m" '$2 == m {print $3 " " $4}' /proc/mounts 2>/dev/null | head -n 1 | cut -c1-60)
+        why="$(echo "$err" | tail -n 1 | sed 's/.*: //' | cut -c1-60) ($opts)"
+    fi
 done
+why=$(echo "$why" | tr -d '"\\')
 size=$(wc -c < "$TMP" 2>/dev/null)
 usbjson=$(for m in $copied; do printf '"%s",' "$m"; done | sed 's/,$//')
-status "{\"state\":\"done\",\"mode\":\"$MODE\",\"at\":$(date +%s 2>/dev/null || echo 0),\"bytes\":${size:-0},\"usb\":[$usbjson],\"file\":\"$NAME-$STAMP.txt\"}"
+status "{\"state\":\"done\",\"mode\":\"$MODE\",\"at\":$(date +%s 2>/dev/null || echo 0),\"bytes\":${size:-0},\"usb\":[$usbjson],\"usbWhy\":\"$why\",\"file\":\"$NAME-$STAMP.txt\"}"
 # the report on stdout too: in the journal (the Store's Phone access, logs) when the service runs it, and in the
 # file when it is run by hand over SSH
 cat "$TMP"
