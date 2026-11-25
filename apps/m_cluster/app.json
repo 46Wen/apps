@@ -2,7 +2,7 @@
   "id": "m_cluster",
   "title": "M Cluster",
   "description": "M-style instrument cluster in SPORT and SPORT PLUS (an M8's cluster: shift lights, boost and temperatures); in every other mode BMW's own cluster stays, untouched (and Waze on Cluster's map with it). The light version of Cluster Themes: install one or the other, not both.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "vendor": "custom",
   "loggingId": "OAC2",
   "autostart": true,
@@ -245,7 +245,7 @@
       "label": "M ready in the background",
       "type": "bool",
       "default": false,
-      "help": "On: the M theme stays loaded (hidden) in the other modes, so Sport switches at once, but it holds part of cluster-render's memory and the cluster's screen. Off: nothing of ours on the cluster outside Sport; the switch takes a second or two."
+      "help": "Leave it off. On: the M theme stays loaded (hidden) in the other modes, so Sport switches at once, but the cluster then counts our screen as shown: BMW takes its right-hand display (the one the turn-signal stalk's button changes: range, kW / torque, music, tyre pressures...) off the cluster in every mode, and it holds part of cluster-render's memory. Off: nothing of ours on the cluster outside Sport, BMW's right-hand display stays; the switch takes a second or two."
     },
     {
       "key": "keepStrip",
