@@ -34,7 +34,7 @@ se crea únicamente cuando se pulsa su botón.
    en pausa: la entrada cuyos niveles siguen a la música es la que lleva la música. Queda en el USB como
    `mgu-audio-capture-<fecha>.txt`. El programa que escucha es `files/mgu-audio-capture` (fuente en `src/`).
 
-La lista paso a paso para ir al coche: [PRUEBA.md](PRUEBA.md).
+La lista paso a paso para ir al coche: [PRUEBA.md](../../docs/prueba-audio.md).
 
 Con acceso root por SSH también se puede ejecutar a mano, sin instalar nada:
 
