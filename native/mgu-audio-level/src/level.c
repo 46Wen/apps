@@ -1,7 +1,8 @@
 /*
  * mgu-audio-level (46Wen): the music's level, live, for Ambient config's Music wave. Reads SmartXbar's ring buffers in
  * /dev/shm read only (O_RDONLY, PROT_READ: no player, mixer or amplifier notices) and writes, 20 times a second,
- *   /dev/shm/mgu-audio-level.json   {"level":0..1,"db":-35.2,"src":"MediaSink_AudioOut_Front","at":<ms>}
+ *   /dev/shm/mgu-audio-level.json   {"level":0..1,"db":-35.2,"bass":0..1,"beats":n,"beatAgo":ms,"src":"MediaSink_AudioOut_Front","at":<ms>}
+ *   (0.2: "bass" the low end, under about 150 Hz; "beats" counts the beats found in it, "beatAgo" ms since the last)
  * which music.js reads.
  *
  * What the car showed (Audio probe 0.5.0, 25 Nov 2026, music on Bluetooth): a 48 kHz ring buffer is
@@ -38,7 +39,7 @@
 #define OUT SHM "/mgu-audio-level.json"
 #define WANT SHM "/mgu-audio-level.want"
 #define STATUS SHM "/mgu-audio-level.status"
-#define VERSION "0.1.1"
+#define VERSION "0.2.0"
 #define HEAD 240
 #define TAIL 4436
 #define BLOCK 6144                 /* 1536 frames x 4 bytes, one channel */
@@ -171,13 +172,57 @@ static void heartbeat(int w, const char *src, int live) {
     if (put(STATUS, buf, n) && !warned++) fprintf(stderr, "mgu-audio-level: cannot write %s: %s\n", STATUS, strerror(errno));
 }
 
+/* The bass of one channel block (0..1 full scale): a one-pole low-pass at about 150 Hz over its 1536 samples, then
+ * its RMS. Kicks and bass lines carry the beat; voices and cymbals stay out of it. */
+static double block_bass(const unsigned char *b) {
+    const double a = 0.0194;                       /* 1 - exp(-2 pi 150 / 48000) */
+    int i, ok = 0, fl;
+    double y = 0, s = 0;
+    for (i = 0; i < FRAMES; i += 16) { float f; memcpy(&f, b + i * 4, 4); if (isfinite(f) && fabsf(f) <= 8.0f) ok++; }
+    fl = ok * 10 >= (FRAMES / 16) * 9;
+    for (i = 0; i < FRAMES; i++) {
+        double x;
+        if (fl) { float f; memcpy(&f, b + i * 4, 4); x = isfinite(f) ? f : 0; }
+        else { int32_t v; memcpy(&v, b + i * 4, 4); x = v / 2147483648.0; }
+        y += a * (x - y);
+        if (i >= 64) s += y * y;                   /* the filter's first 64 samples settle, left out */
+    }
+    return sqrt(s / (FRAMES - 64));
+}
+
+/* Beats: a look whose bass energy jumps over twice its average of the last 1.5 s and a standard deviation over it, at least 5 % of the sound's energy, rising, loud enough, and no
+ * sooner than 280 ms after the last beat (214 BPM at most). Counted up; music.js turns the colour at each one. */
+#define HIST 30
+static double bass_hist[HIST];
+static int bass_n, bass_i;
+static double bass_prev, bass_now;
+static unsigned beats;
+static long long beat_at;
+static void beat_feed(double bass, double full, long long now) {
+    double e = bass * bass, mean = 0, var = 0;
+    int i, n = bass_n < HIST ? bass_n : HIST;
+    for (i = 0; i < n; i++) mean += bass_hist[i];
+    mean = n ? mean / n : e;
+    for (i = 0; i < n; i++) var += (bass_hist[i] - mean) * (bass_hist[i] - mean);
+    var = n ? var / n : 0;
+    /* (a standard deviation over it: a steady bass line that only wobbles is no beat; and the bass at least 5 % of the
+     * whole sound's energy: hiss and cymbals have next to none down there) */
+    if (n >= 10 && e > 2.0 * mean && e > mean + sqrt(var) && e > 2e-5 && e > 0.05 * full * full && e > bass_prev && now - beat_at >= 280) { beats++; beat_at = now; }
+    bass_hist[bass_i] = e; bass_i = (bass_i + 1) % HIST; if (bass_n < HIST) bass_n++;
+    bass_prev = e; bass_now = bass;
+}
+
 static void publish(double rms, const char *src) {
     char buf[256];
     double db = rms > 1e-7 ? 20.0 * log10(rms) : -140.0;
     double level = (db + 48.0) / 42.0;           /* -48 dBFS = 0, -6 dBFS = 1 */
     if (level < 0) level = 0;
     if (level > 1) level = 1;
-    int n = snprintf(buf, sizeof buf, "{\"level\":%.3f,\"db\":%.1f,\"src\":\"%s\",\"at\":%lld}\n", level, db, src, wall_ms());
+    double bdb = bass_now > 1e-7 ? 20.0 * log10(bass_now) : -140.0, bass = (bdb + 54.0) / 42.0;
+    if (bass < 0) bass = 0;
+    if (bass > 1) bass = 1;
+    int n = snprintf(buf, sizeof buf, "{\"level\":%.3f,\"db\":%.1f,\"bass\":%.3f,\"beats\":%u,\"beatAgo\":%lld,\"src\":\"%s\",\"at\":%lld}\n",
+                     level, db, bass, beats, beat_at ? now_ms() - beat_at : -1, src, wall_ms());
     if (put(OUT, buf, n)) {
         snprintf(last_err, sizeof last_err, "cannot write %s: %s", OUT, strerror(errno));
         static int warned;
@@ -244,24 +289,28 @@ int main(int argc, char **argv) {
         }
         double best = 0, best_amp = 0;
         const char *src = "none", *src_amp = "none";
+        const unsigned char *blk = NULL, *blk_amp = NULL;   /* the loudest moving block of each: its bass, for the beats */
         int i, c, nlive = 0;
         for (i = 0; i < nports; i++) {
             struct port *p = &ports[i];
             double lv = 0;
             int live = 0;
+            const unsigned char *lb = NULL;
             for (c = 0; c < p->nch; c++) {
                 const unsigned char *b = p->map + HEAD + (size_t)c * BLOCK;
                 uint32_t f = fingerprint(b);
-                if (f != p->sig[c]) { live = 1; double r = block_rms(b); if (r > lv) lv = r; }
+                if (f != p->sig[c]) { live = 1; double r = block_rms(b); if (r > lv || !lb) { lv = r; lb = b; } }
                 p->sig[c] = f;
             }
             if (!live) continue;
             nlive++;
-            if (p->amp) { if (lv >= best_amp) { best_amp = lv; src_amp = p->name; } }
-            else if (lv >= best) { best = lv; src = p->name; }
+            if (p->amp) { if (lv >= best_amp) { best_amp = lv; src_amp = p->name; blk_amp = lb; } }
+            else if (lv >= best) { best = lv; src = p->name; blk = lb; }
         }
         /* a player's own port when one plays, else what goes to the amplifier */
         const char *from = strcmp(src, "none") ? src : src_amp;
+        const unsigned char *fb = strcmp(src, "none") ? blk : blk_amp;
+        beat_feed(fb ? block_bass(fb) : 0, fb ? block_rms(fb) : 0, t);
         publish(strcmp(src, "none") ? best : best_amp, from);
         if (t - last_beat >= 1000) { last_beat = t; heartbeat(1, from, nlive); }
         struct timespec ts = { 0, TICK_MS * 1000000L };

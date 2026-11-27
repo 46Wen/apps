@@ -456,7 +456,7 @@ class Lights extends EventEmitter {
                 }
                 let reply = null;
                 // 46Wen: the animation pace: a moving scene's next write no sooner than paceMs after the last
-                if (this.paceMs && this._wroteAt && S.moves(this.scene)) {
+                if (this.paceMs && this._wroteAt && S.moves(this.scene) && this.scene.kind !== 'music') {
                     const g = this._wroteAt + this.paceMs - this.now();
                     if (g > 0) await new Promise((r) => setTimeout(r, g));
                     if (this._stopped || this._holds.size) return;

@@ -2,14 +2,14 @@
   "id": "audio_probe",
   "title": "Audio probe",
   "description": "La fase final del audio: el nivel de la música en vivo (Music level) y, si no llega, por qué; \"Explorar SmartXbar\" crea el informe de solo lectura (Music level, los buffers de SmartXbar y el Audio Manager) y lo muestra en pantalla, página a página.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "vendor": "custom",
   "loggingId": "OAP7",
   "iconGlyph": "AUD",
   "fonts": "es",
   "requires": {
     "mgu-audio-probe": "0.6.0",
-    "mgu-audio-level": "0.1.1"
+    "mgu-audio-level": "0.2.0"
   },
   "signals": {
     "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {

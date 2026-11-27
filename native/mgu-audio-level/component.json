@@ -1,9 +1,9 @@
 {
   "id": "mgu-audio-level",
   "kind": "tool",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "title": "Music level",
-  "description": "The music's level, live, for Ambient config's Music wave: read from SmartXbar's audio buffers without touching them (read only, nothing played or changed), 20 times a second only while the Music wave or Audio probe wants it, idle otherwise.",
+  "description": "The music's level and its beats, live, for Ambient config's Music wave: read from SmartXbar's audio buffers without touching them (read only, nothing played or changed), 20 times a second only while the Music wave or Audio probe wants it, idle otherwise. 0.2: the beats, found in the bass (under about 150 Hz).",
   "mguHmi": [
     "ID7"
   ],

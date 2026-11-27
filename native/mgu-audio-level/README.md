@@ -11,7 +11,11 @@ la música no pasa por ALSA sino por **SmartXbar**, y cada reproductor escribe e
 - Los bloques que cambian entre dos miradas llevan audio en vivo; su RMS es el nivel.
 - Primero los puertos de los reproductores (`smartx_*_p`: MediaSink de mediaengine para USB y Bluetooth, CarPlayMain,
   AndroidAutoMedia...), antes del volumen de BMW; si ninguno suena, las salidas AVB al amplificador.
-- Escribe `/dev/shm/mgu-audio-level.json` (`{"level":0..1,"db":...,"src":"..."}`), que la Music wave ya lee.
+- Escribe `/dev/shm/mgu-audio-level.json` (`{"level":0..1,"db":...,"bass":0..1,"beats":n,"beatAgo":ms,"src":"..."}`), que la Music wave lee.
+- **Beats (0.2):** los graves (filtro de paso bajo a ~150 Hz) del bloque más fuerte; un beat es un salto de su energía a
+  más del doble de su media del último segundo y medio, más de una desviación típica por encima, con al menos el 5 % de
+  la energía del sonido en graves, subiendo y como mínimo 280 ms después del anterior (214 BPM). Probado con bombos
+  simulados: 90, 120 y 174 BPM se cuentan bien; ruido y una línea de bajo continua no dan beats.
 
 ## Consumo
 

@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode (46Wen: with a Music wave)",
-  "version": "2.7.2704",
+  "version": "2.7.2705",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -13,7 +13,7 @@
   "requires": {
     "idrive7-renderd": "2.1.18",
     "mgu-inputgate": "1.1.0",
-    "mgu-audio-level": "0.1.1"
+    "mgu-audio-level": "0.2.0"
   },
   "autostart": true,
   "signals": {

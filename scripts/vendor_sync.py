@@ -173,7 +173,7 @@ def ambient_music(app_dir):
     scenes.js, its button on the Animations tab, the media state as an optional signal, and the version as
     x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older than the original's next one.
     Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
-    PATCH_REV = 4
+    PATCH_REV = 5
     shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'ambient_config', 'music.js'), os.path.join(app_dir, 'music.js'))
 
     def edit(name, pairs):
@@ -201,9 +201,16 @@ def ambient_music(app_dir):
          "/** What a light shows: the scene,"),
         ("    case 'welcome': {",
          "    case 'music': {\n"
-         "        // (46Wen) the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens it,\n"
-         "        // the brightness in steps of 5 so a level's small changes don't cost writes\n"
+         "        // (46Wen) with beats (music.js, mgu-audio-level 0.2): the colour turns at each beat and holds till the next,\n"
+         "        // the rear bus a beat behind (the colour runs front to back), brighter on the beat; one write a bus a frame\n"
          "        const at = typeof light.bus === 'number' ? light.bus * 0.25 : light.y;\n"
+         "        if (music && music.beatsLive && music.beatsLive()) {\n"
+         "            const lvb = music.level(), push = Math.max(music.pulse(), lvb == null ? 0 : lvb);\n"
+         "            const hb = hueOf(base.rgb) + music.hueShift(at > 0.12 ? 1 : 0);\n"
+         "            return { rgb: hsv(((hb % 360) + 360) % 360, 1, 1), bright: Math.max(5, Math.round(base.bright * (0.45 + 0.55 * push) / 5) * 5) };\n"
+         "        }\n"
+         "        // without beats: the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens\n"
+         "        // it, the brightness in steps of 5 so a level's small changes don't cost writes\n"
          "        const lv = music ? music.level() : null, clock = music ? music.clock() : t;\n"
          "        const swing = lv == null ? 60 : 25 + 65 * lv, turn = music ? music.hueShift() : 0;\n"
          "        const h = hueOf(base.rgb) + turn + swing * Math.sin(2 * Math.PI * (clock / (5000 * k) - at));\n"
@@ -246,7 +253,7 @@ def ambient_music(app_dir):
     edit('lights.js', [
         ("                // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s\n",
          "                // 46Wen: the animation pace: a moving scene's next write no sooner than paceMs after the last\n"
-         "                if (this.paceMs && this._wroteAt && S.moves(this.scene)) {\n"
+         "                if (this.paceMs && this._wroteAt && S.moves(this.scene) && this.scene.kind !== 'music') {\n"
          "                    const g = this._wroteAt + this.paceMs - this.now();\n"
          "                    if (g > 0) await new Promise((r) => setTimeout(r, g));\n"
          "                    if (this._stopped || this._holds.size) return;\n"
@@ -275,7 +282,7 @@ def ambient_music(app_dir):
                                  'options': [['light', 'Light (about half the writes, less load on the head unit)'],
                                              ['normal', 'Normal (as fast as the gateway takes them)']]})
     # the music's level, read from SmartXbar by the tool mgu-audio-level (installed with the app)
-    a.setdefault('requires', {})['mgu-audio-level'] = '0.1.1'
+    a.setdefault('requires', {})['mgu-audio-level'] = '0.2.0'
     a['signals']['de.bmw.infotainment.hmi.hmimediastate.HmiMediaState'] = {
         '_instances': 'HMI_CID',
         '_optional': 'now playing: the Music wave rolls while something plays, new colours each track (46Wen)',

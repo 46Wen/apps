@@ -71,8 +71,10 @@ function levelInfo() {
     const lv = readJson(LEVEL_FILE);
     if (lv && typeof lv.level === 'number' && now - lv.at < 1500) {
         const level = Math.max(0, Math.min(1, lv.level));
-        return { lv: { level }, text: lv.src === 'none' ? 'nada suena (ningún buffer se mueve)' : Math.round(lv.db) + ' dB  ' + lv.src,
-            key: Math.round(level * 40) + lv.src };
+        // (0.2) the beats it finds in the bass: their count, and a dot lit on a beat (the Music wave turns its colour then)
+        const beats = typeof lv.beats === 'number' ? lv.beats : null, onBeat = typeof lv.beatAgo === 'number' && lv.beatAgo >= 0 && lv.beatAgo < 350;
+        return { lv: { level }, text: lv.src === 'none' ? 'nada suena (ningún buffer se mueve)' : Math.round(lv.db) + ' dB  ' + lv.src + (beats != null ? '  ·  beats ' + beats : ''),
+            beat: onBeat, key: Math.round(level * 40) + lv.src + (beats != null ? ':' + beats : '') + (onBeat ? '*' : '') };
     }
     const st = readJson(LEVEL_STATUS);
     if (!st || now - st.at > 5000) return { text: 'la herramienta no está en marcha',
@@ -170,6 +172,7 @@ mgu.run({
             if (L.lv) {
                 cv.roundRect(470, ly - 20, Math.max(26, 600 * L.lv.level), 26, 13, L.lv.level > 0.8 ? C.amber : C.green);
                 cv.text(L.text, 1090, ly, 18, C.dim, { literal: true });
+                if (L.beat) cv.circle(1076, ly - 7, 8, C.amber);
             } else cv.text(L.text, 1090, ly, 18, C.amber, { literal: true });
             if (L.why) cv.text(L.why, 24, ly + 28, 17, C.amber, { literal: true });
             // the actions: on the page where the kit runs the screen (touch and controller), else in BMW's menu bar

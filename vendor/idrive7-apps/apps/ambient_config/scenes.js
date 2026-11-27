@@ -82,9 +82,16 @@ function lightAt(scene, light, t) {
         return { rgb: hsv((h + 360) % 360, 1, 1), bright: base.bright };
     }
     case 'music': {
-        // (46Wen) the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens it,
-        // the brightness in steps of 5 so a level's small changes don't cost writes
+        // (46Wen) with beats (music.js, mgu-audio-level 0.2): the colour turns at each beat and holds till the next,
+        // the rear bus a beat behind (the colour runs front to back), brighter on the beat; one write a bus a frame
         const at = typeof light.bus === 'number' ? light.bus * 0.25 : light.y;
+        if (music && music.beatsLive && music.beatsLive()) {
+            const lvb = music.level(), push = Math.max(music.pulse(), lvb == null ? 0 : lvb);
+            const hb = hueOf(base.rgb) + music.hueShift(at > 0.12 ? 1 : 0);
+            return { rgb: hsv(((hb % 360) + 360) % 360, 1, 1), bright: Math.max(5, Math.round(base.bright * (0.45 + 0.55 * push) / 5) * 5) };
+        }
+        // without beats: the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens
+        // it, the brightness in steps of 5 so a level's small changes don't cost writes
         const lv = music ? music.level() : null, clock = music ? music.clock() : t;
         const swing = lv == null ? 60 : 25 + 65 * lv, turn = music ? music.hueShift() : 0;
         const h = hueOf(base.rgb) + turn + swing * Math.sin(2 * Math.PI * (clock / (5000 * k) - at));

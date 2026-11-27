@@ -7,7 +7,7 @@
 const path = require('path');
 
 const APP = path.join(__dirname, '..', 'vendor', 'idrive7-apps', 'apps', 'ambient_config');
-const { Music, parseLevel, LEVEL_MS, LEVEL_STALE_MS, PLAY_MS, TRACK_HUE, MEDIA_IF, MEDIA_INSTANCE } = require(path.join(APP, 'music'));
+const { Music, parseLevel, LEVEL_MS, LEVEL_STALE_MS, PLAY_MS, TRACK_HUE, BEAT_HUE, MEDIA_IF, MEDIA_INSTANCE } = require(path.join(APP, 'music'));
 const S = require(path.join(APP, 'scenes'));
 const { Lights } = require(path.join(APP, 'lights'));
 
@@ -178,6 +178,43 @@ ok(Math.abs(((h1 - h0 + 540) % 360) - 180 - 120) < 3, 'a new track: the colours 
     ok(musicWrites <= waveWrites + 2, 'playing: about as many writes as a Colour wave (' + musicWrites + ' against ' + waveWrites + ')');
     ok(pausedWrites <= 8 && pausedWrites < musicWrites / 3, 'paused: only the renewals (' + pausedWrites + ' in 10 s against ' + musicWrites + ' playing)');
     S.setMusic(null);
+
+    // beats (mgu-audio-level 0.2): the colour turns at each beat and holds till the next, the rear bus a beat behind
+    {
+        let bn = 0;
+        const bm = mk();
+        const lv = (beats, ago) => { now += LEVEL_MS + 1; write(JSON.stringify({ level: 0.5, db: -27, bass: 0.5, beats, beatAgo: ago, at: now })); bm.level(); };
+        lv(7, 900);
+        ok(!bm.beatsLive(), 'the first look: no beat yet (the count only says how many so far)');
+        const h0 = bm.hueShift();
+        lv(8, 20);
+        ok(bm.beatsLive() && bm.pulse() > 0.9, 'a new beat: the beat look, the pulse at its top');
+        ok(bm.hueShift() === (h0 + BEAT_HUE) % 360 && bm.hueShift(1) === h0, 'a beat turns the colour BEAT_HUE; one beat behind keeps the last');
+        now += 400; bm.level();
+        ok(bm.pulse() < 0.5 && bm.hueShift() === (h0 + BEAT_HUE) % 360, 'between beats: the colour holds, the pulse fades');
+        lv(20, 10);
+        ok(bm.hueShift() === (h0 + 5 * BEAT_HUE) % 360, 'many beats between two looks: at most 4 counted');
+        lv(3, 10);
+        ok(bm.hueShift() === (h0 + 5 * BEAT_HUE) % 360, 'the tool restarted (a lower count): nothing turned, counted from there');
+        now += 5000; bm.level();
+        ok(!bm.beatsLive(), 'no beat for 4 s: the wave again');
+        // the scene: front and rear a beat apart, the same between beats (no writes for nothing)
+        lv(4, 5);
+        S.setMusic(bm);
+        const sc = Object.assign({}, scene, { kind: 'music' });
+        const front = { bus: 0, nad: 1, x: 0.2, y: 0.2 }, rear = { bus: 1, nad: 1, x: 0.2, y: 0.8 };
+        const a1 = S.lightAt(sc, front, 100), a2 = S.lightAt(sc, rear, 100);
+        ok(JSON.stringify(a1.rgb) !== JSON.stringify(a2.rgb), 'front and rear: a beat apart');
+        now += 150; bm.level();
+        const b1 = S.lightAt(sc, front, 250);
+        ok(JSON.stringify(b1.rgb) === JSON.stringify(a1.rgb), 'no beat since: the same colour');
+        lv(5, 5);
+        const c2 = S.lightAt(sc, rear, 400);
+        ok(JSON.stringify(c2.rgb) === JSON.stringify(a1.rgb), 'the next beat: the rear takes the front\'s colour (it runs front to back)');
+        S.setMusic(null);
+        bn = 1;
+        ok(bn === 1, 'beats checked');
+    }
 
     console.log('writes in 10 s: Colour wave ' + waveWrites + ', Music wave ' + musicWrites + ', paused ' + pausedWrites);
     console.log('ambient music: ' + checks + ' checks, ' + fails + ' failed');
