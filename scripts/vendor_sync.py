@@ -168,13 +168,13 @@ def draggy_idle_hidden(app_dir):
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
-def ambient_music(app_dir):
-    """Ambient config with the Music wave (46Wen): music.js from vendor/patches/ambient_config, a 'music' scene in
-    scenes.js, its button on the Animations tab, the media state as an optional signal, and the version as
-    x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older than the original's next one.
-    Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
-    PATCH_REV = 5
-    shutil.copy2(os.path.join(ROOT, 'vendor', 'patches', 'ambient_config', 'music.js'), os.path.join(app_dir, 'music.js'))
+def ambient_pace(app_dir):
+    """Ambient config, lighter (46Wen): the Animation pace setting (Light by default: about half the writes to the
+    lights), and the version as x.y.(z*100 + PATCH_REV) so the Store sees it as newer than the original and older
+    than the original's next one. (PATCH_REV 1-5 also carried a Music wave, taken out on Nov 28 2026: the lights take
+    about 2.5 colours a second through the gateway, too few to follow a beat; a look saved as 'music' becomes the
+    Colour wave.) Fails (PatchError) when Ambient config's code moved so far that the edits no longer fit."""
+    PATCH_REV = 6
 
     def edit(name, pairs):
         p = os.path.join(app_dir, name)
@@ -186,74 +186,12 @@ def ambient_music(app_dir):
         open(p, 'w', encoding='utf-8', newline='\n').write(s)
         subprocess.run(['node', '--check', p], check=True)
 
-    edit('scenes.js', [
-        (" *   welcome    a sweep",
-         " *   music      (46Wen, music.js) the Colour wave going with the music: rolling only while something plays, a new\n"
-         " *              track's colours further round; with an audio level, louder = faster, a wider swing and brighter\n"
-         " *   welcome    a sweep"),
-        ("const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave'];",
-         "const KINDS = ['solid', 'breathing', 'rainbow', 'fade', 'wave', 'music'];"),
-        ("wave: 'Colour wave',", "wave: 'Colour wave', music: 'Music wave',"),
-        ("/** What a light shows: the scene,",
-         "/* 46Wen: the Music wave's music (music.js: clock(), level(), hueShift()); without it, a Colour wave. */\n"
-         "let music = null;\n"
-         "function setMusic(m) { music = m; }\n\n"
-         "/** What a light shows: the scene,"),
-        ("    case 'welcome': {",
-         "    case 'music': {\n"
-         "        // (46Wen) with beats (music.js, mgu-audio-level 0.2): the colour turns at each beat and holds till the next,\n"
-         "        // the rear bus a beat behind (the colour runs front to back), brighter on the beat; one write a bus a frame\n"
-         "        const at = typeof light.bus === 'number' ? light.bus * 0.25 : light.y;\n"
-         "        if (music && music.beatsLive && music.beatsLive()) {\n"
-         "            const lvb = music.level(), push = Math.max(music.pulse(), lvb == null ? 0 : lvb);\n"
-         "            const hb = hueOf(base.rgb) + music.hueShift(at > 0.12 ? 1 : 0);\n"
-         "            return { rgb: hsv(((hb % 360) + 360) % 360, 1, 1), bright: Math.max(5, Math.round(base.bright * (0.45 + 0.55 * push) / 5) * 5) };\n"
-         "        }\n"
-         "        // without beats: the Colour wave on the music's clock: still in a pause; a level widens the swing and brightens\n"
-         "        // it, the brightness in steps of 5 so a level's small changes don't cost writes\n"
-         "        const lv = music ? music.level() : null, clock = music ? music.clock() : t;\n"
-         "        const swing = lv == null ? 60 : 25 + 65 * lv, turn = music ? music.hueShift() : 0;\n"
-         "        const h = hueOf(base.rgb) + turn + swing * Math.sin(2 * Math.PI * (clock / (5000 * k) - at));\n"
-         "        const bright = lv == null ? base.bright : Math.max(5, Math.round(base.bright * (0.35 + 0.65 * lv) / 5) * 5);\n"
-         "        return { rgb: hsv(((h % 360) + 360) % 360, 1, 1), bright };\n"
-         "    }\n"
-         "    case 'welcome': {"),
-        ("module.exports = { KINDS, NAMES, lightAt, setDecor,", "module.exports = { KINDS, NAMES, lightAt, setDecor, setMusic,"),
-    ])
-
-    edit('main.js', [
-        (" *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, how fast,",
-         " *   Animations     Solid, Breathing, Rainbow, Smooth fade, Colour wave, Music wave (46Wen: music.js), how fast,"),
-        ("const S = require('./scenes');", "const S = require('./scenes');\nconst { Music } = require('./music');"),
-        ("    S.setDecor(settings.get('decorWith'));\n",
-         "    S.setDecor(settings.get('decorWith'));\n"
-         "    // 46Wen: the Music wave's music (music.js), before the first scene goes on\n"
-         "    const music = new Music({ log });\n"
-         "    S.setMusic(music);\n"),
-        ("    control.start();\n",
-         "    control.start();\n"
-         "    // (46Wen) the media state watched only while a Music wave is on (the driver's look or a driving mode's)\n"
-         "    const musicOn = () => music.use(!!lights.scene && lights.scene.kind === 'music', signals);\n"
-         "    lights.on('change', musicOn);\n"
-         "    musicOn();\n"),
-        ("    return { ambient, lights, control, active, others, strobe, checks, lookAgain:",
-         "    return { ambient, lights, control, active, others, strobe, checks, music, lookAgain:"),
-        ("const { ambient, lights, control, active, others, strobe, checks, lookAgain } = ctx.background",
-         "const { ambient, lights, control, active, others, strobe, checks, music, lookAgain } = ctx.background"),
-        ("['wave', 'Colour rolling from side to side']];",
-         "['wave', 'Colour rolling from side to side'], ['music', music.label()]];"),
-        ("const y = 92 + i * 66, on = isOn() && l.kind === k;", "const y = 92 + i * 58, on = isOn() && l.kind === k;"),
-        ("G.button(cv, t, 44, y, 220, 50, S.NAMES[k],", "G.button(cv, t, 44, y, 220, 46, S.NAMES[k],"),
-        ("cv.text(d, 284, y + 32, 20,", "cv.text(d, 284, y + 30, 20,"),
-    ])
-
-    # Animation pace (46Wen, PATCH_REV 4): a moving scene's writes go back to back through the head unit's gateway
-    # (~5 a second, each ~200 ms); "Light" leaves PACE_MS between two of them, about half the writes and the gateway
-    # free half the time, so the head unit's own diagnostic traffic and the CPU get room (the default)
+    # a moving scene's writes go back to back through the head unit's gateway (~5 a second, each ~200 ms); "Light"
+    # leaves PACE_MS between two of them, about half the writes, so the head unit's own traffic and the CPU get room
     edit('lights.js', [
         ("                // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s\n",
          "                // 46Wen: the animation pace: a moving scene's next write no sooner than paceMs after the last\n"
-         "                if (this.paceMs && this._wroteAt && S.moves(this.scene) && this.scene.kind !== 'music') {\n"
+         "                if (this.paceMs && this._wroteAt && S.moves(this.scene)) {\n"
          "                    const g = this._wroteAt + this.paceMs - this.now();\n"
          "                    if (g > 0) await new Promise((r) => setTimeout(r, g));\n"
          "                    if (this._stopped || this._holds.size) return;\n"
@@ -269,6 +207,11 @@ def ambient_music(app_dir):
          "    const pace = () => { lights.paceMs = settings.get('animPace') === 'normal' ? 0 : 250; };\n"
          "    pace();\n"
          "    settings.onChange((key) => { if (key === 'animPace') pace(); });\n"
+         "    // (46Wen) the Music wave is gone (Nov 2026): a look saved with it becomes the Colour wave\n"
+         "    ['look', 'mode_sport', 'mode_comfort', 'mode_eco', 'mode_adaptive', 'mode_hybrid', 'mode_electric'].forEach((k) => {\n"
+         "        const l = settings.get(k);\n"
+         "        if (l && typeof l === 'object' && l.kind === 'music') settings.set(k, Object.assign({}, l, { kind: 'wave' }));\n"
+         "    });\n"
          "    const control = new Control({ settings, lights, ambient, log });\n"),
     ])
 
@@ -276,19 +219,11 @@ def ambient_music(app_dir):
     a = json.load(open(p, encoding='utf-8'))
     x, y, z = (int(n) for n in a['version'].split('.'))
     a['version'] = '%d.%d.%d' % (x, y, z * 100 + PATCH_REV)
-    a['description'] = a['description'] + ' (46Wen: with a Music wave)'
+    a['description'] = a['description'] + ' (46Wen: lighter animations)'
     if not any(st['key'] == 'animPace' for st in a['settings']):
         a['settings'].insert(0, {'key': 'animPace', 'label': 'Animation pace', 'type': 'choice', 'default': 'light',
                                  'options': [['light', 'Light (about half the writes, less load on the head unit)'],
                                              ['normal', 'Normal (as fast as the gateway takes them)']]})
-    # the music's level, read from SmartXbar by the tool mgu-audio-level (installed with the app)
-    a.setdefault('requires', {})['mgu-audio-level'] = '0.2.0'
-    a['signals']['de.bmw.infotainment.hmi.hmimediastate.HmiMediaState'] = {
-        '_instances': 'HMI_CID',
-        '_optional': 'now playing: the Music wave rolls while something plays, new colours each track (46Wen)',
-        'playerMetadata': 'rs',
-        'trackProgress': 'rs',
-    }
     open(p, 'w', encoding='utf-8', newline='\n').write(json.dumps(a, indent=2, ensure_ascii=False) + '\n')
 
 
@@ -398,7 +333,7 @@ def ridetube_d_on_demand(tool_dir):
 TOOL_PATCHES = {'jap-ridetube-d': ridetube_d_on_demand}
 
 
-PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_music': ambient_music, 'draggy_idle_hidden': draggy_idle_hidden, 'ridetube_on_demand': ridetube_on_demand}
+PATCHES = {'redline_no_hud': redline_no_hud, 'ambient_pace': ambient_pace, 'draggy_idle_hidden': draggy_idle_hidden, 'ridetube_on_demand': ridetube_on_demand}
 
 PRIORITY_MARK = "require('./priority').lower(log, SPEC.config)"
 

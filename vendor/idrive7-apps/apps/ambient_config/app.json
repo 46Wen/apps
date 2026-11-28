@@ -1,8 +1,8 @@
 {
   "id": "ambient_config",
   "title": "Ambient config",
-  "description": "Any colour on the ambient light, animations, and a look for each driving mode (46Wen: with a Music wave)",
-  "version": "2.7.2705",
+  "description": "Any colour on the ambient light, animations, and a look for each driving mode (46Wen: lighter animations)",
+  "version": "2.7.2706",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -12,8 +12,7 @@
   ],
   "requires": {
     "idrive7-renderd": "2.1.18",
-    "mgu-inputgate": "1.1.0",
-    "mgu-audio-level": "0.2.0"
+    "mgu-inputgate": "1.1.0"
   },
   "autostart": true,
   "signals": {
@@ -55,12 +54,6 @@
       "_optional": "the car's speed: driven (for a car that does not say it is locked and left), and the light show only standing still",
       "statusCarSpeed2": "rs",
       "statusLightStatus": "rs"
-    },
-    "de.bmw.infotainment.hmi.hmimediastate.HmiMediaState": {
-      "_instances": "HMI_CID",
-      "_optional": "now playing: the Music wave rolls while something plays, new colours each track (46Wen)",
-      "playerMetadata": "rs",
-      "trackProgress": "rs"
     }
   },
   "screens": [

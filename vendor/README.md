@@ -19,16 +19,12 @@ compile en el coche exactamente como en el original. Los créditos y las licenci
   quitan las seis interfaces que solo servían al HUD (navegación, CarPlay / Android Auto, llamadas), así
   la app se suscribe a menos señales, y los ajustes del HUD quedan ocultos. `hud.js` se queda porque la
   pantalla usa sus funciones de luces de cambio. Pasa `kit/tools/test_redline_running.js` (68 comprobaciones).
-- **Ambient config** (`idrive7-apps/apps/ambient_config`): con la animación **Music wave** (ola musical).
-  La ola de colores avanza solo mientras suena algo (estado multimedia del HMI, `HmiMediaState`, la misma
-  señal que el panel de música de Cluster Themes), se queda quieta en pausa y gira 45° de tono con cada
-  canción nueva. La señal solo se escucha mientras la Music wave está puesta. Preparada para el volumen real:
-  si algo en la unidad escribe `/dev/shm/mgu-audio-level.json` (`{"level": 0..1}` o solo el número, 10–20
-  veces por segundo), más volumen = ola más rápida, más amplia y más brillante. Ese captador nativo todavía
-  no existe: ninguna app puede leer el audio del coche. El código está en
-  `vendor/patches/ambient_config/music.js`; `scripts/vendor_sync.py` (`ambient_music`) lo vuelve a aplicar
-  tras cada actualización y pone la versión como x.y.(z·100+1) (2.7.26 → 2.7.2601) para que el Store la vea
-  más nueva. Pasa `tools/test_ambient_music.js` (36 comprobaciones).
+- **Ambient config** (`idrive7-apps/apps/ambient_config`): con el ajuste **Animation pace** («Light» por defecto:
+  unas 250 ms entre dos escrituras de una animación, la mitad de escrituras por la pasarela). `scripts/vendor_sync.py`
+  (`ambient_pace`) lo vuelve a aplicar tras cada actualización y pone la versión como x.y.(z·100+6) para que el Store
+  la vea más nueva. La Music wave (con Music level y Audio probe) se quitó el 28 de noviembre de 2026: las luces solo
+  aceptan unos 2,5 colores por segundo por la pasarela, demasiado pocos para seguir el ritmo; un look guardado con
+  ella pasa a la Colour wave.
 - `idrive7-apps/kit/localization/diagnostic-full.*.json` (25 MB, solo los usa el Fault Scanner) no se
   han traído: el coche descarga `kit/` en cada compilación.
 - `ridetube/kit/tools/.font-cache/` (una caché de 17 MB para hornear fuentes) no se ha traído.

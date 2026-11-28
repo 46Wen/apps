@@ -12,9 +12,7 @@ con sí / no y haz las fotos marcadas con 📷.
 |---|---|
 | M Cluster | 0.2.2 (nueva) |
 | Copiloto de voz | 0.8.3 |
-| Ambient config | 2.7.2704 |
-| Audio probe | app 0.6.0, herramienta 0.6.0 |
-| Music level | 0.1.1 |
+| Ambient config | 2.7.2706 |
 | RideTube | 0.6.401, servicio 0.5.401 |
 | Redline / Draggy / Dyno | 2.0.5401 / 2.7.301 / 1.6.6 |
 | Maps on cluster | 0.6.17 (Waze on Cluster 0.14.17, cluster-render 0.8.14) |
@@ -38,15 +36,11 @@ con sí / no y haz las fotos marcadas con 📷.
    botón de la palanca del intermitente: autonomía, kW / par, música, presión de neumáticos)? Debe estar siempre fuera
    de Sport, también al abrir la app M Cluster.
 
-## 4. Música y Music wave (5 min)
+## 4. Ambient config (1 min)
 
-1. Música por Bluetooth o USB. Abre **Audio probe**: la barra **Nivel de la música en vivo** ¿se mueve con la música?
-   - Si no: 📷 foto de la línea en naranja (dice el motivo). Pulsa **Explorar SmartXbar**, espera, y en **Informe**
-     📷 fotos de las dos primeras páginas (sección **Music level**).
-2. Repite con **CarPlay** sonando: ¿qué pone a la derecha de la barra?
-3. **Ambient config → Animations → Music wave**: ¿va más viva cuanto más alto suena la música?
-4. **Ambient config → Settings → Animation pace**: está en **Light**. ¿Las animaciones se ven bien o a saltos?
-   Si van a saltos, prueba **Normal** y dime cuál prefieres.
+1. **Store:** desinstala **Audio probe** (la app) y las herramientas **Audio probe** y **Music level**: ya no hacen falta.
+2. **Ambient config → Settings → Animation pace** está en **Light**. ¿Las animaciones se ven bien o a saltos? Si van a
+   saltos, prueba **Normal** y dime cuál prefieres.
 
 ## 5. RideTube (3 min)
 
@@ -70,6 +64,5 @@ con sí / no y haz las fotos marcadas con 📷.
 ## Qué mandarme
 
 Las fotos 📷 y un sí / no por punto. Con eso:
-- **Music level:** si no da nivel, la sección Music level dice el motivo exacto y lo arreglo.
 - **Cuadro:** si siguen las cajas negras, busco otra forma de quitarlas.
 - **CarPlay:** según lo que apuntes, decidimos si probar sin el parche de Waze.

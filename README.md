@@ -14,7 +14,7 @@
 | **Redline** (`redline`) | Cuentarrevoluciones a pantalla completa con luces de cambio, marcha y puntuación de cambios. Sin la parte de HUD | [cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps) | MIT |
 | **Drag Timer** (`draggy`) | 0-100, ¼ de milla, 100-200, mejores tiempos | cauliflowermossgrape/idrive7-apps | MIT |
 | **Virtual Dyno** (`dyno`) | Curvas de potencia y par a partir de una aceleración a fondo | cauliflowermossgrape/idrive7-apps | MIT |
-| **Ambient config** (`ambient_config`) | Cualquier color en la luz ambiente, un color por modo de conducción, animaciones, y una ola de colores con la música (Music wave) | cauliflowermossgrape/idrive7-apps + Music wave propia | MIT |
+| **Ambient config** (`ambient_config`) | Cualquier color en la luz ambiente, un color por modo de conducción, animaciones (46Wen: ritmo de animación ligero) | cauliflowermossgrape/idrive7-apps + ritmo de animación propio | MIT |
 | **DPF Monitor** (`dpf_monitor`) | Filtro de partículas y regeneraciones (diésel), solo lectura | [NamelsMissing/mgu-apps](https://github.com/NamelsMissing/mgu-apps) | GPL-3.0 |
 | **iDrive Monitor** (`jap_sysmon`) | CPU, memoria y swap de la unidad; avisa cuando va justa | [JustAnotherPU/mgu-apps](https://github.com/JustAnotherPU/mgu-apps) | MIT |
 | **Maps on cluster** (`robertn_waze_cluster`) | El mapa de CarPlay (Waze, Apple o Google Maps) en el cuadro | [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | GPL-3.0 |
@@ -22,9 +22,7 @@
 
 Componentes nativos que se instalan solos con las apps que los necesitan (`tools-prebuilt/`, los binarios publicados por sus autores, sin cambios): `cluster-render`, `waze-on-cluster`, `idrive7-renderd` (renderizador GPU), `mgu-inputgate` (mando del iDrive), `jap-ridetube-d` (servicio de RideTube) y `mgu-render-id7-touch` (opcional).
 
-**Audio probe** (app `audio_probe` y herramienta `mgu-audio-probe`, propias): un informe de solo lectura sobre cómo está montado el sonido de la unidad, para saber si se puede leer el volumen de la música. La app comprueba antes que suena música y que hay un USB, y el informe solo se crea al pulsar su botón. [Cómo usarlo](native/mgu-audio-probe/README.md)
 
-**Music level** (`mgu-audio-level`, propia, en `native/`): el volumen de la música en vivo para la Music wave de Ambient config, leído de los buffers de SmartXbar sin tocarlos. Se instala con Ambient config. [Cómo funciona](native/mgu-audio-level/README.md)
 
 **Node.js 22 (`jap-node22`) no está aquí:** su binario pesa 137 MB y GitHub no admite archivos de más de 100 MB. RideTube lo necesita: añade también el origen `JustAnotherPU/mgu-apps` (canal *Releases*) en el Store y se instala desde allí.
 
